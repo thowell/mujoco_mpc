@@ -24,18 +24,18 @@
 
 namespace mjpc {
 const char kPlannerNames[] =
+    "iLQG\n"
     "Sampling\n"
-    "Gradient\n"
-    "iLQG";
+    "Gradient";
 
 // load all available planners
 std::vector<std::unique_ptr<mjpc::Planner>> LoadPlanners() {
   // planners
   std::vector<std::unique_ptr<mjpc::Planner>> planners;
 
+  planners.emplace_back(new mjpc::iLQGPlanner);
   planners.emplace_back(new mjpc::SamplingPlanner);
   planners.emplace_back(new mjpc::GradientPlanner);
-  planners.emplace_back(new mjpc::iLQGPlanner);
   return planners;
 }
 
