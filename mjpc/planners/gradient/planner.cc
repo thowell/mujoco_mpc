@@ -192,8 +192,9 @@ void GradientPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
     // compute model and sensor Jacobians
     model_derivative.Compute(
         model, data_, trajectory[0].states.data(),
-        trajectory[0].actions.data(), dim_state,
-        dim_state_derivative, dim_action, dim_sensor, horizon,
+        trajectory[0].actions.data(), 
+        trajectory[0].times.data(),
+        dim_state, dim_state_derivative, dim_action, dim_sensor, horizon,
         settings.fd_tolerance, settings.fd_mode, pool);
 
     // stop timer

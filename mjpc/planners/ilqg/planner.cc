@@ -187,8 +187,9 @@ void iLQGPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
     // compute model and sensor Jacobians
     model_derivative.Compute(
         model, data_, candidate_policy[0].trajectory.states.data(),
-        candidate_policy[0].trajectory.actions.data(), dim_state,
-        dim_state_derivative, dim_action, dim_sensor, horizon,
+        candidate_policy[0].trajectory.actions.data(), 
+        candidate_policy[0].trajectory.times.data(),
+        dim_state, dim_state_derivative, dim_action, dim_sensor, horizon,
         settings.fd_tolerance, settings.fd_mode, pool);
 
     // stop timer
