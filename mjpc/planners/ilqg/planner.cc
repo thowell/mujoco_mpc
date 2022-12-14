@@ -138,6 +138,9 @@ void iLQGPlanner::SetState(State& state) {
 void iLQGPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
   ResizeMjData(model, pool.NumThreads());
 
+  // printf("time: %f\n", time);
+  // printf("step index: %i\n", std::min((int) (time * 30.0), (model->nkey) - 1));
+
   // timers
   double nominal_time = 0.0;
   double model_derivative_time = 0.0;
