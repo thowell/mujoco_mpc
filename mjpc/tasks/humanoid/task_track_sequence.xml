@@ -139,5 +139,5 @@
     <framelinvel name="tracking_vel[rhip]" objtype="site" objname="thigh_right"/>
   </sensor>
 
-  <include file="./keyframes/CMU-CMU-108-108_13_poses.xml" />
+  <include file="./keyframes/CMU-CMU-137-137_40_poses.xml" />
 </mujoco>
