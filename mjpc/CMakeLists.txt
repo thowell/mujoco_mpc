@@ -222,6 +222,10 @@ add_library(
   planners/policy.h
   planners/include.cc
   planners/include.h
+  planners/cma/planner.cc
+  planners/cma/planner.h
+  planners/cma/policy.cc
+  planners/cma/policy.h
   planners/cost_derivatives.cc
   planners/cost_derivatives.h
   planners/model_derivatives.cc

@@ -9,6 +9,7 @@
     <numeric name="agent_timestep" data="0.015" />
     <numeric name="sampling_spline_points" data="3" />
     <numeric name="sampling_exploration" data="0.05" />
+    <numeric name="cma_spline_points" data="3" />
     <numeric name="gradient_spline_points" data="5" />
     <numeric name="residual_Height Goal" data="1.4 0.0 1.5" />
   </custom>

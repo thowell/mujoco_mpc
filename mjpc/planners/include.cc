@@ -17,6 +17,7 @@
 #include <memory>
 #include <vector>
 
+#include "planners/cma/planner.h"
 #include "planners/gradient/planner.h"
 #include "planners/ilqg/planner.h"
 #include "planners/planner.h"
@@ -25,6 +26,7 @@
 namespace mjpc {
 const char kPlannerNames[] =
     "Sampling\n"
+    "CMA-ES\n"
     "Gradient\n"
     "iLQG";
 
@@ -34,6 +36,7 @@ std::vector<std::unique_ptr<mjpc::Planner>> LoadPlanners() {
   std::vector<std::unique_ptr<mjpc::Planner>> planners;
 
   planners.emplace_back(new mjpc::SamplingPlanner);
+  planners.emplace_back(new mjpc::CMAPlanner);
   planners.emplace_back(new mjpc::GradientPlanner);
   planners.emplace_back(new mjpc::iLQGPlanner);
   return planners;
