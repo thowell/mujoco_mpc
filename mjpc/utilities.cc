@@ -15,6 +15,7 @@
 #include "array_safety.h"
 #include "utilities.h"
 
+#include <algorithm>  
 #include <cerrno>
 #include <cmath>
 #include <cstdint>
@@ -23,6 +24,7 @@
 #include <iostream>
 #include <memory>
 #include <new>
+#include <numeric>      
 #include <string>
 #include <string_view>
 
@@ -592,6 +594,31 @@ void LogScale(double* values, double max_value, double min_value, int steps) {
       mju_log(max_value) - mju_log(min_value) / mju_max((steps - 1), 1);
   for (int i = 0; i < steps; i++) {
     values[i] = mju_exp(mju_log(min_value) + i * step);
+  }
+}
+
+// generate sorted indices (ascenting) for vector of values
+void sort_indices(std::vector<int>& idx, const std::vector<double> &f) {
+  std::iota(idx.begin(), idx.end(), 0);
+  std::sort(idx.begin(), idx.end(),
+       [&f](int idx1, int idx2) {return f[idx1] < f[idx2];});
+}
+
+// Cholesky solve
+void mju_cholForward(mjtNum* res, const mjtNum* mat, const mjtNum* vec, int n) {
+  // copy if source and destination are different
+  if (res!=vec) {
+    mju_copy(res, vec, n);
+  }
+
+  // forward substitution: solve L*res = vec
+  for (int i=0; i<n; i++) {
+    if (i) {
+      res[i] -= mju_dot(mat+i*n, res, i);
+    }
+
+    // diagonal
+    res[i] /= mat[i*(n+1)];
   }
 }
 

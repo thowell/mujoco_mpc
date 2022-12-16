@@ -117,9 +117,6 @@ class CMAPlanner : public Planner {
                              // exploration)
   std::vector<double> noise;
 
-  // gradient
-  std::vector<double> noise_gradient;
-
   // best trajectory
   int winner;
 
@@ -134,6 +131,38 @@ class CMAPlanner : public Planner {
   std::atomic<double> noise_compute_time;
   double rollouts_compute_time;
   double policy_update_compute_time;
+
+  // ----- CMA-ES ----- // 
+  int num_elite;
+
+  double step_size;
+
+  std::vector<double> weight;
+  std::vector<double> weight_update;
+
+  std::vector<double> p_sigma;
+  std::vector<double> p_sigma_tmp;
+  std::vector<double> p_Sigma;
+  std::vector<double> Sigma; 
+  std::vector<double> Sigma_tmp;
+  std::vector<double> covariance;
+  std::vector<double> covariance_lower;
+  std::vector<double> fitness;
+  std::vector<int> fitness_sort;
+  std::vector<double> gaussian_noise;
+  std::vector<double> delta_s;
+  std::vector<double> delta_w;
+  std::vector<double> C_delta_s;
+
+  // parameters 
+  double mu_eff;
+  double c_sigma;
+  double d_sigma;
+  double c_Sigma;
+  double c1;
+  double c_mu;
+  double E;
+  double eps;
 
  private:
   int num_trajectories_;

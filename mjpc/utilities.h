@@ -177,6 +177,12 @@ inline UniqueMjData MakeUniqueMjData(mjData* d) {
   return UniqueMjData(d, mj_deleteData);
 }
 
+// generate sorted indices (ascenting) for vector of values
+void sort_indices(std::vector<int>& idx, const std::vector<double> &f);
+
+// Cholesky solve (forward substitution only)
+void mju_cholForward(mjtNum* res, const mjtNum* mat, const mjtNum* vec, int n);
+
 }  // namespace mjpc
 
 #endif  // MJPC_UTILITIES_H_
