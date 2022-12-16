@@ -27,7 +27,7 @@
 
 namespace mjpc {
 
-// CMA-ES planner limits
+// cma planner limits
 inline constexpr int MinCMASplinePoints = 1;
 inline constexpr int MaxCMASplinePoints = 36;
 inline constexpr int MinCMASplinePower = 1;
@@ -57,7 +57,7 @@ class CMAPlanner : public Planner {
   // set state
   void SetState(State& state) override;
 
-  // optimize nominal policy using CMA-ES
+  // optimize nominal policy using random cma
   void OptimizePolicy(int horizon, ThreadPool& pool) override;
 
   // compute trajectory using nominal policy
@@ -101,7 +101,7 @@ class CMAPlanner : public Planner {
   // policy
   CMAPolicy policy; // (Guarded by mtx_)
   CMAPolicy candidate_policy[kMaxTrajectory];
-  
+
   // scratch
   std::vector<double> parameters_scratch;
   std::vector<double> times_scratch;
@@ -113,7 +113,7 @@ class CMAPlanner : public Planner {
   double timestep_power;
 
   // ----- noise ----- //
-  double noise_exploration;  // standard deviation for sampling normal: N(0,
+  double noise_exploration;  // standard deviation for cma normal: N(0,
                              // exploration)
   std::vector<double> noise;
 
@@ -131,38 +131,6 @@ class CMAPlanner : public Planner {
   std::atomic<double> noise_compute_time;
   double rollouts_compute_time;
   double policy_update_compute_time;
-
-  // ----- CMA-ES ----- // 
-  int num_elite;
-
-  double step_size;
-
-  std::vector<double> weight;
-  std::vector<double> weight_update;
-
-  std::vector<double> p_sigma;
-  std::vector<double> p_sigma_tmp;
-  std::vector<double> p_Sigma;
-  std::vector<double> Sigma; 
-  std::vector<double> Sigma_tmp;
-  std::vector<double> covariance;
-  std::vector<double> covariance_lower;
-  std::vector<double> fitness;
-  std::vector<int> fitness_sort;
-  std::vector<double> gaussian_noise;
-  std::vector<double> delta_s;
-  std::vector<double> delta_w;
-  std::vector<double> C_delta_s;
-
-  // parameters 
-  double mu_eff;
-  double c_sigma;
-  double d_sigma;
-  double c_Sigma;
-  double c1;
-  double c_mu;
-  double E;
-  double eps;
 
  private:
   int num_trajectories_;

@@ -262,8 +262,8 @@ void SamplingPlanner::AddNoiseToPolicy(int i) {
   auto noise_start = std::chrono::steady_clock::now();
 
   // dimensions
-  int num_spline_points = candidate_policy->num_spline_points;
-  int num_parameters = candidate_policy->num_parameters;
+  int num_spline_points = candidate_policy[0].num_spline_points;
+  int num_parameters = candidate_policy[0].num_parameters;
 
   // sampling token
   absl::BitGen gen_;
