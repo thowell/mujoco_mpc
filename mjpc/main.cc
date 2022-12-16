@@ -610,13 +610,12 @@ int main(int argc, char** argv) {
   // fitness
   double v = f(x, dim);
 
+  printf("Initial fitness: %f\n", v);
+
   // info 
   printf("initial point: \n");
   mju_printMat(x, 1, dim);
   printf("value: %f\n", v);
-
-  // iteration 
-  int iteration = 1;
 
   // number of samples
   int num_sample = 4 + mju_floor(3 * mju_log(dim));
@@ -652,8 +651,8 @@ int main(int argc, char** argv) {
   double c_Sigma = (4.0 + mu_eff / dim) / (dim + 4.0 + 2.0 * mu_eff / dim);
   double c1 = 2.0 / ((dim + 1.3) * (dim + 1.3) + mu_eff);
   double c_mu = mju_min(1.0 - c1, 2.0 * (mu_eff - 2.0 + 1.0 / mu_eff) / ((dim + 2.0) * (dim + 2.0) + mu_eff));
-  double E = mju_pow(dim, 0.5) * (1.0 - 1.0 / (4 * dim) + 1.0 / (21.0 * dim * dim));
-  double eps = 1.0e-6;
+  double E = mju_sqrt(dim) * (1.0 - 1.0 / (4 * dim) + 1.0 / (21.0 * dim * dim));
+  double eps = 1.0e-3;
 
   // scale non-elite weights
   double nonelite_sum = mju_sum(weight + num_elite, num_sample - num_elite);
@@ -683,6 +682,7 @@ int main(int argc, char** argv) {
   std::vector<double> Sigma; 
   std::vector<double> Sigma_tmp;
   std::vector<double> covariance;
+  std::vector<double> covariance_lower;
   std::vector<double> fitness;
   std::vector<int> fitness_sort;
   std::vector<double> gaussian_noise;
@@ -699,6 +699,7 @@ int main(int argc, char** argv) {
   Sigma.resize(dim * dim);
   Sigma_tmp.resize(dim * dim);
   covariance.resize(dim * dim);
+  covariance_lower.resize(dim * dim);
   fitness.resize(num_sample);
   fitness_sort.resize(num_sample);
   gaussian_noise.resize(dim * num_sample);
@@ -713,127 +714,210 @@ int main(int argc, char** argv) {
   mju_zero(p_Sigma.data(), dim);
   mju_eye(Sigma.data(), dim);
 
-  printf("Sigma: \n");
-  mju_printMat(Sigma.data(), dim, dim);
-
   // ----- sample and evaluate candidates ----- //
+  int max_iteration = 100;
 
-  // copy covariance
-  mju_copy(covariance.data(), Sigma.data(), dim * dim);
+  for (int k = 0; k < max_iteration; k++) {
+    printf("ITERATION: %i\n", k + 1);
 
-  // regularize covariance
-  for (int i = 0; i < dim; i++) {
-    covariance[i * dim + i] += eps;
-  }
+    // copy covariance
+    mju_copy(covariance.data(), Sigma.data(), dim * dim);
 
-  // Cholesky factor (L L')
-  int rank = mju_cholFactor(covariance.data(), dim, 0.0);
-  if (rank < dim) {
-    printf("Cholesky factorization failure\n");
-  }
-
-  printf("Cholesky factor\n");
-  mju_printMat(covariance.data(), dim, dim);
-
-  // ----- sample ----- //
-
-  absl::BitGen gen_;
-
-  // sample ~ N(mu, step_size^2 Sigma)
-  for (int i = 0; i < num_sample; i++) {
-    // standard normal sample 
-    for (int j = 0; j < dim; j++) {
-      gaussian_noise[i * dim + j] = absl::Gaussian<double>(gen_, 0.0, 1.0);
+    // regularize covariance
+    for (int i = 0; i < dim; i++) {
+      covariance[i * dim + i] += eps;
     }
 
-    // step_size * L * gaussian_noise
-    mju_mulMatVec(mjpc::DataAt(sample, i * dim), covariance.data(), mjpc::DataAt(gaussian_noise, i * dim), dim, dim);
-    mju_scl(mjpc::DataAt(sample, i * dim), mjpc::DataAt(sample, i * dim), step_size, dim);
-
-    // sample = L * gaussian_noise + mu
-    mju_addTo(mjpc::DataAt(sample, i * dim), mu.data(), dim);
-
-    // compute fitness
-    fitness[i] = f(mjpc::DataAt(sample, i * dim), dim);
-  }
-
-  // info
-  printf("(pre) fitness: \n");
-  mju_printMat(fitness.data(), 1, num_sample);
-
-  // fitness sort 
-  sort_indices(fitness_sort, fitness);
-
-  // info
-  printf("(post) fitness: \n");
-  mju_printMat(fitness.data(), 1, num_sample);
-
-  printf("fitness sort: \n");
-  for (int i = 0; i < num_sample; i++) {
-    printf("%i ", fitness_sort[i]);
-  }
-
-  // ----- selection and mean update ----- //
-
-  // (sample - x) / step_size
-  for (int i = 0; i < num_sample; i++) {
-    mju_sub(mjpc::DataAt(delta_s, i * dim), mjpc::DataAt(sample, i * dim), mu.data(), dim);
-    mju_scl(mjpc::DataAt(delta_s, i * dim), mjpc::DataAt(delta_s, i * dim), 1.0 / step_size, dim);
-  }
-
-  // sum(weight[i] * delta_s[rank[i]])
-  for (int i = 0; i < num_sample; i++) {
-    int idx = fitness_sort[i];
-    if (idx < num_elite) {
-      mju_addToScl(delta_w.data(), mjpc::DataAt(sample, i * dim), weight[idx], dim);
+    // Cholesky factor (L L')
+    int rank = mju_cholFactor(covariance.data(), dim, 0.0);
+    if (rank < dim) {
+      mju_error("Cholesky factorization failure\n");
     }
-  }
 
-  // update m += step_size * delta_w 
-  mju_addToScl(mu.data(), delta_w.data(), step_size, dim);
-
-  // ----- step-size control ----- //
-
-  mju_cholForward(p_sigma_tmp.data(), covariance.data(), delta_w.data(), dim);
-  mju_scl(p_sigma_tmp.data(), p_sigma_tmp.data(), mju_sqrt(c_sigma * (2.0 - c_sigma) * mu_eff), dim);
-
-  mju_scl(p_sigma.data(), p_sigma.data(), 1.0 - c_sigma, dim);
-  mju_addTo(p_sigma.data(), p_sigma_tmp.data(), dim);
-
-  step_size *= mju_exp(c_sigma / d_sigma * (mju_norm(p_sigma.data(), dim) / E - 1.0));
-
-  // ----- covariance adaptation ----- //
-
-  int h_sigma = (int) (mju_norm(p_sigma.data(), dim) / mju_sqrt(1.0 - mju_pow(1.0 - c_sigma, 2 * iteration)) < (1.4 + 2.0 / (dim + 1)) * E);
-
-  mju_scl(p_Sigma.data(), p_Sigma.data(), 1.0 - c_Sigma, dim);
-  mju_addToScl(p_Sigma.data(), delta_w.data(), h_sigma * mju_sqrt(c_Sigma * (2.0 - c_Sigma) * mu_eff), dim);  
-
-  for (int i = 0; i < num_sample; i++) {
-    if (weight[i] >= 0.0) {
-      weight_update[i] = weight[i];
-    } else {
-      auto idx = std::find(fitness_sort.begin(), fitness_sort.end(), i);
-      mju_cholForward(C_delta_s.data(), covariance.data(), mjpc::DataAt(delta_s, *idx * dim), dim);
-      weight_update[i] = dim * weight[i] / mju_dot(C_delta_s.data(), C_delta_s.data(), dim);
+    // get lower triangular matrix
+    mju_zero(covariance_lower.data(), dim * dim);
+    for (int i = 0; i < dim; i++) {
+      for (int j = 0; j < dim; j++) {
+        if (j <= i) {
+          covariance_lower[i * dim + j] = covariance[i * dim + j];
+        }
+      }
     }
-  }
 
-  mju_scl(Sigma.data(), Sigma.data(), (1.0 - c1 - c_mu) + (c1 * (1.0 - h_sigma) * c_Sigma * (2.0 - c_Sigma)), dim * dim);
-  
-  mju_mulMatMatT(Sigma_tmp.data(), p_Sigma.data(), p_Sigma.data(), dim, 1, dim);
-  mju_scl(Sigma_tmp.data(), Sigma_tmp.data(), c1, dim * dim);
 
-  mju_addTo(Sigma.data(), Sigma_tmp.data(), dim * dim);
+    printf("Cholesky factor\n");
+    mju_printMat(covariance.data(), dim, dim);
 
-  for (int i = 0; i < num_sample; i++) {
-    auto idx = std::find(fitness_sort.begin(), fitness_sort.end(), i);
-    mju_mulMatMatT(Sigma_tmp.data(), mjpc::DataAt(delta_s, *idx * dim), mjpc::DataAt(delta_s, *idx * dim), dim, 1, dim);
-    mju_scl(Sigma_tmp.data(), Sigma_tmp.data(), c_mu * weight_update[i], dim * dim);
+    printf("Cholesky factor lower\n");
+    mju_printMat(covariance_lower.data(), dim, dim);
+
+    printf("step size: %f\n", step_size);
+    // ----- sample ----- //
+
+    absl::BitGen gen_;
+
+    // sample ~ N(mu, step_size^2 Sigma)
+    for (int i = 0; i < num_sample; i++) {
+      // standard normal sample 
+      for (int j = 0; j < dim; j++) {
+        gaussian_noise[i * dim + j] = absl::Gaussian<double>(gen_, 0.0, 1.0);
+      }
+
+      // mju_fill(mjpc::DataAt(gaussian_noise, i * dim), (i + 1) * 1.0e-1, dim);
+
+      // step_size * L * gaussian_noise
+      mju_mulMatVec(mjpc::DataAt(sample, i * dim), covariance_lower.data(), mjpc::DataAt(gaussian_noise, i * dim), dim, dim);
+      mju_scl(mjpc::DataAt(sample, i * dim), mjpc::DataAt(sample, i * dim), step_size, dim);
+
+      // sample = L * gaussian_noise + mu
+      mju_addTo(mjpc::DataAt(sample, i * dim), mu.data(), dim);
+
+      // compute fitness
+      fitness[i] = f(mjpc::DataAt(sample, i * dim), dim);
+    }
+    
+    // fitness sort 
+    sort_indices(fitness_sort, fitness);
+
+    // info
+
+    printf("sample: \n");
+    mju_printMat(sample.data(), num_sample, dim);
+
+    printf("fitness: \n");
+    mju_printMat(fitness.data(), 1, num_sample);
+
+    printf("fitness sort: \n");
+    for (int i = 0; i < num_sample; i++) {
+      printf("%i ", fitness_sort[i]);
+    }
+
+    printf("  best fitness: %f\n", fitness[fitness_sort[0]]);
+
+    // ----- selection and mean update ----- //
+
+    // (sample - x) / step_size
+    for (int i = 0; i < num_sample; i++) {
+      mju_sub(mjpc::DataAt(delta_s, i * dim), mjpc::DataAt(sample, i * dim), mu.data(), dim);
+      mju_scl(mjpc::DataAt(delta_s, i * dim), mjpc::DataAt(delta_s, i * dim), 1.0 / step_size, dim);
+    }
+
+    // sum(weight[i] * delta_s[rank[i]])
+    mju_zero(delta_w.data(), dim);
+    for (int i = 0; i < num_elite; i++) {
+      int idx = fitness_sort[i];
+      mju_addToScl(delta_w.data(), mjpc::DataAt(delta_s, idx * dim), weight[i], dim);
+    }
+
+    // update m += step_size * delta_w 
+    mju_addToScl(mu.data(), delta_w.data(), step_size, dim);
+
+
+    printf("delta_s: \n");
+    mju_printMat(delta_s.data(), num_sample, dim);
+
+    printf("delta w:\n");
+    mju_printMat(delta_w.data(), 1, dim);
+
+    printf("mu update:\n");
+    mju_printMat(mu.data(), 1, dim);
+
+    // ----- step-size control ----- //
+
+    mju_cholForward(p_sigma_tmp.data(), covariance.data(), delta_w.data(), dim);
+
+    printf("Sigma^-0.5 delta_w: \n");
+    mju_printMat(p_sigma_tmp.data(), 1, dim);
+
+    mju_scl(p_sigma_tmp.data(), p_sigma_tmp.data(), mju_sqrt(c_sigma * (2.0 - c_sigma) * mu_eff), dim);
+    printf("scale * Sigma^-0.5 delta_w: \n");
+    mju_printMat(p_sigma_tmp.data(), 1, dim);
+    
+    mju_scl(p_sigma.data(), p_sigma.data(), 1.0 - c_sigma, dim);
+    mju_addTo(p_sigma.data(), p_sigma_tmp.data(), dim);
+
+    printf("p_sigma: \n");
+    mju_printMat(p_sigma.data(), 1, dim);
+
+    step_size *= mju_exp(c_sigma / d_sigma * (mju_norm(p_sigma.data(), dim) / E - 1.0));
+
+    printf("new step size: %f\n", step_size);
+
+    // ----- covariance adaptation ----- //
+
+    int h_sigma = (mju_norm(p_sigma.data(), dim) / mju_sqrt(1.0 - mju_pow(1.0 - c_sigma, 2 * (k + 1))) < (1.4 + 2.0 / (dim + 1)) * E) ? 1 : 0;
+
+    printf("h_sigma: %i\n", h_sigma);
+
+    mju_scl(p_Sigma.data(), p_Sigma.data(), 1.0 - c_Sigma, dim);
+    mju_addToScl(p_Sigma.data(), delta_w.data(), h_sigma * mju_sqrt(c_Sigma * (2.0 - c_Sigma) * mu_eff), dim);  
+
+    printf("p_Sigma: \n");
+    mju_printMat(p_Sigma.data(), 1, dim);
+
+    for (int i = 0; i < num_sample; i++) {
+      if (weight[i] >= 0.0) {
+        weight_update[i] = weight[i];
+      } else {
+        int idx = fitness_sort[i];
+        mju_cholForward(C_delta_s.data(), covariance.data(), mjpc::DataAt(delta_s, idx * dim), dim);
+        weight_update[i] = dim * weight[i] / mju_dot(C_delta_s.data(), C_delta_s.data(), dim);
+      }
+    }
+    printf("weight update: \n");
+    mju_printMat(weight_update.data(), 1, num_sample);
+
+    mju_scl(Sigma.data(), Sigma.data(), (1.0 - c1 - c_mu) + (c1 * (1.0 - h_sigma) * c_Sigma * (2.0 - c_Sigma)), dim * dim);
+    
+    mju_mulMatMatT(Sigma_tmp.data(), p_Sigma.data(), p_Sigma.data(), dim, 1, dim);
+    mju_scl(Sigma_tmp.data(), Sigma_tmp.data(), c1, dim * dim);
+
     mju_addTo(Sigma.data(), Sigma_tmp.data(), dim * dim);
+
+    for (int i = 0; i < num_sample; i++) {
+      int idx = fitness_sort[i];
+      mju_mulMatMatT(Sigma_tmp.data(), mjpc::DataAt(delta_s, idx * dim), mjpc::DataAt(delta_s, idx * dim), dim, 1, dim);
+      mju_scl(Sigma_tmp.data(), Sigma_tmp.data(), c_mu * weight_update[i], dim * dim);
+      mju_addTo(Sigma.data(), Sigma_tmp.data(), dim * dim);
+    }
+
+    mju_symmetrize(Sigma.data(), Sigma.data(), dim);
+
+    printf("new Sigma:\n");
+    mju_printMat(Sigma.data(), dim, dim);
+
+    printf("  best sample %i - best candidate: \n", fitness_sort[0]);
+    mju_printMat(mjpc::DataAt(sample, fitness_sort[0] * dim), 1, dim);
+
+    printf("\n\n\n");
   }
 
-  mju_symmetrize(Sigma.data(), Sigma.data(), dim);
+  // std::vector<double> A;
+  // A.resize(4);
+
+  // std::vector<double> b;
+  // b.resize(2);
+
+  // std::vector<double> res;
+  // res.resize(2);
+
+  // A[0] = 1.0;
+  // A[1] = 0.1; 
+  // A[2] = 0.1;
+  // A[3] = 1.0;
+
+  // b[0] = 1.0;
+  // b[1] = 1.0;
+
+  // mju_cholFactor(A.data(), 2, 0.0);
+
+  // printf("factor: \n");
+  // mju_printMat(A.data(), 2, 2);
+
+  // mju_cholForward(res.data(), A.data(), b.data(), 2);
+
+  // printf("res:\n");
+  // mju_printMat(res.data(), 2, 1);
 
   return 0;
 }
