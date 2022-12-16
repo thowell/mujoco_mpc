@@ -598,9 +598,9 @@ void LogScale(double* values, double max_value, double min_value, int steps) {
 }
 
 // generate sorted indices (ascenting) for vector of values
-void sort_indices(std::vector<int>& idx, const std::vector<double> &f) {
-  std::iota(idx.begin(), idx.end(), 0);
-  std::sort(idx.begin(), idx.end(),
+void sort_indices(std::vector<int>& idx, const std::vector<double> &f, int n) {
+  std::iota(idx.begin(), idx.begin() + n, 0);
+  std::sort(idx.begin(), idx.begin() + n,
        [&f](int idx1, int idx2) {return f[idx1] < f[idx2];});
 }
 

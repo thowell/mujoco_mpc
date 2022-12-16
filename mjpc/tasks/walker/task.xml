@@ -11,6 +11,7 @@
     <numeric name="sampling_spline_points" data="3" />
     <numeric name="sampling_exploration" data="0.5" />
     <numeric name="gradient_spline_points" data="5" />
+    <numeric name="cma_spline_points" data="5" />
     <numeric name="residual_Height Goal" data="1.2 0.5 1.2" />
     <numeric name="residual_Speed Goal" data="0 -5.0 5.0" />
   </custom>

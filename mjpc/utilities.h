@@ -178,7 +178,7 @@ inline UniqueMjData MakeUniqueMjData(mjData* d) {
 }
 
 // generate sorted indices (ascenting) for vector of values
-void sort_indices(std::vector<int>& idx, const std::vector<double> &f);
+void sort_indices(std::vector<int>& idx, const std::vector<double> &f, int n);
 
 // Cholesky solve (forward substitution only)
 void mju_cholForward(mjtNum* res, const mjtNum* mat, const mjtNum* vec, int n);
