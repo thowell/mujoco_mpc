@@ -263,7 +263,7 @@ void PhysicsLoop(mj::Simulate& sim) {
       }
 
       // set initial configuration via keyframe
-      double* qpos_key = mjpc::KeyFrameByName(sim.mnew, sim.dnew, "home");
+      double* qpos_key = mjpc::KeyQPosByName(sim.mnew, sim.dnew, "home");
       if (qpos_key) {
         mju_copy(sim.dnew->qpos, qpos_key, sim.mnew->nq);
       }
@@ -512,7 +512,7 @@ int main(int argc, char** argv) {
   printf("Agent threads: %i\n", sim->agent.max_threads());
 
   // set initial configuration via keyframe
-  double* qpos_key = mjpc::KeyFrameByName(sim->mnew, sim->dnew, "home");
+  double* qpos_key = mjpc::KeyQPosByName(sim->mnew, sim->dnew, "home");
   if (qpos_key) {
     mju_copy(sim->dnew->qpos, qpos_key, sim->mnew->nq);
   }
