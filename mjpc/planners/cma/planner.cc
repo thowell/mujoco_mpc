@@ -53,7 +53,7 @@ void CMAPlanner::Initialize(mjModel* model, const Task& task) {
   winner = 0;
 
   // CMA-ES 
-  eps = 1.0e-6;
+  eps = 1.0e-16;
 }
 
 // allocate memory
@@ -277,7 +277,7 @@ void CMAPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
   mju_addTo(p_sigma.data(), p_sigma_tmp.data(), num_parameters);
 
   step_size *= mju_exp(c_sigma / d_sigma * (mju_norm(p_sigma.data(), num_parameters) / E - 1.0));
-  // step_size = mju_min(mju_max(1.0e-8, step_size), 1.0);
+  // step_size = mju_min(mju_max(1.0e-8, step_size), 10.0);
 
   // ----- covariance adaptation ----- //
   int k = 0;
