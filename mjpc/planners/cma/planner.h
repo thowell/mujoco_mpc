@@ -28,8 +28,6 @@
 namespace mjpc {
 
 // cma planner limits
-inline constexpr int MinCMASplinePoints = 1;
-inline constexpr int MaxCMASplinePoints = 36;
 inline constexpr int MinCMASplinePower = 1;
 inline constexpr int MaxCMASplinePower = 5;
 inline constexpr double MinCMANoiseStdDev = 0.0;
@@ -113,8 +111,6 @@ class CMAPlanner : public Planner {
   double timestep_power;
 
   // ----- noise ----- //
-  double noise_exploration;  // standard deviation for cma normal: N(0,
-                             // exploration)
   std::vector<double> noise;
 
   // best trajectory
@@ -122,9 +118,6 @@ class CMAPlanner : public Planner {
 
   // improvement
   double improvement;
-
-  // flags
-  int processed_noise_status;
 
   // timing
   double nominal_compute_time;

@@ -24,6 +24,9 @@
 
 namespace mjpc {
 
+inline constexpr int kMinCMASplinePoints = 1;
+inline constexpr int kMaxCMASplinePoints = 36;
+
 // policy for CMA-ES planner
 class CMAPolicy : public Policy {
  public:

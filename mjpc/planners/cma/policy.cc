@@ -38,7 +38,7 @@ void CMAPolicy::Allocate(const mjModel* model, const Task& task,
   num_parameters = model->nu * kMaxTrajectoryHorizon;
 
   // spline points
-  num_spline_points = GetNumberOrDefault(kMaxTrajectoryHorizon, model,
+  num_spline_points = GetNumberOrDefault(kMaxCMASplinePoints, model,
                                          "cma_spline_points");
 
   // representation

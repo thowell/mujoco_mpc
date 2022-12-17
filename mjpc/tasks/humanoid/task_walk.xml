@@ -9,6 +9,7 @@
     <numeric name="sampling_spline_points" data="3" />
     <numeric name="sampling_exploration" data="0.05" />
     <numeric name="gradient_spline_points" data="5" />
+    <numeric name="cma_spline_points" data="5" />
     <numeric name="residual_Torso" data="1.35 1.0 1.7" />
     <numeric name="residual_Speed" data="0.5 -3.0 3.0" />
   </custom>
