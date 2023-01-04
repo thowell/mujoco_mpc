@@ -17,7 +17,8 @@
 #include "tasks/acrobot/acrobot.h"
 #include "tasks/cartpole/cartpole.h"
 #include "tasks/hand/hand.h"
-#include "tasks/humanoid/humanoid.h"
+#include "tasks/humanoid/stand/task.h"
+#include "tasks/humanoid/walk/task.h"
 #include "tasks/particle/particle.h"
 #include "tasks/quadrotor/quadrotor.h"
 #include "tasks/quadruped/quadruped.h"
@@ -33,13 +34,13 @@ namespace {
 const TaskDefinition kTasksArray[]{
     {
         .name = "Humanoid Stand",
-        .xml_path = "humanoid/task_stand.xml",
-        .residual = &Humanoid::ResidualStand,
+        .xml_path = "humanoid/stand/task.xml",
+        .residual = &Humanoid::Stand::Residual,
     },
     {
         .name = "Humanoid Walk",
-        .xml_path = "humanoid/task_walk.xml",
-        .residual = &Humanoid::ResidualWalk,
+        .xml_path = "humanoid/walk/task.xml",
+        .residual = &Humanoid::Walk::Residual,
     },
     {
         .name = "Swimmer",
