@@ -108,9 +108,6 @@ void Trajectory::Rollout(
   times[0] = time;
   data->time = time;
 
-  // transition
-  task->Transition(model, data);
-
   // step1
   mj_step1(model, data);
 
@@ -141,9 +138,6 @@ void Trajectory::Rollout(
     mju_copy(DataAt(states, t * dim_state + model->nq + model->nv), data->act,
              model->na);
     times[t] = data->time;
-
-    // transition
-    task->Transition(model, data);
 
     // step1
     mj_step1(model, data);
@@ -187,9 +181,6 @@ void Trajectory::Rollout(
     mju_zero(DataAt(actions, (horizon - 1) * dim_action), dim_action);
   }
 
-  // transition
-  task->Transition(model, data);
-
   // final step1
   mj_step1(model, data);
 
@@ -232,9 +223,6 @@ void Trajectory::RolloutDiscrete(
   times[0] = time;
   data->time = time;
 
-  // transition
-  task->Transition(model, data);
-
   // step1
   mj_step1(model, data);
 
@@ -266,9 +254,6 @@ void Trajectory::RolloutDiscrete(
     mju_copy(DataAt(states, t * dim_state + model->nq + model->nv), data->act,
              model->na);
     times[t] = data->time;
-
-    // transition
-    task->Transition(model, data);
 
     // step1
     mj_step1(model, data);
@@ -311,9 +296,6 @@ void Trajectory::RolloutDiscrete(
   } else {
     mju_zero(DataAt(actions, (horizon - 1) * dim_action), dim_action);
   }
-
-  // transition
-  task->Transition(model, data);
 
   // final step1
   mj_step1(model, data);
