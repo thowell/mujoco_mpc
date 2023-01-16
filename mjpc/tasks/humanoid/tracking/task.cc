@@ -46,29 +46,6 @@ namespace mjpc {
 
     double weight_1 = std::clamp(data->time * fps, 0.0, (double)last_key_index) - key_index_0;
     double weight_0 = 1.0 - weight_1;
-
-    // double mocap_pos_0[3 * model->nmocap];
-    // double mocap_pos_1[3 * model->nmocap];
-
-    // mju_scl(mocap_pos_0,
-    //         model->key_mpos + model->nmocap * 3 * key_index_0,
-    //         weight_0,
-    //         model->nmocap * 3);
-
-    // mju_scl(mocap_pos_1,
-    //         model->key_mpos + model->nmocap * 3 * key_index_1,
-    //         weight_1,
-    //         model->nmocap * 3);
-
-    // mju_copy(data->mocap_pos, mocap_pos_0, model->nmocap * 3);
-    // mju_addTo(data->mocap_pos, mocap_pos_1, model->nmocap * 3);
-
-    // Velocities:
-    // mju_copy(data->mocap_quat,
-    //          model->key_mpos + model->nmocap * 3 * key_index_1,
-    //          model->nmocap * 3);
-    // mju_subFrom(data->mocap_quat, data->mocap_pos, model->nmocap * 3);
-    // mju_scl(data->mocap_quat, data->mocap_quat, fps, model->nmocap * 3);
     
     // ----- residual ----- //
     int counter = 0;
