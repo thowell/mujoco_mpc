@@ -15,13 +15,14 @@
 #ifndef MJPC_PLANNERS_CMA_OPTIMIZER_H_
 #define MJPC_PLANNERS_CMA_OPTIMIZER_H_
 
+#include <mujoco/mujoco.h>
+
 #include <atomic>
 #include <shared_mutex>
 #include <vector>
 
-#include <mujoco/mujoco.h>
-#include "planners/planner.h"
 #include "planners/cma/policy.h"
+#include "planners/planner.h"
 #include "states/state.h"
 #include "trajectory.h"
 
@@ -59,7 +60,7 @@ class CMAPlanner : public Planner {
   void OptimizePolicy(int horizon, ThreadPool& pool) override;
 
   // compute trajectory using nominal policy
-  void NominalTrajectory(int horizon) override;
+  void NominalTrajectory(int horizon, ThreadPool& pool) override;
 
   // set action from policy
   void ActionFromPolicy(double* action, const double* state,
@@ -84,8 +85,8 @@ class CMAPlanner : public Planner {
   void GUI(mjUI& ui) override;
 
   // planner-specific plots
-  void Plots(mjvFigure* fig_planner, mjvFigure* fig_timer,
-             int planning) override;
+  void Plots(mjvFigure* fig_planner, mjvFigure* fig_timer, int planner_shift,
+             int timer_shift, int planning) override;
 
   // ----- members ----- //
   mjModel* model;
@@ -95,9 +96,10 @@ class CMAPlanner : public Planner {
   std::vector<double> state;
   double time;
   std::vector<double> mocap;
+  std::vector<double> userdata;
 
   // policy
-  CMAPolicy policy; // (Guarded by mtx_)
+  CMAPolicy policy;  // (Guarded by mtx_)
   CMAPolicy candidate_policy[kMaxTrajectory];
 
   // scratch
@@ -125,22 +127,22 @@ class CMAPlanner : public Planner {
   double rollouts_compute_time;
   double policy_update_compute_time;
 
-  // CMA-ES 
+  // CMA-ES
   int num_elite;
   double step_size;
   double mu_eff;
   double c_sigma;
-  double d_sigma; 
+  double d_sigma;
   double c_Sigma;
-  double c1; 
-  double c_mu; 
+  double c1;
+  double c_mu;
   double E;
   double eps;
 
   std::vector<double> p_sigma;
   std::vector<double> p_sigma_tmp;
   std::vector<double> p_Sigma;
-  std::vector<double> Sigma; 
+  std::vector<double> Sigma;
   std::vector<double> Sigma_tmp;
   std::vector<double> covariance;
   std::vector<double> covariance_lower;

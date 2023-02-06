@@ -14,13 +14,14 @@
 
 #include "planners/cma/planner.h"
 
+#include <absl/random/random.h>
+
 #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <mutex>
 #include <shared_mutex>
 
-#include <absl/random/random.h>
 #include "array_safety.h"
 #include "planners/cma/policy.h"
 #include "states/state.h"
@@ -52,7 +53,7 @@ void CMAPlanner::Initialize(mjModel* model, const Task& task) {
 
   winner = 0;
 
-  // CMA-ES 
+  // CMA-ES
   eps = 1.0e-16;
 }
 
@@ -64,6 +65,7 @@ void CMAPlanner::Allocate() {
   // state
   state.resize(num_state);
   mocap.resize(7 * model->nmocap);
+  userdata.resize(model->nuserdata);
 
   // policy
   int num_max_parameter = model->nu * kMaxTrajectoryHorizon;
@@ -84,7 +86,7 @@ void CMAPlanner::Allocate() {
     candidate_policy[i].Allocate(model, *task, kMaxTrajectoryHorizon);
   }
 
-  // CMA-ES 
+  // CMA-ES
   int num_parameters = model->nu * kMaxCMASplinePoints;
   p_sigma.resize(num_parameters);
   p_sigma_tmp.resize(num_parameters);
@@ -111,6 +113,7 @@ void CMAPlanner::Reset(int horizon) {
   // state
   std::fill(state.begin(), state.end(), 0.0);
   std::fill(mocap.begin(), mocap.end(), 7 * model->nmocap);
+  std::fill(userdata.begin(), userdata.end(), 0.0);
   time = 0.0;
 
   // policy parameters
@@ -139,7 +142,7 @@ void CMAPlanner::Reset(int horizon) {
   // winner
   winner = 0;
 
-  // CMA-ES 
+  // CMA-ES
   int num_parameters = model->nu * kMaxCMASplinePoints;
   step_size = 1.0;
   mju_zero(p_sigma.data(), num_parameters);
@@ -163,7 +166,8 @@ void CMAPlanner::Reset(int horizon) {
 
 // set state
 void CMAPlanner::SetState(State& state) {
-  state.CopyTo(this->state.data(), this->mocap.data(), &this->time);
+  state.CopyTo(this->state.data(), this->mocap.data(), this->userdata.data(),
+               &this->time);
 }
 
 // optimize nominal policy using random cma
@@ -187,9 +191,9 @@ void CMAPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
   {
     const std::shared_lock<std::shared_mutex> lock(mtx_);
 
-    // check spline point change 
+    // check spline point change
     if (policy.num_spline_points != candidate_policy[0].num_spline_points) {
-      // reset 
+      // reset
       step_size = 1.0;
       mju_zero(p_sigma.data(), model->nu * policy.num_spline_points);
       mju_zero(p_Sigma.data(), model->nu * policy.num_spline_points);
@@ -197,7 +201,7 @@ void CMAPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
     }
 
     // ----- update ----- //
-    policy.num_parameters = model->nu * policy.num_spline_points; // set
+    policy.num_parameters = model->nu * policy.num_spline_points;  // set
 
     // copy nominal policy
     candidate_policy[0].CopyFrom(policy, policy.num_spline_points);
@@ -218,7 +222,7 @@ void CMAPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
   // sample random policies and rollout
   double best_return = trajectories[winner].total_return;
 
-  // CMA-ES 
+  // CMA-ES
   int num_parameters = candidate_policy[0].num_parameters;
   int num_sample = num_trajectories - 1;
   num_elite = mju_floor(num_sample / 2);
@@ -237,14 +241,24 @@ void CMAPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
   // parameters
   mu_eff = 1.0 / mju_dot(weight.data(), weight.data(), num_elite);
   c_sigma = (mu_eff + 2.0) / (num_parameters + mu_eff + 5.0);
-  d_sigma = 1.0 + 2.0 * mju_max(0.0, mju_sqrt((mu_eff - 1.0) / (num_parameters + 1.0)) - 1.0) + c_sigma;
-  c_Sigma = (4.0 + mu_eff / num_parameters) / (num_parameters + 4.0 + 2.0 * mu_eff / num_parameters);
+  d_sigma =
+      1.0 +
+      2.0 * mju_max(0.0,
+                    mju_sqrt((mu_eff - 1.0) / (num_parameters + 1.0)) - 1.0) +
+      c_sigma;
+  c_Sigma = (4.0 + mu_eff / num_parameters) /
+            (num_parameters + 4.0 + 2.0 * mu_eff / num_parameters);
   c1 = 2.0 / ((num_parameters + 1.3) * (num_parameters + 1.3) + mu_eff);
-  c_mu = mju_min(1.0 - c1, 2.0 * (mu_eff - 2.0 + 1.0 / mu_eff) / ((num_parameters + 2.0) * (num_parameters + 2.0) + mu_eff));
-  E = mju_sqrt(num_parameters) * (1.0 - 1.0 / (4 * num_parameters) + 1.0 / (21.0 * num_parameters * num_parameters));
+  c_mu = mju_min(
+      1.0 - c1, 2.0 * (mu_eff - 2.0 + 1.0 / mu_eff) /
+                    ((num_parameters + 2.0) * (num_parameters + 2.0) + mu_eff));
+  E = mju_sqrt(num_parameters) *
+      (1.0 - 1.0 / (4 * num_parameters) +
+       1.0 / (21.0 * num_parameters * num_parameters));
 
   // scale non-elite weights
-  double nonelite_sum = mju_sum(weight.data() + num_elite, num_sample - num_elite);
+  double nonelite_sum =
+      mju_sum(weight.data() + num_elite, num_sample - num_elite);
   for (int i = num_elite; i < num_sample; i++) {
     weight[i] *= -1.0 * (1.0 + c1 / c_mu) / nonelite_sum;
   }
@@ -252,8 +266,8 @@ void CMAPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
   // simulate noisy policies
   this->Rollouts(num_trajectories, horizon, pool);
 
-  // ----- CMA-ES update ----- // 
-  // fitness sort 
+  // ----- CMA-ES update ----- //
+  // fitness sort
   sort_indices(fitness_sort, fitness, num_sample);
 
   // ----- selection and mean update ----- //
@@ -262,52 +276,76 @@ void CMAPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
   mju_zero(delta_w.data(), num_parameters);
   for (int i = 0; i < num_elite; i++) {
     int idx = fitness_sort[i];
-    mju_addToScl(delta_w.data(), mjpc::DataAt(delta_s, idx * num_parameters), weight[i], num_parameters);
+    mju_addToScl(delta_w.data(), mjpc::DataAt(delta_s, idx * num_parameters),
+                 weight[i], num_parameters);
   }
 
-  // update m += step_size * delta_w 
-  mju_addToScl(candidate_policy[0].parameters.data(), delta_w.data(), step_size, num_parameters);
+  // update m += step_size * delta_w
+  mju_addToScl(candidate_policy[0].parameters.data(), delta_w.data(), step_size,
+               num_parameters);
 
   // ----- step-size control ----- //
-  mju_mulMatVec(p_sigma_tmp.data(), C.data(), delta_w.data(), num_parameters, num_parameters);
+  mju_mulMatVec(p_sigma_tmp.data(), C.data(), delta_w.data(), num_parameters,
+                num_parameters);
 
-  mju_scl(p_sigma_tmp.data(), p_sigma_tmp.data(), mju_sqrt(c_sigma * (2.0 - c_sigma) * mu_eff), num_parameters);
-  
+  mju_scl(p_sigma_tmp.data(), p_sigma_tmp.data(),
+          mju_sqrt(c_sigma * (2.0 - c_sigma) * mu_eff), num_parameters);
+
   mju_scl(p_sigma.data(), p_sigma.data(), 1.0 - c_sigma, num_parameters);
   mju_addTo(p_sigma.data(), p_sigma_tmp.data(), num_parameters);
 
-  step_size *= mju_exp(c_sigma / d_sigma * (mju_norm(p_sigma.data(), num_parameters) / E - 1.0));
+  step_size *= mju_exp(c_sigma / d_sigma *
+                       (mju_norm(p_sigma.data(), num_parameters) / E - 1.0));
   // step_size = mju_min(mju_max(1.0e-8, step_size), 10.0);
 
   // ----- covariance adaptation ----- //
   int k = 0;
-  int h_sigma = (mju_norm(p_sigma.data(), num_parameters) / mju_sqrt(1.0 - mju_pow(1.0 - c_sigma, 2 * (k + 1))) < (1.4 + 2.0 / (num_parameters + 1)) * E) ? 1 : 0;
+  int h_sigma = (mju_norm(p_sigma.data(), num_parameters) /
+                     mju_sqrt(1.0 - mju_pow(1.0 - c_sigma, 2 * (k + 1))) <
+                 (1.4 + 2.0 / (num_parameters + 1)) * E)
+                    ? 1
+                    : 0;
 
   mju_scl(p_Sigma.data(), p_Sigma.data(), 1.0 - c_Sigma, num_parameters);
-  mju_addToScl(p_Sigma.data(), delta_w.data(), h_sigma * mju_sqrt(c_Sigma * (2.0 - c_Sigma) * mu_eff), num_parameters);  
+  mju_addToScl(p_Sigma.data(), delta_w.data(),
+               h_sigma * mju_sqrt(c_Sigma * (2.0 - c_Sigma) * mu_eff),
+               num_parameters);
 
   for (int i = 0; i < num_sample; i++) {
     if (weight[i] >= 0.0) {
       weight_update[i] = weight[i];
     } else {
       int idx = fitness_sort[i];
-      mju_mulMatVec(C_delta_s.data(), C.data(), mjpc::DataAt(delta_s, idx * num_parameters), num_parameters, num_parameters);
-      weight_update[i] = num_parameters * weight[i] / mju_dot(C_delta_s.data(), C_delta_s.data(), num_parameters);
+      mju_mulMatVec(C_delta_s.data(), C.data(),
+                    mjpc::DataAt(delta_s, idx * num_parameters), num_parameters,
+                    num_parameters);
+      weight_update[i] =
+          num_parameters * weight[i] /
+          mju_dot(C_delta_s.data(), C_delta_s.data(), num_parameters);
     }
   }
 
-  mju_scl(Sigma.data(), Sigma.data(), (1.0 - c1 - c_mu) + (c1 * (1.0 - h_sigma) * c_Sigma * (2.0 - c_Sigma)), num_parameters * num_parameters);
-  
-  mju_mulMatMatT(Sigma_tmp.data(), p_Sigma.data(), p_Sigma.data(), num_parameters, 1, num_parameters);
+  mju_scl(
+      Sigma.data(), Sigma.data(),
+      (1.0 - c1 - c_mu) + (c1 * (1.0 - h_sigma) * c_Sigma * (2.0 - c_Sigma)),
+      num_parameters * num_parameters);
 
-  mju_scl(Sigma_tmp.data(), Sigma_tmp.data(), c1, num_parameters * num_parameters);
-  
+  mju_mulMatMatT(Sigma_tmp.data(), p_Sigma.data(), p_Sigma.data(),
+                 num_parameters, 1, num_parameters);
+
+  mju_scl(Sigma_tmp.data(), Sigma_tmp.data(), c1,
+          num_parameters * num_parameters);
+
   mju_addTo(Sigma.data(), Sigma_tmp.data(), num_parameters * num_parameters);
 
   for (int i = 0; i < num_sample; i++) {
     int idx = fitness_sort[i];
-    mju_mulMatMatT(Sigma_tmp.data(), mjpc::DataAt(delta_s, idx * num_parameters), mjpc::DataAt(delta_s, idx * num_parameters), num_parameters, 1, num_parameters);
-    mju_scl(Sigma_tmp.data(), Sigma_tmp.data(), c_mu * weight_update[i], num_parameters * num_parameters);
+    mju_mulMatMatT(Sigma_tmp.data(),
+                   mjpc::DataAt(delta_s, idx * num_parameters),
+                   mjpc::DataAt(delta_s, idx * num_parameters), num_parameters,
+                   1, num_parameters);
+    mju_scl(Sigma_tmp.data(), Sigma_tmp.data(), c_mu * weight_update[i],
+            num_parameters * num_parameters);
     mju_addTo(Sigma.data(), Sigma_tmp.data(), num_parameters * num_parameters);
   }
 
@@ -330,7 +368,7 @@ void CMAPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
   {
     const std::shared_lock<std::shared_mutex> lock(mtx_);
     policy.CopyParametersFrom(candidate_policy[winner].parameters,
-                    candidate_policy[winner].times);
+                              candidate_policy[winner].times);
   }
 
   // stop timer
@@ -349,7 +387,7 @@ void CMAPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
 }
 
 // compute trajectory using nominal policy
-void CMAPlanner::NominalTrajectory(int horizon) {
+void CMAPlanner::NominalTrajectory(int horizon, ThreadPool& pool) {
   // set policy
   auto nominal_policy = [&cp = candidate_policy[0]](
                             double* action, const double* state, double time) {
@@ -358,12 +396,13 @@ void CMAPlanner::NominalTrajectory(int horizon) {
 
   // rollout nominal policy
   trajectories[0].Rollout(nominal_policy, task, model, data_[0].get(),
-                          state.data(), time, mocap.data(), horizon);
+                          state.data(), time, mocap.data(), userdata.data(),
+                          horizon);
 }
 
 // set action from policy
 void CMAPlanner::ActionFromPolicy(double* action, const double* state,
-                                       double time) {
+                                  double time) {
   const std::shared_lock<std::shared_mutex> lock(mtx_);
   policy.Action(action, state, time);
 }
@@ -376,14 +415,13 @@ void CMAPlanner::ResamplePolicy(int horizon) {
   // set time
   double nominal_time = time;
   double time_shift = mju_max(
-      (horizon - 1) * model->opt.timestep / (num_spline_points - 1),
-      1.0e-5);
+      (horizon - 1) * model->opt.timestep / (num_spline_points - 1), 1.0e-5);
 
   // get spline points
   for (int t = 0; t < num_spline_points; t++) {
     times_scratch[t] = nominal_time;
-    candidate_policy[0].Action(DataAt(parameters_scratch, t * model->nu), nullptr,
-                  nominal_time);
+    candidate_policy[0].Action(DataAt(parameters_scratch, t * model->nu),
+                               nullptr, nominal_time);
     nominal_time += time_shift;
   }
 
@@ -391,9 +429,10 @@ void CMAPlanner::ResamplePolicy(int horizon) {
   candidate_policy[0].CopyParametersFrom(parameters_scratch, times_scratch);
 
   // time power transformation
-  PowerSequence(candidate_policy[0].times.data(), time_shift, candidate_policy[0].times[0],
-                candidate_policy[0].times[num_spline_points - 1], timestep_power,
-                num_spline_points);
+  PowerSequence(candidate_policy[0].times.data(), time_shift,
+                candidate_policy[0].times[0],
+                candidate_policy[0].times[num_spline_points - 1],
+                timestep_power, num_spline_points);
 }
 
 // add random noise to nominal policy
@@ -416,11 +455,15 @@ void CMAPlanner::AddNoiseToPolicy(int i) {
   }
 
   // step_size * L * gaussian_noise
-  mju_mulMatVec(candidate_policy[i].parameters.data(), covariance_lower.data(), mjpc::DataAt(noise, i * num_parameters), num_parameters, num_parameters);
-  mju_scl(candidate_policy[i].parameters.data(), candidate_policy[i].parameters.data(), step_size, num_parameters);
+  mju_mulMatVec(candidate_policy[i].parameters.data(), covariance_lower.data(),
+                mjpc::DataAt(noise, i * num_parameters), num_parameters,
+                num_parameters);
+  mju_scl(candidate_policy[i].parameters.data(),
+          candidate_policy[i].parameters.data(), step_size, num_parameters);
 
   // sample = L * gaussian_noise + mu
-  mju_addTo(candidate_policy[i].parameters.data(), candidate_policy[0].parameters.data(), num_parameters);
+  mju_addTo(candidate_policy[i].parameters.data(),
+            candidate_policy[0].parameters.data(), num_parameters);
 
   // clamp parameters
   for (int t = 0; t < num_spline_points; t++) {
@@ -436,12 +479,11 @@ void CMAPlanner::AddNoiseToPolicy(int i) {
 }
 
 // compute candidate trajectories
-void CMAPlanner::Rollouts(int num_trajectories, int horizon,
-                               ThreadPool& pool) {
+void CMAPlanner::Rollouts(int num_trajectories, int horizon, ThreadPool& pool) {
   // reset noise compute time
   noise_compute_time = 0.0;
 
-  // CMA-ES 
+  // CMA-ES
   int num_parameters = candidate_policy[0].num_parameters;
 
   // copy covariance
@@ -463,30 +505,35 @@ void CMAPlanner::Rollouts(int num_trajectories, int horizon,
   for (int i = 0; i < num_parameters; i++) {
     for (int j = 0; j < num_parameters; j++) {
       if (j <= i) {
-        covariance_lower[i * num_parameters + j] = covariance[i * num_parameters + j];
+        covariance_lower[i * num_parameters + j] =
+            covariance[i * num_parameters + j];
       }
     }
   }
 
-  // compute D 
+  // compute D
   mju_zero(D.data(), num_parameters * num_parameters);
   for (int i = 0; i < num_parameters; i++) {
     D[i * num_parameters + i] = 1.0 / covariance_lower[i * num_parameters + i];
   }
 
-  // compute B 
-  mju_mulMatMat(B.data(), covariance_lower.data(), D.data(), num_parameters, num_parameters, num_parameters);
+  // compute B
+  mju_mulMatMat(B.data(), covariance_lower.data(), D.data(), num_parameters,
+                num_parameters, num_parameters);
 
   // compute C^-0.5
-  mju_mulMatMat(C_tmp.data(), B.data(), D.data(), num_parameters, num_parameters, num_parameters);
-  mju_mulMatMatT(C.data(), C_tmp.data(), B.data(), num_parameters, num_parameters, num_parameters);
+  mju_mulMatMat(C_tmp.data(), B.data(), D.data(), num_parameters,
+                num_parameters, num_parameters);
+  mju_mulMatMatT(C.data(), C_tmp.data(), B.data(), num_parameters,
+                 num_parameters, num_parameters);
 
   // CMA-ES
   int count_before = pool.GetCount();
   for (int i = 0; i < num_trajectories; i++) {
     pool.Schedule([&s = *this, &model = this->model, &task = this->task,
                    &state = this->state, &time = this->time,
-                   &mocap = this->mocap, horizon, num_parameters, i]() {
+                   &mocap = this->mocap, horizon, &userdata = this->userdata,
+                   num_parameters, i]() {
       // sample noise policy
       if (i != 0) s.AddNoiseToPolicy(i);
 
@@ -503,19 +550,23 @@ void CMAPlanner::Rollouts(int num_trajectories, int horizon,
       };
 
       // policy rollout
-      s.trajectories[i].Rollout(sample_policy_i, task, model,
-                                s.data_[ThreadPool::WorkerId()].get(),
-                                state.data(), time, mocap.data(), horizon);
+      s.trajectories[i].Rollout(
+          sample_policy_i, task, model, s.data_[ThreadPool::WorkerId()].get(),
+          state.data(), time, mocap.data(), userdata.data(), horizon);
 
       if (i != 0) {
         // sample index
         int idx = i - 1;
 
         // (sample_parameters - nominal_parameters) / step_size
-        mju_sub(mjpc::DataAt(s.delta_s, idx * num_parameters), s.candidate_policy[i].parameters.data(), s.candidate_policy[0].parameters.data(), num_parameters);
-        mju_scl(mjpc::DataAt(s.delta_s, idx * num_parameters), mjpc::DataAt(s.delta_s, idx * num_parameters), 1.0 / s.step_size, num_parameters);
+        mju_sub(mjpc::DataAt(s.delta_s, idx * num_parameters),
+                s.candidate_policy[i].parameters.data(),
+                s.candidate_policy[0].parameters.data(), num_parameters);
+        mju_scl(mjpc::DataAt(s.delta_s, idx * num_parameters),
+                mjpc::DataAt(s.delta_s, idx * num_parameters),
+                1.0 / s.step_size, num_parameters);
 
-        // fitness 
+        // fitness
         s.fitness[idx] = s.trajectories[i].total_return;
       }
     });
@@ -525,9 +576,7 @@ void CMAPlanner::Rollouts(int num_trajectories, int horizon,
 }
 
 // return trajectory with best total return
-const Trajectory* CMAPlanner::BestTrajectory() {
-  return &trajectories[winner];
-}
+const Trajectory* CMAPlanner::BestTrajectory() { return &trajectories[winner]; }
 
 // visualize planner-specific traces
 void CMAPlanner::Traces(mjvScene* scn) {
@@ -559,13 +608,15 @@ void CMAPlanner::Traces(mjvScene* scn) {
       for (int j = 0; j < task->num_trace; j++) {
         // initialize geometry
         mjv_initGeom(&scn->geoms[scn->ngeom], mjGEOM_LINE, zero3, zero3, zero9,
-                    color);
+                     color);
 
         // make geometry
         mjv_makeConnector(
             &scn->geoms[scn->ngeom], mjGEOM_LINE, width,
-            trajectories[k].trace[3 * task->num_trace * i + 3 * j], trajectories[k].trace[3 * task->num_trace * i + 1 + 3 * j],
-            trajectories[k].trace[3 * task->num_trace * i + 2 + 3 * j], trajectories[k].trace[3 * task->num_trace * (i + 1) + 3 * j],
+            trajectories[k].trace[3 * task->num_trace * i + 3 * j],
+            trajectories[k].trace[3 * task->num_trace * i + 1 + 3 * j],
+            trajectories[k].trace[3 * task->num_trace * i + 2 + 3 * j],
+            trajectories[k].trace[3 * task->num_trace * (i + 1) + 3 * j],
             trajectories[k].trace[3 * task->num_trace * (i + 1) + 1 + 3 * j],
             trajectories[k].trace[3 * task->num_trace * (i + 1) + 2 + 3 * j]);
 
@@ -599,7 +650,7 @@ void CMAPlanner::GUI(mjUI& ui) {
 
 // planner-specific plots
 void CMAPlanner::Plots(mjvFigure* fig_planner, mjvFigure* fig_timer,
-                            int planning) {
+                       int planner_shift, int timer_shift, int planning) {
   // ----- planner ----- //
   double planner_bounds[2] = {-6.0, 6.0};
 
