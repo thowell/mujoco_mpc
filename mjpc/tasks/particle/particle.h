@@ -16,6 +16,7 @@
 #define MJPC_TASKS_PARTICLE_PARTICLE_H_
 
 #include <mujoco/mujoco.h>
+#include "task.h"
 
 namespace mjpc {
 struct Particle {
@@ -27,6 +28,12 @@ struct Particle {
 // --------------------------------------------
 static void Residual(const double* parameters, const mjModel* model,
                      const mjData* data, double* residual);
+
+static void ResidualTimeVarying(const double* parameters, const mjModel* model,
+                                const mjData* data, double* residual);
+
+static void Transition(const mjModel* model, mjData* data, Task* task);
+
 };
 }  // namespace mjpc
 

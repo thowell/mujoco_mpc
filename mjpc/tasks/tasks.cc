@@ -17,7 +17,11 @@
 #include "tasks/acrobot/acrobot.h"
 #include "tasks/cartpole/cartpole.h"
 #include "tasks/hand/hand.h"
-#include "tasks/humanoid/humanoid.h"
+#include "tasks/humanoid/stand/task.h"
+#include "tasks/humanoid/tracking/task.h"
+#include "tasks/humanoid/walk/task.h"
+#include "tasks/panda/panda.h"
+// DEEPMIND INTERNAL IMPORT
 #include "tasks/particle/particle.h"
 #include "tasks/quadrotor/quadrotor.h"
 #include "tasks/quadruped/quadruped.h"
@@ -30,16 +34,22 @@ namespace {
 // Define the array without an explicit size then bind it to an explicitly
 // sized reference afterward. This way the compiler enforces equality between
 // kNumTasks and the size of the array initializer.
-const TaskDefinition kTasksArray[]{
+const TaskDefinition<const char*> kTasksArray[]{
     {
         .name = "Humanoid Stand",
-        .xml_path = "humanoid/task_stand.xml",
-        .residual = &Humanoid::ResidualStand,
+        .xml_path = "humanoid/stand/task.xml",
+        .residual = &humanoid::Stand::Residual,
     },
     {
         .name = "Humanoid Walk",
-        .xml_path = "humanoid/task_walk.xml",
-        .residual = &Humanoid::ResidualWalk,
+        .xml_path = "humanoid/walk/task.xml",
+        .residual = &humanoid::Walk::Residual,
+    },
+    {
+        .name = "Humanoid Track",
+        .xml_path = "humanoid/tracking/task.xml",
+        .residual = &humanoid::Tracking::Residual,
+        .transition = &humanoid::Tracking::Transition,
     },
     {
         .name = "Swimmer",
@@ -64,8 +74,9 @@ const TaskDefinition kTasksArray[]{
     },
     {
         .name = "Particle",
-        .xml_path = "particle/task.xml",
-        .residual = &Particle::Residual,
+        .xml_path = "particle/task_timevarying.xml",
+        .residual = &Particle::ResidualTimeVarying,
+        .transition = &Particle::Transition,
     },
     {
         .name = "Quadruped Hill",
@@ -90,9 +101,16 @@ const TaskDefinition kTasksArray[]{
         .residual = &Quadrotor::Residual,
         .transition = &Quadrotor::Transition,
     },
+    {
+        .name = "Panda",
+        .xml_path = "panda/task.xml",
+        .residual = &Panda::Residual,
+        .transition = &Panda::Transition,
+    },
+// DEEPMIND INTERNAL TASKS
 };
 }  // namespace
 
-const TaskDefinition (&kTasks)[kNumTasks] = kTasksArray;
+const TaskDefinition<const char*> (&kTasks)[kNumTasks] = kTasksArray;
 
 }  // namespace mjpc

@@ -20,6 +20,11 @@
 #include <cstring>
 #include <string>
 
+#include <absl/container/flat_hash_map.h>
+#include <absl/strings/match.h>
+#include <absl/strings/str_join.h>
+#include <absl/strings/strip.h>
+#include <mujoco/mjui.h>
 #include <mujoco/mjvisualize.h>
 #include <mujoco/mujoco.h>
 #include "array_safety.h"
@@ -36,17 +41,17 @@ inline constexpr double kMinTimeStep = 1.0e-4;
 inline constexpr double kMaxTimeStep = 0.1;
 inline constexpr double kMinPlanningHorizon = 1.0e-5;
 inline constexpr double kMaxPlanningHorizon = 2.5;
+
+// maximum number of actions to plot
+const int kMaxActionPlots = 25;
+
 }  // namespace
 
 // initialize data, settings, planners, states
-void Agent::Initialize(mjModel* model, mjData* data,
-                       const std::string& task_names, const char planner_str[],
-                       ResidualFunction* residual,
+void Agent::Initialize(mjModel* model, const std::string& task_names,
+                       const char planner_str[], ResidualFunction* residual,
                        TransitionFunction* transition) {
   // ----- model ----- //
-  if (!(model->nuserdata == 1)) {
-    mju_error("Model passed to Agent requires nuserdata == 1\n");
-  }
   if (this->model_) mj_deleteModel(this->model_);
   this->model_ = mj_copyModel(nullptr, model);  // agent's copy of model
 
@@ -120,7 +125,7 @@ void Agent::Allocate() {
 
   // cost
   residual_.resize(task_.num_residual);
-  terms_.resize(task_.num_cost * kMaxTrajectoryHorizon);
+  terms_.resize(task_.num_term * kMaxTrajectoryHorizon);
 }
 
 // reset data, settings, planners, states
@@ -131,7 +136,7 @@ void Agent::Reset() {
   }
 
   for (const auto& state : states_) {
-    state->Reset(model_);
+    state->Reset();
   }
 
   // cost
@@ -145,6 +150,49 @@ void Agent::Reset() {
   std::fill(terms_.begin(), terms_.end(), 0.0);
 }
 
+void Agent::SetState(const mjData* data) {
+  ActiveState().Set(model_, data);
+}
+
+void Agent::PlanIteration(ThreadPool* pool) {
+  // start agent timer
+  auto agent_start = std::chrono::steady_clock::now();
+
+  // set agent time and time step
+  model_->opt.timestep = timestep_;
+  model_->opt.integrator = integrator_;
+
+  // set planning steps
+  steps_ =
+      mju_max(mju_min(horizon_ / timestep_ + 1, kMaxTrajectoryHorizon), 1);
+
+  // plan
+  if (!allocate_enabled) {
+    // set state
+    ActivePlanner().SetState(ActiveState());
+
+    if (plan_enabled) {
+      // planner policy
+      ActivePlanner().OptimizePolicy(steps_, *pool);
+
+      // compute time
+      agent_compute_time_ =
+          std::chrono::duration_cast<std::chrono::microseconds>(
+              std::chrono::steady_clock::now() - agent_start)
+              .count();
+
+      // counter
+      count_ += 1;
+    } else {
+      // rollout nominal policy
+      ActivePlanner().NominalTrajectory(steps_, *pool);
+
+      // set timers
+      agent_compute_time_ = 0.0;
+    }
+  }
+}
+
 // call planner to update nominal policy
 void Agent::Plan(std::atomic<bool>& exitrequest,
                  std::atomic<int>& uiloadrequest) {
@@ -154,42 +202,7 @@ void Agent::Plan(std::atomic<bool>& exitrequest,
   // main loop
   while (!exitrequest.load()) {
     if (model_ && uiloadrequest.load() == 0) {
-      // start agent timer
-      auto agent_start = std::chrono::steady_clock::now();
-
-      // set agent time and time step
-      model_->opt.timestep = timestep_;
-      model_->opt.integrator = integrator_;
-
-      // set planning steps
-      steps_ =
-          mju_max(mju_min(horizon_ / timestep_ + 1, kMaxTrajectoryHorizon), 1);
-
-      // plan
-      if (!allocate_enabled) {
-        // set state
-        ActivePlanner().SetState(ActiveState());
-
-        if (plan_enabled) {
-          // planner policy
-          ActivePlanner().OptimizePolicy(steps_, pool);
-
-          // compute time
-          agent_compute_time_ =
-              std::chrono::duration_cast<std::chrono::microseconds>(
-                  std::chrono::steady_clock::now() - agent_start)
-                  .count();
-
-          // counter
-          count_ += 1;
-        } else {
-          // rollout nominal policy
-          ActivePlanner().NominalTrajectory(steps_);
-
-          // set timers
-          agent_compute_time_ = 0.0;
-        }
-      }
+      PlanIteration(&pool);
     }
   }  // exitrequest sent -- stop planning
 }
@@ -254,11 +267,14 @@ void Agent::ModifyScene(mjvScene* scn) {
                   color);
 
       // make geometry
-      mjv_makeConnector(&scn->geoms[scn->ngeom], mjGEOM_CAPSULE, width,
-                        winner->trace[3 * task_.num_trace * i + 3 * j], winner->trace[3 * task_.num_trace * i + 1 + 3 * j],
-                        winner->trace[3 * task_.num_trace * i + 2 + 3 * j], winner->trace[3 * task_.num_trace * (i + 1) + 3 * j],
-                        winner->trace[3 * task_.num_trace * (i + 1) + 1 + 3 * j],
-                        winner->trace[3 * task_.num_trace * (i + 1) + 2 + 3 * j]);
+      mjv_makeConnector(
+          &scn->geoms[scn->ngeom], mjGEOM_CAPSULE, width,
+          winner->trace[3 * task_.num_trace * i + 3 * j],
+          winner->trace[3 * task_.num_trace * i + 1 + 3 * j],
+          winner->trace[3 * task_.num_trace * i + 2 + 3 * j],
+          winner->trace[3 * task_.num_trace * (i + 1) + 3 * j],
+          winner->trace[3 * task_.num_trace * (i + 1) + 1 + 3 * j],
+          winner->trace[3 * task_.num_trace * (i + 1) + 2 + 3 * j]);
       // increment number of geometries
       scn->ngeom += 1;
     }
@@ -269,7 +285,7 @@ void Agent::ModifyScene(mjvScene* scn) {
 }
 
 // graphical user interface elements for agent and task
-void Agent::Gui(mjUI& ui) {
+void Agent::GUI(mjUI& ui) {
   // ----- task ------ //
   mjuiDef defTask[] = {{mjITEM_SECTION, "Task", 1, nullptr, "AP"},
                        {mjITEM_BUTTON, "Reset", 2, nullptr, " #459"},
@@ -283,9 +299,9 @@ void Agent::Gui(mjUI& ui) {
   mjui_add(&ui, defTask);
 
   // norm weights
-  if (task_.num_cost) {
+  if (task_.num_term) {
     mjuiDef defNormWeight[kMaxCostTerms + 1];
-    for (int i = 0; i < task_.num_cost; i++) {
+    for (int i = 0; i < task_.num_term; i++) {
       // element
       defNormWeight[i] = {mjITEM_SLIDERNUM, "weight", 2,
                           DataAt(task_.weight, i), "0 1"};
@@ -299,58 +315,92 @@ void Agent::Gui(mjUI& ui) {
       mju::sprintf_arr(defNormWeight[i].other, "%f %f", s[2], s[3]);
     }
 
-    defNormWeight[task_.num_cost] = {mjITEM_END};
+    defNormWeight[task_.num_term] = {mjITEM_END};
     mjui_add(&ui, defNormWeight);
   }
 
   // residual parameters
-  int parameter_shift = (task_.residual_parameters.empty() ? 0 : 1);
+  int parameter_shift = (task_.parameters.empty() ? 0 : 1);
   mjuiDef defFeatureParameters[kMaxCostTerms + 2];
   if (parameter_shift > 0) {
-    defFeatureParameters[0] = {mjITEM_SEPARATOR, "Residual Parameters", 1};
+    defFeatureParameters[0] = {mjITEM_SEPARATOR, "Parameters", 1};
   }
-  for (int i = 0; i < task_.residual_parameters.size(); i++) {
+  for (int i = 0; i < task_.parameters.size(); i++) {
     defFeatureParameters[i + parameter_shift] = {
-        mjITEM_SLIDERNUM, "residual", 2, DataAt(task_.residual_parameters, i),
+        mjITEM_SLIDERNUM, "residual", 2, DataAt(task_.parameters, i),
         "0 1"};
   }
 
+  absl::flat_hash_map<std::string, std::vector<std::string>> selections =
+      ResidualSelectionLists(model_);
+
   int shift = 0;
   for (int i = 0; i < model_->nnumeric; i++) {
-    if (std::strncmp(model_->names + model_->name_numericadr[i], "residual_",
-                     9) == 0) {
+    const char* name = model_->names + model_->name_numericadr[i];
+    if (absl::StartsWith(name, "residual_select_")) {
+      std::string_view list_name = absl::StripPrefix(name, "residual_select_");
+      if (auto it = selections.find(list_name); it != selections.end()) {
+        // insert a dropdown list
+        mjuiDef* uiItem = &defFeatureParameters[shift + parameter_shift];
+        uiItem->type = mjITEM_SELECT;
+        mju::strcpy_arr(uiItem->name, list_name.data());
+        mju::strcpy_arr(uiItem->other, absl::StrJoin(it->second, "\n").c_str());
+
+        // note: uiItem.pdata is pointing at a double in parameters,
+        // but mjITEM_SELECT is going to treat is as an int. the
+        // ResidualSelection and DefaultResidualSelection functions hide the
+        // necessary casting when reading such values.
+
+      } else {
+        mju_error_s("Selection list not found for %s", name);
+        return;
+      }
+      shift += 1;
+    } else if (absl::StartsWith(name, "residual_")) {
+      mjuiDef* uiItem = &defFeatureParameters[shift + parameter_shift];
       // name
-      mju::strcpy_arr(defFeatureParameters[shift + parameter_shift].name,
-                      model_->names + model_->name_numericadr[i] +
-                          std::strlen("residual_"));
+      mju::strcpy_arr(uiItem->name, model_->names + model_->name_numericadr[i] +
+                                        std::strlen("residual_"));
       // limits
       if (model_->numeric_size[i] == 3) {
-        mju::sprintf_arr(defFeatureParameters[shift + parameter_shift].other,
-                         "%f %f",
+        mju::sprintf_arr(uiItem->other, "%f %f",
                          model_->numeric_data[model_->numeric_adr[i] + 1],
                          model_->numeric_data[model_->numeric_adr[i] + 2]);
       }
       shift += 1;
     }
   }
-  defFeatureParameters[task_.residual_parameters.size() + parameter_shift] = {
+  defFeatureParameters[task_.parameters.size() + parameter_shift] = {
       mjITEM_END};
   mjui_add(&ui, defFeatureParameters);
 
   // transition
-  if (GetCustomNumericData(model_, "task_transition")) {
+  char* names = GetCustomTextData(model_, "task_transition");
+
+  if (names) {
     mjuiDef defTransition[] = {
-        {mjITEM_SEPARATOR, "Transition", 1},
-        {mjITEM_RADIO, "Status", 2, &task_.transition_status, "Off\nOn"},
-        {mjITEM_SLIDERINT, "State", 2, &task_.transition_state, "0 1"},
+        {mjITEM_SEPARATOR, "Stages", 1},
+        {mjITEM_RADIO, "", 1, &task_.stage, ""},
         {mjITEM_END},
     };
 
-    // set task state limits
-    mju::sprintf_arr(defTransition[2].other, "%i %i", 0, model_->nkey);
+    // concatenate names
+    int len = strlen(names);
+    std::string str;
+    for (int i = 0; i < len; i++) {
+      if (names[i] == '|') {
+        str.push_back('\n');
+      } else {
+        str.push_back(names[i]);
+      }
+    }
+
+    // update buttons
+    mju::strcpy_arr(defTransition[1].other, str.c_str());
 
     // set tolerance limits
-    mju::sprintf_arr(defTransition[3].other, "%f %f", 0.0, 1.0);
+    mju::sprintf_arr(defTransition[2].other, "%f %f", 0.0, 1.0);
+
     mjui_add(&ui, defTransition);
   }
 
@@ -455,7 +505,7 @@ void Agent::PlotInitialize() {
   mju::strcpy_arr(plots_.action.xlabel, "Time");
   mju::strcpy_arr(plots_.timer.xlabel, "Iteration");
 
-  // y-tick nubmer formats
+  // y-tick number formats
   mju::strcpy_arr(plots_.cost.yformat, "%.2f");
   mju::strcpy_arr(plots_.action.yformat, "%.2f");
   mju::strcpy_arr(plots_.planner.yformat, "%.2f");
@@ -482,56 +532,48 @@ void Agent::PlotInitialize() {
   plots_.cost.linergb[3][0] = 1.0f;
   plots_.cost.linergb[3][1] = 1.0f;
   plots_.cost.linergb[3][2] = 1.0f;
-  for (int i = 0; i < task_.num_cost; i++) {
+  for (int i = 0; i < task_.num_term; i++) {
     // history
     plots_.cost.linergb[4 + i][0] = CostColors[i][0];
     plots_.cost.linergb[4 + i][1] = CostColors[i][1];
     plots_.cost.linergb[4 + i][2] = CostColors[i][2];
 
     // prediction
-    plots_.cost.linergb[4 + task_.num_cost + i][0] = 0.9 * CostColors[i][0];
-    plots_.cost.linergb[4 + task_.num_cost + i][1] = 0.9 * CostColors[i][1];
-    plots_.cost.linergb[4 + task_.num_cost + i][2] = 0.9 * CostColors[i][2];
+    plots_.cost.linergb[4 + task_.num_term + i][0] = 0.9 * CostColors[i][0];
+    plots_.cost.linergb[4 + task_.num_term + i][1] = 0.9 * CostColors[i][1];
+    plots_.cost.linergb[4 + task_.num_term + i][2] = 0.9 * CostColors[i][2];
   }
 
   // history of control
-  for (int i = 0; i < model_->nu; i++) {
+  int dim_action = mju_min(model_->nu, kMaxActionPlots);
+
+  for (int i = 0; i < dim_action; i++) {
     plots_.action.linergb[i][0] = 0.0f;
     plots_.action.linergb[i][1] = 1.0f;
     plots_.action.linergb[i][2] = 1.0f;
   }
 
   // best control
-  for (int i = 0; i < model_->nu; i++) {
-    plots_.action.linergb[model_->nu + i][0] = 1.0f;
-    plots_.action.linergb[model_->nu + i][1] = 0.0f;
-    plots_.action.linergb[model_->nu + i][2] = 1.0f;
+  for (int i = 0; i < dim_action; i++) {
+    plots_.action.linergb[dim_action + i][0] = 1.0f;
+    plots_.action.linergb[dim_action + i][1] = 0.0f;
+    plots_.action.linergb[dim_action + i][2] = 1.0f;
   }
 
   // current line
-  plots_.action.linergb[2 * model_->nu][0] = 1.0f;
-  plots_.action.linergb[2 * model_->nu][1] = 0.647f;
-  plots_.action.linergb[2 * model_->nu][2] = 0.0f;
+  plots_.action.linergb[2 * dim_action][0] = 1.0f;
+  plots_.action.linergb[2 * dim_action][1] = 0.647f;
+  plots_.action.linergb[2 * dim_action][2] = 0.0f;
 
   // policy line
-  plots_.action.linergb[2 * model_->nu + 1][0] = 1.0f;
-  plots_.action.linergb[2 * model_->nu + 1][1] = 0.647f;
-  plots_.action.linergb[2 * model_->nu + 1][2] = 0.0f;
+  plots_.action.linergb[2 * dim_action + 1][0] = 1.0f;
+  plots_.action.linergb[2 * dim_action + 1][1] = 0.647f;
+  plots_.action.linergb[2 * dim_action + 1][2] = 0.0f;
 
   // history of agent compute time
-  plots_.timer.linergb[0][0] = 0.0f;
+  plots_.timer.linergb[0][0] = 1.0f;
   plots_.timer.linergb[0][1] = 1.0f;
   plots_.timer.linergb[0][2] = 1.0f;
-
-  // history of rollout compute time
-  plots_.timer.linergb[1][0] = 0.5f;
-  plots_.timer.linergb[1][1] = 0.5f;
-  plots_.timer.linergb[1][2] = 0.5f;
-
-  // history of shift compute time
-  plots_.timer.linergb[5][0] = 1.0f;
-  plots_.timer.linergb[5][1] = 0.0f;
-  plots_.timer.linergb[5][2] = 1.0f;
 
   // x-tick labels
   plots_.cost.flg_ticklabel[0] = 0;
@@ -556,6 +598,17 @@ void Agent::PlotInitialize() {
     for (int i = 0; i < mjMAXLINEPNT; i++) {
       plots_.planner.linedata[j][2 * i] = (float)-i;
       plots_.timer.linedata[j][2 * i] = (float)-i;
+
+
+      // colors 
+      if (j == 0) continue;
+      plots_.planner.linergb[j][0] = CostColors[j][0];
+      plots_.planner.linergb[j][1] = CostColors[j][1];
+      plots_.planner.linergb[j][2] = CostColors[j][2];
+
+      plots_.timer.linergb[j][0] = CostColors[j][0];
+      plots_.timer.linergb[j][1] = CostColors[j][1];
+      plots_.timer.linergb[j][2] = CostColors[j][2];
     }
   }
 }
@@ -563,12 +616,12 @@ void Agent::PlotInitialize() {
 // reset plot data to zeros
 void Agent::PlotReset() {
   // cost reset
-  for (int k = 0; k < 4 + 2 * task_.num_cost; k++) {
+  for (int k = 0; k < 4 + 2 * task_.num_term; k++) {
     PlotResetData(&plots_.cost, 1000, k);
   }
 
   // action reset
-  for (int j = 0; j < 2 * model_->nu + 2; j++) {
+  for (int j = 0; j < 2 * mju_min(model_->nu, kMaxActionPlots) + 2; j++) {
     PlotResetData(&plots_.action, 1000, j);
   }
 
@@ -609,7 +662,7 @@ void Agent::Plots(const mjData* data, int shift) {
 
   // compute individual costs
   for (int t = 0; t < winner->horizon; t++) {
-    task_.CostTerms(DataAt(terms_, t * task_.num_cost),
+    task_.CostTerms(DataAt(terms_, t * task_.num_term),
                     DataAt(winner->residual, t * task_.num_residual));
   }
 
@@ -634,21 +687,21 @@ void Agent::Plots(const mjData* data, int shift) {
   mju::strcpy_arr(plots_.cost.linename[0], "Total Cost");
 
   // plot costs
-  for (int k = 0; k < task_.num_cost; k++) {
+  for (int k = 0; k < task_.num_term; k++) {
     // current residual
     if (shift) {
       PlotUpdateData(&plots_.cost, cost_bounds, data->time, terms_[k], 1000,
                      4 + k, 1, 1, time_lower_bound);
     }
     // legend
-    mju::strcpy_arr(plots_.cost.linename[4 + task_.num_cost + k],
+    mju::strcpy_arr(plots_.cost.linename[4 + task_.num_term + k],
                     model_->names + model_->name_sensoradr[k]);
   }
 
   // predicted residual
   PlotData(&plots_.cost, cost_bounds, winner->times.data(), terms_.data(),
-           task_.num_cost, task_.num_cost, winner->horizon,
-           4 + task_.num_cost, time_lower_bound);
+           task_.num_term, task_.num_term, winner->horizon,
+           4 + task_.num_term, time_lower_bound);
 
   // vertical lines at current time and agent time
   PlotVertical(&plots_.cost, data->time, cost_bounds[0], cost_bounds[1], 10, 1);
@@ -659,10 +712,12 @@ void Agent::Plots(const mjData* data, int shift) {
   // ----- action ----- //
   double action_bounds[2] = {-1.0, 1.0};
 
+  int dim_action = mju_min(model_->nu, kMaxActionPlots);
+
   // shift data
   if (shift) {
     // agent history
-    for (int j = 0; j < model_->nu; j++) {
+    for (int j = 0; j < dim_action; j++) {
       PlotUpdateData(&plots_.action, action_bounds, data->time, data->ctrl[j],
                      1000, j, 1, 1, time_lower_bound);
     }
@@ -670,26 +725,26 @@ void Agent::Plots(const mjData* data, int shift) {
 
   // agent actions
   PlotData(&plots_.action, action_bounds, winner->times.data(),
-           winner->actions.data(), model_->nu, model_->nu, winner->horizon,
-           model_->nu, time_lower_bound);
+           winner->actions.data(), model_->nu, dim_action, winner->horizon,
+           dim_action, time_lower_bound);
 
   // set final action for visualization
-  for (int j = 0; j < model_->nu; j++) {
+  for (int j = 0; j < dim_action; j++) {
     // set data
     if (winner->horizon > 1) {
-      plots_.action.linedata[model_->nu + j][2 * (winner->horizon - 1) + 1] =
+      plots_.action.linedata[dim_action + j][2 * (winner->horizon - 1) + 1] =
           winner->actions[(winner->horizon - 2) * model_->nu + j];
     } else {
-      plots_.action.linedata[model_->nu + j][2 * (winner->horizon - 1) + 1] = 0;
+      plots_.action.linedata[dim_action + j][2 * (winner->horizon - 1) + 1] = 0;
     }
   }
 
   // vertical lines at current time and agent time
   PlotVertical(&plots_.action, data->time, action_bounds[0], action_bounds[1],
-               10, 2 * model_->nu);
+               10, 2 * dim_action);
   PlotVertical(&plots_.action,
                (winner->times[0] > 0.0 ? winner->times[0] : data->time),
-               action_bounds[0], action_bounds[1], 10, 2 * model_->nu + 1);
+               action_bounds[0], action_bounds[1], 10, 2 * dim_action + 1);
 
   // ranges
   plots_.action.range[0][0] = data->time - horizon_ + model_->opt.timestep;
@@ -699,7 +754,7 @@ void Agent::Plots(const mjData* data, int shift) {
 
   // legend
   mju::strcpy_arr(plots_.action.linename[0], "History");
-  mju::strcpy_arr(plots_.action.linename[model_->nu], "Prediction");
+  mju::strcpy_arr(plots_.action.linename[dim_action], "Prediction");
 
   // ----- planner ----- //
 
@@ -712,7 +767,7 @@ void Agent::Plots(const mjData* data, int shift) {
   // ----- compute timers ----- //
   double compute_bounds[2] = {0.0, 1.0};
 
-  ActivePlanner().Plots(&plots_.planner, &plots_.timer, plan_enabled);
+  ActivePlanner().Plots(&plots_.planner, &plots_.timer, 0, 1, plan_enabled);
 
   // history agent compute time
   PlotUpdateData(&plots_.timer, compute_bounds, plots_.timer.linedata[0][0] + 1,

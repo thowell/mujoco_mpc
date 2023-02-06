@@ -20,6 +20,7 @@
 #include "planners/cma/planner.h"
 #include "planners/gradient/planner.h"
 #include "planners/ilqg/planner.h"
+#include "planners/ilqs/planner.h"
 #include "planners/planner.h"
 #include "planners/sampling/planner.h"
 
@@ -28,7 +29,8 @@ const char kPlannerNames[] =
     "Sampling\n"
     "CMA-ES\n"
     "Gradient\n"
-    "iLQG";
+    "iLQG\n"
+    "iLQS";
 
 // load all available planners
 std::vector<std::unique_ptr<mjpc::Planner>> LoadPlanners() {
@@ -39,6 +41,7 @@ std::vector<std::unique_ptr<mjpc::Planner>> LoadPlanners() {
   planners.emplace_back(new mjpc::CMAPlanner);
   planners.emplace_back(new mjpc::GradientPlanner);
   planners.emplace_back(new mjpc::iLQGPlanner);
+  planners.emplace_back(new mjpc::iLQSPlanner);
   return planners;
 }
 

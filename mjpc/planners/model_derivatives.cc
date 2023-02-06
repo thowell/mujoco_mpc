@@ -44,8 +44,9 @@ void ModelDerivatives::Reset(int dim_state_derivative, int dim_action,
 // compute derivatives at all time steps
 void ModelDerivatives::Compute(const mjModel* m,
                                const std::vector<UniqueMjData>& data,
-                               const double* x, const double* u, const double* h,
-                               int dim_state, int dim_state_derivative, int dim_action,
+                               const double* x, const double* u,
+                               const double* h, int dim_state,
+                               int dim_state_derivative, int dim_action,
                                int dim_sensor, int T, double tol, int mode,
                                ThreadPool& pool) {
   {
@@ -59,19 +60,16 @@ void ModelDerivatives::Compute(const mjModel* m,
         SetState(m, d, x + t * dim_state);
         d->time = h[t];
 
+        // set action
+        mju_copy(d->ctrl, u + t * dim_action, dim_action);
+
         // Jacobians
         if (t == T - 1) {
-          // set action
-          mju_zero(d->ctrl, dim_action);
-
           // Jacobians
           mjd_transitionFD(m, d, tol, mode, nullptr, nullptr,
                            DataAt(C, t * (dim_sensor * dim_state_derivative)),
                            nullptr);
         } else {
-          // set action
-          mju_copy(d->ctrl, u + t * dim_action, dim_action);
-
           // derivatives
           mjd_transitionFD(
               m, d, tol, mode,

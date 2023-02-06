@@ -16,6 +16,7 @@
 
 #include <absl/random/random.h>
 #include <mujoco/mujoco.h>
+#include "task.h"
 #include "utilities.h"
 
 namespace mjpc {
@@ -32,8 +33,8 @@ void Swimmer::Residual(const double* parameters, const mjModel* model,
 
   // ---------- Residuals (5-6) ----------
   // nose to target XY displacement
-  double* target = mjpc::SensorByName(model, data, "target");
-  double* nose = mjpc::SensorByName(model, data, "nose");
+  double* target = SensorByName(model, data, "target");
+  double* nose = SensorByName(model, data, "nose");
   mju_sub(residual + model->nu, nose, target, 2);
 }
 
@@ -41,9 +42,9 @@ void Swimmer::Residual(const double* parameters, const mjModel* model,
 //   If swimmer is within tolerance of goal ->
 //   move goal randomly.
 // ---------------------------------------------
-int Swimmer::Transition(int state, const mjModel* model, mjData* data) {
-  double* target = mjpc::SensorByName(model, data, "target");
-  double* nose = mjpc::SensorByName(model, data, "nose");
+void Swimmer::Transition(const mjModel* model, mjData* data, Task* task) {
+  double* target = SensorByName(model, data, "target");
+  double* nose = SensorByName(model, data, "nose");
   double nose_to_target[2];
   mju_sub(nose_to_target, target, nose, 2);
   if (mju_norm(nose_to_target, 2) < 0.04) {
@@ -51,6 +52,6 @@ int Swimmer::Transition(int state, const mjModel* model, mjData* data) {
     data->mocap_pos[0] = absl::Uniform<double>(gen_, -.8, .8);
     data->mocap_pos[1] = absl::Uniform<double>(gen_, -.8, .8);
   }
-  return state;
 }
+
 }  // namespace mjpc

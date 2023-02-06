@@ -47,7 +47,7 @@ include(FindOrFetch)
 find_package(Threads REQUIRED)
 
 set(MUJOCO_BUILD_EXAMPLES OFF)
-set(MUJOCO_BUILD_SIMULATE OFF)
+set(MUJOCO_BUILD_SIMULATE ON)
 set(MUJOCO_BUILD_TESTS OFF)
 set(MUJOCO_TEST_PYTHON_UTIL OFF)
 
@@ -64,6 +64,7 @@ findorfetch(
   main
   TARGETS
   mujoco::mujoco
+  mujoco::platform_ui_adapter
   EXCLUDE_FROM_ALL
 )
 
@@ -151,6 +152,30 @@ set(BUILD_SHARED_LIBS
 )
 unset(BUILD_SHARED_LIBS_OLD)
 
+FetchContent_Declare(
+  menagerie
+  GIT_REPOSITORY https://github.com/deepmind/mujoco_menagerie.git
+  GIT_TAG main
+)
+
+FetchContent_GetProperties(menagerie)
+if(NOT menagerie_POPULATED)
+  FetchContent_Populate(menagerie)
+endif()
+
+add_custom_target(
+  copy_menagerie_resources ALL
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+          ${menagerie_SOURCE_DIR}/shadow_hand/assets
+          ${CMAKE_CURRENT_BINARY_DIR}/tasks/hand/assets
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+          ${menagerie_SOURCE_DIR}/franka_emika_panda/assets
+          ${CMAKE_CURRENT_BINARY_DIR}/tasks/panda/assets
+  COMMAND ${CMAKE_COMMAND} -E copy_directory
+          ${menagerie_SOURCE_DIR}/unitree_a1/assets
+          ${CMAKE_CURRENT_BINARY_DIR}/tasks/quadruped/assets
+  COMMENT "Copying menagerie assets into binary directory")
+
 if(NOT TARGET lodepng)
   FetchContent_Declare(
     lodepng
@@ -205,8 +230,14 @@ add_library(
   tasks/cartpole/cartpole.h
   tasks/hand/hand.cc
   tasks/hand/hand.h
-  tasks/humanoid/humanoid.cc
-  tasks/humanoid/humanoid.h
+  tasks/humanoid/stand/task.cc
+  tasks/humanoid/stand/task.h
+  tasks/humanoid/tracking/task.cc
+  tasks/humanoid/tracking/task.h
+  tasks/humanoid/walk/task.cc
+  tasks/humanoid/walk/task.h
+  tasks/panda/panda.cc
+  tasks/panda/panda.h
   tasks/particle/particle.cc
   tasks/particle/particle.h
   tasks/quadrotor/quadrotor.cc
@@ -228,6 +259,8 @@ add_library(
   planners/cma/policy.h
   planners/cost_derivatives.cc
   planners/cost_derivatives.h
+  planners/linear_solve.cc
+  planners/linear_solve.h
   planners/model_derivatives.cc
   planners/model_derivatives.h
   planners/sampling/planner.cc
@@ -251,6 +284,8 @@ add_library(
   planners/ilqg/policy.cc
   planners/ilqg/policy.h
   planners/ilqg/settings.h
+  planners/ilqs/planner.cc
+  planners/ilqs/planner.h
   norm.cc
   norm.h
   task.cc
@@ -260,6 +295,7 @@ set_target_properties(libmjpc PROPERTIES OUTPUT_NAME mjpc)
 target_compile_options(libmjpc PUBLIC ${MJPC_COMPILE_OPTIONS})
 target_link_libraries(
   libmjpc
+  absl::flat_hash_map
   absl::random_random
   mujoco::mujoco
   threadpool
@@ -269,13 +305,12 @@ target_include_directories(libmjpc PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 
 add_executable(
   mjpc
-  glfw_dispatch.cc
-  glfw_dispatch.h
+  app.cc
+  app.h
   main.cc
   simulate.cc
   simulate.h
-  uitools.cc
-  uitools.h
+  $<TARGET_OBJECTS:mujoco::platform_ui_adapter>
 )
 target_link_libraries(
   mjpc
@@ -287,6 +322,7 @@ target_link_libraries(
   libmjpc
   lodepng
   mujoco::mujoco
+  mujoco::platform_ui_adapter
   threadpool
   Threads::Threads
 )

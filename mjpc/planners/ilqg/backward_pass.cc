@@ -170,7 +170,6 @@ int iLQGBackwardPass::RiccatiStep(
                           boxqp.H.data(), boxqp.g.data(), m, boxqp.lower.data(),
                           boxqp.upper.data());
     if (mFree < 0) {
-      // printf("backward_pass failure\n");
       return 0;
     }
 
@@ -198,7 +197,12 @@ int iLQGBackwardPass::RiccatiStep(
   } else {
     // Quut^-1
     mju_copy(tmp3, Quu_reg, m * m);
-    mju_cholFactor(tmp3, m, 0.0);
+    int rank = mju_cholFactor(tmp3, m, 0.0);
+
+    if (rank < m) {
+      printf("backward pass failure\n");
+      return 0;
+    }
 
     // Kt = - Quut \ Qxut
     for (int i = 0; i < n; i++) {
@@ -264,7 +268,7 @@ int iLQGBackwardPass::Riccati(iLQGPolicy *p, const ModelDerivatives *md,
   // iterate Riccati backward in time
   int bp_iter = 0;
   int time_index = T - 1;
-  while (bp_iter < settings.max_regularization_iter) {
+  while (bp_iter < settings.max_regularization_iterations) {
     for (int t = T - 1; t > 0; t--) {
       int status = this->RiccatiStep(
           dim_dstate, dim_action, reg, DataAt(Vx, t * dim_dstate),

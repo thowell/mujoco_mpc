@@ -15,6 +15,7 @@
 #ifndef MJPC_TASK_H_
 #define MJPC_TASK_H_
 
+#include <string>
 #include <vector>
 
 #include <mujoco/mujoco.h>
@@ -26,11 +27,13 @@ namespace mjpc {
 inline constexpr double kRiskNeutralTolerance = 1.0e-6;
 
 // maximum cost terms
-inline constexpr int kMaxCostTerms = 30;
+inline constexpr int kMaxCostTerms = 35;
+
+class Task;
 
 using ResidualFunction = void(const double* parameters, const mjModel* model,
                               const mjData* data, double* residual);
-using TransitionFunction = int(int state, const mjModel* model, mjData* data);
+using TransitionFunction = void(const mjModel* model, mjData* data, Task* task);
 
 // contains information for computing costs
 class Task {
@@ -51,7 +54,8 @@ class Task {
   void GetFrom(const mjModel* model);
 
   // compute cost terms
-  void CostTerms(double* terms, const double* residual) const;
+  void CostTerms(double* terms, const double* residual,
+                 bool weighted = true) const;
 
   // compute weighted cost
   double CostValue(const double* residual) const;
@@ -63,12 +67,11 @@ class Task {
   void Transition(const mjModel* m, mjData* d);
 
   int id = 0;             // task ID
-  int transition_state;   // state
-  int transition_status;  // status
+  int stage;              // stage
 
   // cost parameters
   int num_residual;
-  int num_cost;
+  int num_term;
   int num_trace;
   std::vector<int> dim_norm_residual;
   std::vector<int> num_norm_parameter;
@@ -78,7 +81,7 @@ class Task {
   double risk;
 
   // residual parameters
-  std::vector<double> residual_parameters;
+  std::vector<double> parameters;
 
  private:
   // initial residual parameters from model
@@ -91,11 +94,12 @@ class Task {
   TransitionFunction* transition_;
 };
 
-extern int NullTransition(int state, const mjModel* model, mjData* data);
+extern void NullTransition(const mjModel* model, mjData* data, Task* task);
 
+template <typename T = std::string>
 struct TaskDefinition {
-  const char* name;
-  const char* xml_path;
+  T name;
+  T xml_path;
   ResidualFunction* residual;
   TransitionFunction* transition = &NullTransition;
 };

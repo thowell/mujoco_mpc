@@ -14,10 +14,9 @@
 
 #include "planners/ilqg/policy.h"
 
-#include <mujoco/mujoco.h>
-
 #include <algorithm>
 
+#include <mujoco/mujoco.h>
 #include "task.h"
 #include "trajectory.h"
 #include "utilities.h"
@@ -31,7 +30,8 @@ void iLQGPolicy::Allocate(const mjModel* model, const Task& task, int horizon) {
 
   // reference trajectory
   trajectory.Initialize(model->nq + model->nv + model->na, model->nu,
-                        task.num_residual, task.num_trace, kMaxTrajectoryHorizon);
+                        task.num_residual, task.num_trace,
+                        kMaxTrajectoryHorizon);
   trajectory.Allocate(kMaxTrajectoryHorizon);
 
   // feedback gains
@@ -48,7 +48,7 @@ void iLQGPolicy::Allocate(const mjModel* model, const Task& task, int horizon) {
   // interpolation
   // feedback gains ((T - 1) * dim_action * dim_state_derivative)
   feedback_gain_scratch.resize(model->nu * (2 * model->nv + model->na));
-  
+
   // state interpolation (dim_state_derivative)
   state_interp.resize(model->nq + model->nv + model->na);
 
@@ -74,6 +74,8 @@ void iLQGPolicy::Reset(int horizon) {
       0.0);
   std::fill(state_interp.begin(),
             state_interp.begin() + model->nq + model->nv + model->na, 0.0);
+
+  feedback_scaling = 1.0;
 }
 
 // set action from policy
@@ -142,10 +144,12 @@ void iLQGPolicy::Action(double* action, const double* state,
   }
 
   // add feedback
-  StateDiff(model, state_scratch.data(), state_interp.data(), state, 1.0);
-  mju_mulMatVec(action_scratch.data(), feedback_gain_scratch.data(),
-                state_scratch.data(), dim_action, dim_state_derivative);
-  mju_addTo(action, action_scratch.data(), dim_action);
+  if (state) {
+    StateDiff(model, state_scratch.data(), state_interp.data(), state, 1.0);
+    mju_mulMatVec(action_scratch.data(), feedback_gain_scratch.data(),
+                  state_scratch.data(), dim_action, dim_state_derivative);
+    mju_addToScl(action, action_scratch.data(), feedback_scaling, dim_action);
+  }
 
   // clamp controls
   Clamp(action, model->actuator_ctrlrange, dim_action);

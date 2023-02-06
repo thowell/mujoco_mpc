@@ -14,10 +14,10 @@
 
 #include "task.h"
 
-#include <mujoco/mujoco.h>
-
 #include <cstring>
 
+#include <absl/strings/match.h>
+#include <mujoco/mujoco.h>
 #include "utilities.h"
 
 namespace mjpc {
@@ -39,8 +39,7 @@ void Task::GetFrom(const mjModel* model) {
   // ----- defaults ----- //
 
   // transition
-  transition_status = GetNumberOrDefault(0, model, "task_transition");
-  transition_state = 0;
+  stage = 0;
 
   // risk value
   risk = GetNumberOrDefault(0.0, model, "task_risk");
@@ -49,7 +48,7 @@ void Task::GetFrom(const mjModel* model) {
   this->SetFeatureParameters(model);
 
   // ----- set costs ----- //
-  num_cost = 0;
+  num_term = 0;
   num_residual = 0;
   num_trace = 0;
 
@@ -84,7 +83,7 @@ void Task::GetFrom(const mjModel* model) {
     if (model->sensor_type[i] == mjSENS_USER) {
       // residual dimension
       num_residual += model->sensor_dim[i];
-      dim_norm_residual[num_cost] = (int)model->sensor_dim[i];
+      dim_norm_residual[num_term] = (int)model->sensor_dim[i];
 
       // user data: [norm, weight, weight_lower, weight_upper, parameters...]
       double* s = model->sensor_user + i * model->nuser_sensor;
@@ -94,18 +93,25 @@ void Task::GetFrom(const mjModel* model) {
         if (s[4 + j] > 0.0) continue;
         mju_error("Cost construction from XML: Missing parameter value\n");
       }
-      norm[num_cost] = (NormType)s[0];
-      weight[num_cost] = s[1];
-      num_norm_parameter[num_cost] = NormParameterDimension(s[0]);
+      norm[num_term] = (NormType)s[0];
+
+      // check Null norm
+      if (norm[num_term] == -1 && dim_norm_residual[num_term] != 1) {
+        mju_error("Cost construction from XML: Missing parameter value\n");
+      }
+
+      weight[num_term] = s[1];
+      num_norm_parameter[num_term] = NormParameterDimension(s[0]);
       mju_copy(DataAt(num_parameter, parameter_shift), s + 4,
-               num_norm_parameter[num_cost]);
-      parameter_shift += num_norm_parameter[num_cost];
-      num_cost += 1;
+               num_norm_parameter[num_term]);
+      parameter_shift += num_norm_parameter[num_term];
+      num_term += 1;
 
       // check for max norms
-      if (num_cost > kMaxCostTerms) {
-        mju_error("Number of cost terms exceeds maximum. Either: 1) reduce number of "
-                  "terms 2) increase kMaxCostTerms");
+      if (num_term > kMaxCostTerms) {
+        mju_error(
+            "Number of cost terms exceeds maximum. Either: 1) reduce number of "
+            "terms 2) increase kMaxCostTerms");
       }
     }
   }
@@ -115,14 +121,16 @@ void Task::GetFrom(const mjModel* model) {
 }
 
 // compute weighted cost terms
-void Task::CostTerms(double* terms, const double* residual) const {
+void Task::CostTerms(double* terms, const double* residual,
+                     bool weighted) const {
   int f_shift = 0;
   int p_shift = 0;
-  for (int k = 0; k < num_cost; k++) {
+  for (int k = 0; k < num_term; k++) {
     // running cost
-    terms[k] = weight[k] * Norm(nullptr, nullptr, residual + f_shift,
-                                DataAt(num_parameter, p_shift),
-                                dim_norm_residual[k], norm[k]);
+    terms[k] =
+        (weighted ? weight[k] : 1) * Norm(nullptr, nullptr, residual + f_shift,
+                                          DataAt(num_parameter, p_shift),
+                                          dim_norm_residual[k], norm[k]);
 
     // shift residual
     f_shift += dim_norm_residual[k];
@@ -142,7 +150,7 @@ double Task::CostValue(const double* residual) const {
 
   // summation of cost terms
   double cost = 0.0;
-  for (int i = 0; i < num_cost; i++) {
+  for (int i = 0; i < num_term; i++) {
     cost += terms[i];
   }
 
@@ -156,44 +164,46 @@ double Task::CostValue(const double* residual) const {
 
 void Task::Residuals(const mjModel* m, const mjData* d,
                      double* residuals) const {
-  residual_(residual_parameters.data(), m, d, residuals);
+  residual_(parameters.data(), m, d, residuals);
 }
 
 void Task::Transition(const mjModel* m, mjData* d) {
-  transition_state = transition_(transition_state, m, d);
+  transition_(m, d, this);
 }
 
 // initial residual parameters from model
 void Task::SetFeatureParameters(const mjModel* model) {
   // set counter
-  int num_residual_parameters = 0;
+  int num_parameters = 0;
 
   // search custom numeric in model for "residual"
   for (int i = 0; i < model->nnumeric; i++) {
-    if (std::strncmp(model->names + model->name_numericadr[i], "residual_",
-                     8) == 0) {
-      num_residual_parameters += 1;
+    if (absl::StartsWith(model->names + model->name_numericadr[i],
+                         "residual_")) {
+      num_parameters += 1;
     }
   }
 
   // allocate memory
-  residual_parameters.resize(num_residual_parameters);
+  parameters.resize(num_parameters);
 
   // set values
   int shift = 0;
   for (int i = 0; i < model->nnumeric; i++) {
-    if (std::strncmp(model->names + model->name_numericadr[i], "residual_",
-                     9) == 0) {
+    if (absl::StartsWith(model->names + model->name_numericadr[i],
+                         "residual_select_")) {
+      parameters[shift] = DefaultResidualSelection(model, i);
+      shift++;
+    } else if (absl::StartsWith(model->names + model->name_numericadr[i],
+                                "residual_")) {
       int dim = 1;  // model->numeric_size[i];
       double* params = model->numeric_data + model->numeric_adr[i];
-      mju_copy(DataAt(residual_parameters, shift), params, dim);
+      mju_copy(DataAt(parameters, shift), params, dim);
       shift += dim;
     }
   }
 }
 
-int NullTransition(int state, const mjModel* model, mjData* data) {
-  return state;
-}
+void NullTransition(const mjModel* model, mjData* data, Task* task) {}
 
 }  // namespace mjpc

@@ -33,7 +33,7 @@ void Trajectory::Initialize(int dim_state, int dim_action, int dim_residual,
   this->horizon = horizon;
   this->dim_state = dim_state;
   this->dim_action = dim_action;
-  this->dim_feature = dim_residual;
+  this->dim_residual = dim_residual;
   this->dim_trace = 3 * num_trace;
   this->failure = false;
 }
@@ -50,7 +50,7 @@ void Trajectory::Allocate(int T) {
   costs.resize(T);
 
   // residual
-  residual.resize(dim_feature * T);
+  residual.resize(dim_residual * T);
 
   // times
   times.resize(T);
@@ -72,7 +72,7 @@ void Trajectory::Reset(int T) {
 
   // costs
   std::fill(costs.begin(), costs.begin() + T, 0.0);
-  std::fill(residual.begin(), residual.begin() + dim_feature * T, 0.0);
+  std::fill(residual.begin(), residual.begin() + dim_residual * T, 0.0);
   total_return = 0.0;
   failure = false;
 
@@ -85,45 +85,55 @@ void Trajectory::Rollout(
     std::function<void(double* action, const double* state, double time)>
         policy,
     const Task* task, const mjModel* model, mjData* data, const double* state,
-    double time, const double* mocap, int steps) {
+    double time, const double* mocap, const double* userdata, int steps) {
   // reset failure flag
   failure = false;
+
+  // model sizes
+  int nq = model->nq;
+  int nv = model->nv;
+  int na = model->na;
+  int nu = model->nu;
+  int nmocap = model->nmocap;
+  int nuserdata = model->nuserdata;
 
   // horizon
   horizon = steps;
 
   // set mocap
-  for (int i = 0; i < model->nmocap; i++) {
+  for (int i = 0; i < nmocap; i++) {
     mju_copy(data->mocap_pos + 3 * i, mocap + 7 * i, 3);
     mju_copy(data->mocap_quat + 4 * i, mocap + 7 * i + 3, 4);
   }
 
+  // set userdata
+  mju_copy(data->userdata, userdata, nuserdata);
+
   // set initial state
   mju_copy(states.data(), state, dim_state);
-  mju_copy(data->qpos, state, model->nq);
-  mju_copy(data->qvel, state + model->nq, model->nv);
-  mju_copy(data->act, state + model->nq + model->nv, model->na);
+  mju_copy(data->qpos, state, nq);
+  mju_copy(data->qvel, state + nq, nv);
+  mju_copy(data->act, state + nq + nv, na);
 
   // set initial time
   times[0] = time;
   data->time = time;
 
-  // step1
-  mj_step1(model, data);
+  for (int t = 0; t < horizon - 1; t++) {
+    // set action
+    policy(DataAt(actions, t * nu), DataAt(states, t * dim_state), data->time);
+    mju_copy(data->ctrl, DataAt(actions, t * nu), nu);
 
-  // action from policy
-  policy(actions.data(), states.data(), time);
-  mju_copy(data->ctrl, actions.data(), model->nu);
+    // step
+    mj_step(model, data);
 
-  // initial residual
-  task->Residuals(model, data, residual.data());
+    // record residual
+    mju_copy(DataAt(residual, t * dim_residual), data->sensordata,
+             dim_residual);
 
-  // initial trace
-  GetTraces(trace.data(), model, data, task->num_trace);
-
-  for (int t = 1; t < horizon - 1; t++) {
-    // step2
-    mj_step2(model, data);
+    // record trace
+    GetTraces(DataAt(trace, t * 3 * task->num_trace), model, data,
+              task->num_trace);
 
     // check for step warnings
     if ((failure |= CheckWarnings(data))) {
@@ -133,29 +143,11 @@ void Trajectory::Rollout(
     }
 
     // record state
-    mju_copy(DataAt(states, t * dim_state), data->qpos, model->nq);
-    mju_copy(DataAt(states, t * dim_state + model->nq), data->qvel, model->nv);
-    mju_copy(DataAt(states, t * dim_state + model->nq + model->nv), data->act,
-             model->na);
-    times[t] = data->time;
-
-    // step1
-    mj_step1(model, data);
-
-    // set action
-    policy(DataAt(actions, t * model->nu), DataAt(states, t * dim_state),
-           data->time);
-    mju_copy(data->ctrl, DataAt(actions, t * model->nu), model->nu);
-
-    // residual
-    task->Residuals(model, data, DataAt(residual, t * dim_feature));
-
-    // record trace
-    GetTraces(DataAt(trace, t * 3 * task->num_trace), model, data, task->num_trace);
+    mju_copy(DataAt(states, (t + 1) * dim_state), data->qpos, nq);
+    mju_copy(DataAt(states, (t + 1) * dim_state + nq), data->qvel, nv);
+    mju_copy(DataAt(states, (t + 1) * dim_state + nq + nv), data->act, na);
+    times[t + 1] = data->time;
   }
-
-  // final step2
-  mj_step2(model, data);
 
   // check for step warnings
   if ((failure |= CheckWarnings(data))) {
@@ -163,14 +155,6 @@ void Trajectory::Rollout(
     std::cerr << "Rollout divergence at step\n";
     return;
   }
-
-  // record final state
-  mju_copy(DataAt(states, (horizon - 1) * dim_state), data->qpos, model->nq);
-  mju_copy(DataAt(states, (horizon - 1) * dim_state + model->nq), data->qvel,
-           model->nv);
-  mju_copy(DataAt(states, (horizon - 1) * dim_state + model->nq + model->nv),
-           data->act, model->na);
-  times[horizon - 1] = data->time;
 
   // copy final action
   if (horizon > 1) {
@@ -180,14 +164,16 @@ void Trajectory::Rollout(
     mju_zero(DataAt(actions, (horizon - 1) * dim_action), dim_action);
   }
 
-  // final step1
-  mj_step1(model, data);
+  // final forward
+  mj_forward(model, data);
 
   // final residual
-  task->Residuals(model, data, DataAt(residual, (horizon - 1) * dim_feature));
+  mju_copy(DataAt(residual, (horizon - 1) * dim_residual), data->sensordata,
+           dim_residual);
 
   // final trace
-  GetTraces(DataAt(trace, (horizon - 1) * 3 * task->num_trace), model, data, task->num_trace);
+  GetTraces(DataAt(trace, (horizon - 1) * 3 * task->num_trace), model, data,
+            task->num_trace);
 
   // compute return
   UpdateReturn(task);
@@ -198,46 +184,55 @@ void Trajectory::RolloutDiscrete(
     std::function<void(double* action, const double* state, int index)>
         policy,
     const Task* task, const mjModel* model, mjData* data, const double* state,
-    double time, const double* mocap, int steps) {
+    double time, const double* mocap, const double* userdata, int steps) {
   // reset failure flag
   failure = false;
+
+  // model sizes
+  int nq = model->nq;
+  int nv = model->nv;
+  int na = model->na;
+  int nu = model->nu;
+  int nmocap = model->nmocap;
+  int nuserdata = model->nuserdata;
 
   // horizon
   horizon = steps;
 
   // set mocap
-  for (int i = 0; i < model->nmocap; i++) {
+  for (int i = 0; i < nmocap; i++) {
     mju_copy(data->mocap_pos + 3 * i, mocap + 7 * i, 3);
     mju_copy(data->mocap_quat + 4 * i, mocap + 7 * i + 3, 4);
   }
 
+  // set userdata
+  mju_copy(data->userdata, userdata, nuserdata);
+
   // set initial state
   mju_copy(states.data(), state, dim_state);
-  mju_copy(data->qpos, state, model->nq);
-  mju_copy(data->qvel, state + model->nq, model->nv);
-  mju_copy(data->act, state + model->nq + model->nv, model->na);
+  mju_copy(data->qpos, state, nq);
+  mju_copy(data->qvel, state + nq, nv);
+  mju_copy(data->act, state + nq + nv, na);
 
   // set initial time
   times[0] = time;
   data->time = time;
 
-  // step1
-  mj_step1(model, data);
+  for (int t = 0; t < horizon - 1; t++) {
+    // set action
+    policy(DataAt(actions, t * nu), DataAt(states, t * dim_state), t);
+    mju_copy(data->ctrl, DataAt(actions, t * nu), nu);
 
-  // action from policy
-  policy(actions.data(), states.data(), 0);
-  mju_copy(data->ctrl, actions.data(), model->nu);
+    // step
+    mj_step(model, data);
 
-  // initial residual
-  task->Residuals(model, data, residual.data());
+    // record residual
+    mju_copy(DataAt(residual, t * dim_residual), data->sensordata,
+             dim_residual);
 
-  // initial trace
-  GetTraces(trace.data(), model, data, task->num_trace);
-
-
-  for (int t = 1; t < horizon - 1; t++) {
-    // step2
-    mj_step2(model, data);
+    // record trace
+    GetTraces(DataAt(trace, t * 3 * task->num_trace), model, data,
+              task->num_trace);
 
     // check for step warnings
     if ((failure |= CheckWarnings(data))) {
@@ -247,29 +242,11 @@ void Trajectory::RolloutDiscrete(
     }
 
     // record state
-    mju_copy(DataAt(states, t * dim_state), data->qpos, model->nq);
-    mju_copy(DataAt(states, t * dim_state + model->nq), data->qvel, model->nv);
-    mju_copy(DataAt(states, t * dim_state + model->nq + model->nv), data->act,
-             model->na);
-    times[t] = data->time;
-
-    // step1
-    mj_step1(model, data);
-
-    // set action
-    policy(DataAt(actions, t * model->nu), DataAt(states, t * dim_state),
-           t);
-    mju_copy(data->ctrl, DataAt(actions, t * model->nu), model->nu);
-
-    // residual
-    task->Residuals(model, data, DataAt(residual, t * dim_feature));
-
-    // record trace
-    GetTraces(DataAt(trace, t * 3 * task->num_trace), model, data, task->num_trace);
+    mju_copy(DataAt(states, (t + 1) * dim_state), data->qpos, nq);
+    mju_copy(DataAt(states, (t + 1) * dim_state + nq), data->qvel, nv);
+    mju_copy(DataAt(states, (t + 1) * dim_state + nq + nv), data->act, na);
+    times[t + 1] = data->time;
   }
-
-  // final step2
-  mj_step2(model, data);
 
   // check for step warnings
   if ((failure |= CheckWarnings(data))) {
@@ -277,14 +254,6 @@ void Trajectory::RolloutDiscrete(
     std::cerr << "Rollout divergence at step\n";
     return;
   }
-
-  // record final state
-  mju_copy(DataAt(states, (horizon - 1) * dim_state), data->qpos, model->nq);
-  mju_copy(DataAt(states, (horizon - 1) * dim_state + model->nq), data->qvel,
-           model->nv);
-  mju_copy(DataAt(states, (horizon - 1) * dim_state + model->nq + model->nv),
-           data->act, model->na);
-  times[horizon - 1] = data->time;
 
   // copy final action
   if (horizon > 1) {
@@ -294,14 +263,16 @@ void Trajectory::RolloutDiscrete(
     mju_zero(DataAt(actions, (horizon - 1) * dim_action), dim_action);
   }
 
-  // final step1
-  mj_step1(model, data);
+  // final forward
+  mj_forward(model, data);
 
   // final residual
-  task->Residuals(model, data, DataAt(residual, (horizon - 1) * dim_feature));
+  mju_copy(DataAt(residual, (horizon - 1) * dim_residual), data->sensordata,
+           dim_residual);
 
   // final trace
-  GetTraces(DataAt(trace, (horizon - 1) * 3 * task->num_trace), model, data, task->num_trace);
+  GetTraces(DataAt(trace, (horizon - 1) * 3 * task->num_trace), model, data,
+            task->num_trace);
 
   // compute return
   UpdateReturn(task);
