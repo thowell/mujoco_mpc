@@ -25,6 +25,7 @@
 #include "mjpc/utilities.h"
 #include "mjpc/tasks/tasks.h"
 
+#include "mjpc/planners/linear_solve.h"
 
 // machinery for replacing command line error by a macOS dialog box
 // when running under Rosetta
@@ -73,10 +74,14 @@ const std::vector<double> C{1.0, 0.0, 0.0, 1.0};        // sensor state Jacobian
 const std::vector<double> D{0.0, 0.0, 0.0, 0.0};        // sensor action Jacobian
 const std::vector<double> E{-1.0, -1.0 * h, 0.0, -1.0}; // inverse dynamics current state Jacobian
 const std::vector<double> F{1.0, 0.0, 0.0, 1.0};        // inverse dynamics next state Jacobian
-const std::vector<double> In{1.0, 0.0, 0.0, 1.0};       // identity
+const std::vector<double> In{1.0, 0.0, 0.0, 1.0};       // identity (state dimension)
+const std::vector<double> Inq{1.0};                     // identity (configuration dimension)
+const std::vector<double> Inv{1.0};                     // identity (velocity dimension)
+const std::vector<double> Ina;                          // identity (acceleration dimension)
 const int n  = 2;                                       // state dimension
-// const int nq = 1;                                    // configuration dimension
-// const int nv = 1;                                    // velocity dimension 
+const int nq = 1;                                       // configuration dimension
+const int nv = 1;                                       // velocity dimension 
+const int na = 0;                                       // acceleration dimension
 const int m  = 2;                                       // action dimension
 const int p  = 2;                                       // sensor dimension 
 
@@ -258,6 +263,110 @@ void J3zz(double* Jzz, const double* Z, const double* U, const double* R, int T)
   r3z(rz, Z, U, T);
   mju_mulMatMat(tmp, R, rz, m * (T - 1), m * (T - 1), n * T);
   mju_mulMatTMat(Jzz, rz, tmp, m * (T - 1), n * T, n * T); 
+}
+
+// cumulative cost 
+double J(const double* Z, const double* U, const double* Y, const double* P, const double* S, const double* R, int T) {
+  return J1(Z, U, P, T) + J2(Z, U, Y, S, T) + J3(Z, U, R, T);
+}
+
+// cumulative cost gradient 
+void Jz(double* Jz_, const double* Z, const double* U, const double* Y, const double* P, const double* S, const double* R, int T) {
+  double tmp[n * T];
+  J1z(Jz_, Z, U, P, T);
+  J2z(tmp, Z, U, Y, S, T);
+  mju_addTo(Jz_, tmp, n * T);
+  J3z(tmp, Z, U, R, T);
+  mju_addTo(Jz_, tmp, n * T);
+}
+
+// cumulative cost Hessian
+void Jzz(double* Jzz_, const double* Z, const double* U, const double* Y, const double* P, const double* S, const double* R, int T) {
+  double tmp[(n * T) * (n * T)];
+  J1zz(Jzz_, Z, U, P, T);
+  J2zz(tmp, Z, U, Y, S, T);
+  mju_addTo(Jzz_, tmp, (n * T) * (n * T));
+  J3zz(tmp, Z, U, R, T);
+  mju_addTo(Jzz_, tmp, (n * T) * (n * T));
+}
+
+// mapping from configurations to state (via finite difference)
+// TODO(taylor): acceleration
+void ConfigurationToState(double* Z, const double* Q, int T) {
+  // time step for finite difference
+  double h_ = h * (T - 1) / (2 * T - 1);
+
+  for (int t = 0; t < T; t++) {
+    const double* q0 = Q + 2 * nq * t;
+    const double* q1 = Q + 2 * nq * t + nq;
+    const double* q2 = Q + 2 * nq * t + 2 * nq;
+
+    // configuration 
+    mju_copy(Z + n * t, q1, nq);
+
+    // velocity 
+    mju_scl(Z + n * t + nq, q1, 1.0 / h_, nv);
+    mju_addToScl(Z + n * t + nq, q0, -1.0 / h_, nv);
+
+    // acceleration 
+    mju_scl(Z + n * t + nq + nv, q2, 1.0 / (h_ * h_), na);
+    mju_addToScl(Z + n * t + nq + nv, q1, -2.0 / (h_ * h_), na);
+    mju_addToScl(Z + n * t + nq + nv, q0, 1.0 / (h_ * h_), na);
+  }
+}
+
+// TODO(taylor): acceleration
+void ConfigurationToStateMapping(double* M, int T) {
+  // set to zero 
+  mju_zero(M, (n * T) * (2 * nq * T));
+
+  // time step for finite difference
+  double h_ = h * (T - 1) / (2 * T - 1);
+
+  for (int t = 0; t < T; t++) {
+    // configuration 
+    SetMatrixInMatrix(M, In.data(), 1.0, n * T, 2 * nq * T, nq, nq, n * t, 2 * nq * t + nq);
+
+    // velocity 
+    SetMatrixInMatrix(M, Inq.data(), -1.0 / h_, n * T, 2 * nq * T, nv, nv, n * t + nq, 2 * nq * t);
+    SetMatrixInMatrix(M, Inq.data(),  1.0 / h_, n * T, 2 * nq * T, nv, nv, n * t + nq, 2 * nq * t + nq);
+
+    // acceleration 
+    // TODO(taylor): check index overflow
+    if (na > 0) {
+      // SetMatrixInMatrix(M, Ina.data(),  1.0 / (h_ * h_), n * T, 2 * nq * T, nv, nv, n * t + nq + nv, 2 * nq * t);
+      // SetMatrixInMatrix(M, Ina.data(), -2.0 / (h_ * h_), n * T, 2 * nq * T, nv, nv, n * t + nq + nv, 2 * nq * t + nq);
+      // SetMatrixInMatrix(M, Ina.data(),  1.0 / (h_ * h_), n * T, 2 * nq * T, nv, nv, n * t + nq + nv, 2 * nq * t + nq + nq);
+    }
+  }
+}
+
+// cumulative cost gradient wrt to configurations 
+void Jq(double* Jq_, const double* Z, const double* U, const double* Y, const double* P, const double* S, const double* R, int T) {
+  double Jz_[n * T];
+  double M[(n * T) * (2 * nq * T)];
+
+  // intermediate results
+  Jz(Jz_, Z, U, Y, P, S, R, T);
+  ConfigurationToStateMapping(M, T);
+
+  // total gradient 
+  mju_mulMatTVec(Jq_, M, Jz_, n * T, 2 * nq * T);
+}
+
+// cumulative cost Hessian wrt to configurations
+void Jqq(double* Jqq_, const double* Z, const double* U, const double* Y, const double* P, const double* S, const double* R, int T) {
+  double Jzz_[(n * T) * (n * T)];
+  double M[(n * T) * (2 * nq * T)];
+  double tmp[(n * T) * (2 * nq * T)];
+
+  // intermediate results
+  Jzz(Jzz_, Z, U, Y, P, S, R, T);
+  ConfigurationToStateMapping(M, T);
+
+  // total Hessian 
+  mju_mulMatMat(tmp, Jzz_, M, n * T, n * T, 2 * nq * T);
+  mju_mulMatTMat(Jqq_, M, tmp, n * T, 2 * nq * T, 2 * nq * T);
 }
 
 // run event loop
@@ -470,6 +579,148 @@ int main(int argc, char** argv) {
   J3zz(J3zz_.data(), X.data(), U.data(), R.data(), T);
   printf("J3zz: \n");
   mju_printMat(J3zz_.data(), n * T, n * T);
+
+  // cumulative cost 
+  double J_ = J(X.data(), U.data(), Y.data(), P.data(), S.data(), R.data(), T);
+  printf("J: %f\n", J_);
+
+  // cumulative cost gradient 
+  std::vector<double> Jz_;
+  Jz_.resize(n * T);
+  Jz(Jz_.data(), X.data(), U.data(), Y.data(), P.data(), S.data(), R.data(), T);
+  printf("Jz: \n");
+  mju_printMat(Jz_.data(), n * T, 1);
+
+  // cumulative cost Hessian 
+  std::vector<double> Jzz_;
+  Jzz_.resize((n * T) * (n * T));
+  Jzz(Jzz_.data(), X.data(), U.data(), Y.data(), P.data(), S.data(), R.data(), T);
+  printf("Jzz: \n");
+  mju_printMat(Jzz_.data(), n * T, n * T);
+
+  // configuration mapping 
+  std::vector<double> M;
+  M.resize((n * T) * (2 * nq * T));
+  ConfigurationToStateMapping(M.data(), T);
+  printf("configuration to state mapping: \n");
+  mju_printMat(M.data(), n * T, 2 * nq * T);
+
+  // check mapping
+  mjpc::LinearSolve solver;
+  std::vector<double> Q(2 * nq * T);
+  solver.Initialize(n * T, 2 * nq * T);
+  solver.Solve(Q.data(), M.data(), X.data());
+
+  printf("X: \n");
+  mju_printMat(X.data(), n * T, 1);
+
+  printf("Q: \n");
+  mju_printMat(Q.data(), 2 * nq * T, 1);
+
+  // configuration to state conversion
+  std::vector<double> Z_(n * T);
+  ConfigurationToState(Z_.data(), Q.data(), T);
+
+  printf("recovered Z:\n");
+  mju_printMat(Z_.data(), n * T, 1);
+
+  // Jq 
+  std::vector<double> Jq_(2 * nq * T);
+  std::vector<double> X0(n * T);
+  mju_zero(X0.data(), n * T);
+  Jq(Jq_.data(), X0.data(), U.data(), Y.data(), P.data(), S.data(), R.data(), T);
+
+  printf("Jq000: \n");
+  mju_printMat(Jq_.data(), 2 * nq * T, 1);
+
+  Jz(Jz_.data(), X0.data(), U.data(), Y.data(), P.data(), S.data(), R.data(), T);
+  printf("Jz000: \n");
+  mju_printMat(Jz_.data(), n * T, 1);
+
+
+  // Jqq 
+  std::vector<double> Jqq_((2 * nq * T) * (2 * nq * T));
+  Jqq(Jqq_.data(), X.data(), U.data(), Y.data(), P.data(), S.data(), R.data(), T);
+
+  printf("Jqq: \n");
+  mju_printMat(Jqq_.data(), 2 * nq * T, 2 * nq * T);
+
+  // ----- optimize ----- //
+
+  // allocate
+  std::vector<double> Qo(2 * nq * T);
+  std::vector<double> Zo(n * T);
+  std::vector<double> Qc(2 * nq * T);
+  std::vector<double> Zc(n * T);
+  std::vector<double> grad(2 * nq * T);
+  std::vector<double> hess((2 * nq * T) * (2 * nq * T));
+  std::vector<double> dir(2 * nq * T);
+
+  // initialize 
+  mju_zero(Qo.data(), 2 * nq * T);
+
+  // 
+  ConfigurationToState(Zo.data(), Qo.data(), T);
+  double obj = J(Zo.data(), U.data(), Y.data(), P.data(), S.data(), R.data(), T);
+  printf("obj (0): %f\n", obj);
+
+  for (int i = 0; i < 10; i++) {
+    // gradient
+    Jq(grad.data(), Zo.data(), U.data(), Y.data(), P.data(), S.data(), R.data(), T);
+
+    printf("grad:\n");
+    mju_printMat(grad.data(), 2 * nq * T, 1);
+
+    // check convergence
+    double residual = mju_norm(grad.data(), 2 * nq * T) / (2 * nq * T);
+    if (residual < 1.0e-3) {
+      printf("Solved!\n");
+      printf("Solution: \n");
+      mju_printMat(Qo.data(), 2 * nq * T, 1);
+      return 0;
+    }
+
+    // Hessian 
+    Jqq(hess.data(), Zo.data(), U.data(), Y.data(), P.data(), S.data(), R.data(), T);
+    
+    printf("hess:\n");
+    mju_printMat(hess.data(), 2 * nq * T, 2 * nq * T);
+
+    // compute search direction
+    mju_cholFactor(hess.data(), 2 * nq * T, 0.0);
+    mju_cholSolve(dir.data(), hess.data(), grad.data(), 2 * nq * T);
+
+    double step = 1.0;
+    int iter = 0;
+
+    mju_copy(Qc.data(), Qo.data(), 2 * nq * T);
+    mju_addToScl(Qc.data(), dir.data(), -1.0 * step, 2 * nq * T);
+    ConfigurationToState(Zc.data(), Qc.data(), T);
+    double obj_c = J(Zc.data(), U.data(), Y.data(), P.data(), S.data(), R.data(), T);
+
+    while(obj_c >= obj) {
+      step *= 0.5;
+      mju_copy(Qc.data(), Qo.data(), 2 * nq * T);
+      mju_addToScl(Qc.data(), dir.data(), -1.0 * step, 2 * nq * T);
+      ConfigurationToState(Zc.data(), Qc.data(), T);
+      obj_c = J(Zc.data(), U.data(), Y.data(), P.data(), S.data(), R.data(), T);
+
+      iter += 1;
+
+      if (iter > 20) {
+        printf("line search failure\n");
+        mju_printMat(Qo.data(), 2 * nq * T, 1);
+        return 0;
+      }
+    }
+    mju_copy(Qo.data(), Qc.data(), 2 * nq * T);
+    mju_copy(Zo.data(), Zc.data(), n * T);
+    obj = obj_c;
+    printf("obj (%i): %f\n", i + 1, obj);
+  }
+
+  printf("optimization failure\n");
+
 
   return 0;
 }
