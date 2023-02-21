@@ -228,6 +228,10 @@ void NearestInHull(mjtNum res[2], const mjtNum query[2],
 // find the convex hull of a set of 2D points
 int Hull2D(int* hull, int num_points, const mjtNum* points);
 
+// set scaled matrix A2 in A1 given upper left row and column indices (ri, ci)
+void SetMatrixInMatrix(double* A1, const double* A2, double s, int r1, int c1,
+                       int r2, int c2, int ri, int ci);
+
 }  // namespace mjpc
 
 #endif  // MJPC_UTILITIES_H_

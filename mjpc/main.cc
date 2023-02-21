@@ -54,18 +54,6 @@ extern "C" void _mj_rosettaError(const char* msg) {
 //   return 0;
 // }
 
-// ----- utilities ----- //
-// set scaled matrix A2 in A1 given upper left row and column indices (ri, ci)
-void SetMatrixInMatrix(double* A1, const double* A2, double s, int r1, int c1, int r2, int c2, int ri, int ci) {
-  // loop over A2 rows
-  for (int i = 0; i < r2; i++) {
-    // loop over A2 columns 
-    for (int j = 0; j < c2; j++) {
-      A1[(ri + i) * c1 + ci + j] = s * A2[i * c2 + j];
-    }
-  }
-}
-
 // ----- problem setup ----- // 
 const double h = 0.1;
 const std::vector<double> A{1.0, h, 0.0, 1.0};          // dynamics state Jacobian
@@ -128,8 +116,8 @@ void r1(double* R, const double* Z, const double* U, int T) {
 void r1z(double* Rz, const double* Z, const double* U, int T) {
   mju_zero(Rz, (n * (T - 1)) * (n * T));
   for (int t = 0; t < T - 1; t++) {
-    SetMatrixInMatrix(Rz, A.data(), 1.0, n * (T - 1), n * T, n, n, n * t, n * t);
-    SetMatrixInMatrix(Rz, In.data(), -1.0, n * (T - 1), n * T, n, n, n * t, n * (t + 1));
+    mjpc::SetMatrixInMatrix(Rz, A.data(), 1.0, n * (T - 1), n * T, n, n, n * t, n * t);
+    mjpc::SetMatrixInMatrix(Rz, In.data(), -1.0, n * (T - 1), n * T, n, n, n * t, n * (t + 1));
   }
 }
 
@@ -179,7 +167,7 @@ void r2(double* R, const double* Z, const double* U, const double* Y, int T) {
 void r2z(double* Rz, const double* Z, const double* U, const double* Y, int T) {
   mju_zero(Rz, (p * (T - 1)) * (n * T));
   for (int t = 0; t < T - 1; t++) {
-    SetMatrixInMatrix(Rz, C.data(), 1.0, p * (T - 1), n * T, p, n, p * t, n * t);
+    mjpc::SetMatrixInMatrix(Rz, C.data(), 1.0, p * (T - 1), n * T, p, n, p * t, n * t);
   }
 }
 
@@ -231,8 +219,8 @@ void r3(double* R, const double* Z, const double* U, int T) {
 void r3z(double* Rz, const double* Z, const double* U, int T) {
   mju_zero(Rz, (m * (T - 1)) * (n * T));
   for (int t = 0; t < T - 1; t++) {
-    SetMatrixInMatrix(Rz, E.data(), 1.0, m * (T - 1), n * T, m, n, m * t, n * t);
-    SetMatrixInMatrix(Rz, F.data(), 1.0, m * (T - 1), n * T, m, n, m * t, n * (t + 1));
+    mjpc::SetMatrixInMatrix(Rz, E.data(), 1.0, m * (T - 1), n * T, m, n, m * t, n * t);
+    mjpc::SetMatrixInMatrix(Rz, F.data(), 1.0, m * (T - 1), n * T, m, n, m * t, n * (t + 1));
   }
 }
 
@@ -325,18 +313,18 @@ void ConfigurationToStateMapping(double* M, int T) {
 
   for (int t = 0; t < T; t++) {
     // configuration 
-    SetMatrixInMatrix(M, In.data(), 1.0, n * T, 2 * nq * T, nq, nq, n * t, 2 * nq * t + nq);
+    mjpc::SetMatrixInMatrix(M, In.data(), 1.0, n * T, 2 * nq * T, nq, nq, n * t, 2 * nq * t + nq);
 
     // velocity 
-    SetMatrixInMatrix(M, Inq.data(), -1.0 / h_, n * T, 2 * nq * T, nv, nv, n * t + nq, 2 * nq * t);
-    SetMatrixInMatrix(M, Inq.data(),  1.0 / h_, n * T, 2 * nq * T, nv, nv, n * t + nq, 2 * nq * t + nq);
+    mjpc::SetMatrixInMatrix(M, Inq.data(), -1.0 / h_, n * T, 2 * nq * T, nv, nv, n * t + nq, 2 * nq * t);
+    mjpc::SetMatrixInMatrix(M, Inq.data(),  1.0 / h_, n * T, 2 * nq * T, nv, nv, n * t + nq, 2 * nq * t + nq);
 
     // acceleration 
     // TODO(taylor): check index overflow
     if (na > 0) {
-      // SetMatrixInMatrix(M, Ina.data(),  1.0 / (h_ * h_), n * T, 2 * nq * T, nv, nv, n * t + nq + nv, 2 * nq * t);
-      // SetMatrixInMatrix(M, Ina.data(), -2.0 / (h_ * h_), n * T, 2 * nq * T, nv, nv, n * t + nq + nv, 2 * nq * t + nq);
-      // SetMatrixInMatrix(M, Ina.data(),  1.0 / (h_ * h_), n * T, 2 * nq * T, nv, nv, n * t + nq + nv, 2 * nq * t + nq + nq);
+      // mjpc::SetMatrixInMatrix(M, Ina.data(),  1.0 / (h_ * h_), n * T, 2 * nq * T, nv, nv, n * t + nq + nv, 2 * nq * t);
+      // mjpc::SetMatrixInMatrix(M, Ina.data(), -2.0 / (h_ * h_), n * T, 2 * nq * T, nv, nv, n * t + nq + nv, 2 * nq * t + nq);
+      // mjpc::SetMatrixInMatrix(M, Ina.data(),  1.0 / (h_ * h_), n * T, 2 * nq * T, nv, nv, n * t + nq + nv, 2 * nq * t + nq + nq);
     }
   }
 }
@@ -467,16 +455,16 @@ int main(int argc, char** argv) {
   mju_printMat(W4.data(), 2, 2);
 
   // set W1 
-  SetMatrixInMatrix(W.data(), W1.data(), 1.0, q, q, 2, 2, 0, 0);
+  mjpc::SetMatrixInMatrix(W.data(), W1.data(), 1.0, q, q, 2, 2, 0, 0);
 
   // set W2
-  SetMatrixInMatrix(W.data(), W2.data(), 1.0, q, q, 2, 2, 0, 4);
+  mjpc::SetMatrixInMatrix(W.data(), W2.data(), 1.0, q, q, 2, 2, 0, 4);
 
   // set W3
-  SetMatrixInMatrix(W.data(), W3.data(), 1.0, q, q, 2, 2, 4, 0);
+  mjpc::SetMatrixInMatrix(W.data(), W3.data(), 1.0, q, q, 2, 2, 4, 0);
 
   // set W4
-  SetMatrixInMatrix(W.data(), W4.data(), 1.0, q, q, 2, 2, 4, 4);
+  mjpc::SetMatrixInMatrix(W.data(), W4.data(), 1.0, q, q, 2, 2, 4, 4);
 
   printf("W (filled):\n");
   mju_printMat(W.data(), q, q);

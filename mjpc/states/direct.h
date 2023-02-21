@@ -38,7 +38,7 @@ class DirectEstimation : public State {
   // ----- methods ----- //
 
   // initialize settings
-  void Initialize(const mjModel* model) override {};
+  void Initialize(const mjModel* model) override;
 
   // allocate memory
   void Allocate(const mjModel* model) override;
@@ -57,6 +57,114 @@ class DirectEstimation : public State {
   const std::vector<double>& mocap() const override{ return mocap_; }
   const std::vector<double>& userdata() const override{ return userdata_; }
   double time() const override{ return time_; }
+
+  // model 
+  const mjModel* model_;
+
+  // data 
+  // TODO(taylor): one per history 
+  mjData* data_;
+
+  // ----- memory for direct estimation ----- //
+  // trajectories 
+  std::vector<double> configurations_;
+  std::vector<double> velocities_;
+  std::vector<double> accelerations_;
+  std::vector<double> measurements_;
+  std::vector<double> actions_;
+  std::vector<double> times_;
+
+  // states for difference
+  std::vector<double> state1_;
+  std::vector<double> state2_;
+
+  // Jacobians
+  std::vector<double> A_;        // dynamics state Jacobian
+  std::vector<double> C_;        // sensor state Jacobian
+  std::vector<double> E_;        // inverse dynamics current state Jacobian
+
+  // identity matrices
+  std::vector<double> I_state_;         // identity (state dimension)
+  std::vector<double> I_configuration_; // identity (configuration dimension)
+  std::vector<double> I_velocity_;      // identity (velocity dimension)
+  std::vector<double> I_acceleration_;  // identity (acceleration dimension)
+
+  // ----- cost (1): dynamics ----- //
+  double cost1_;
+  std::vector<double> cost1_state_gradient_;
+  std::vector<double> cost1_state_hessian_;
+  std::vector<double> residual1_;
+  std::vector<double> residual1_state_jacobian_;
+  std::vector<double> P_;                        // weight matrix
+  std::vector<double> cost1_scratch_;
+
+  // ----- cost (2): sensors ----- //
+  double cost2_;
+  std::vector<double> cost2_state_gradient_;
+  std::vector<double> cost2_state_hessian_;
+  std::vector<double> residual2_;
+  std::vector<double> residual2_state_jacobian_;
+  std::vector<double> S_;                        // weight matrix
+  std::vector<double> cost2_scratch_;
+
+  // ----- cost (3): actions ----- //
+  double cost3_;
+  std::vector<double> cost3_state_gradient_;
+  std::vector<double> cost3_state_hessian_;
+  std::vector<double> residual3_;
+  std::vector<double> residual3_state_jacobian_;
+  std::vector<double> R_;                        // weight matrix
+  std::vector<double> cost3_scratch_;
+
+  // total cost 
+  double total_cost_;
+  std::vector<double> total_cost_configuration_gradient_;
+  std::vector<double> total_cost_configuration_hessian_;  
+  std::vector<double> total_cost_state_gradient_;
+  std::vector<double> total_cost_state_hessian_;
+  std::vector<double> total_cost_state_hessian_cache_;
+
+  // configuration to state mapping
+  std::vector<double> configuration_to_state_;
+
+  // search direction 
+  std::vector<double> search_direction_;
+
+  // solver settings 
+  int iterations_;
+  double gradient_tolerance_;
+
+  int num_sensor_;               // number of sensors
+  int sensor_shift_;             // sensor shift
+  int horizon_;                  // estimation horizon
+
+  // ----- methods for direct estimation ----- //
+
+  // cost (1)
+  double Cost1();
+  void Cost1Gradient();
+  void Cost1Hessian();
+  void Residual1();
+  void Residual1Jacobian();
+
+  // cost (2)
+  double Cost2();
+  void Cost2Gradient();
+  void Cost2Hessian();
+  void Residual2();
+  void Residual2Jacobian();
+
+  // cost (3)
+  double Cost3();
+  void Cost3Gradient();
+  void Cost3Hessian();
+  void Residual3();
+  void Residual3Jacobian();
+
+  // total cost 
+  double TotalCost();
+  void TotalCostGradient();
+  void TotalCostHessian();
 
  private:
   std::vector<double> state_;     // (state dimension x 1)
