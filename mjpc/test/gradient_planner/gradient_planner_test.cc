@@ -17,7 +17,7 @@
 #include "gtest/gtest.h"
 #include <mujoco/mujoco.h>
 #include "mjpc/planners/gradient/planner.h"
-#include "mjpc/states/state.h"
+#include "mjpc/states/oracle.h"
 #include "mjpc/task.h"
 #include "mjpc/test/load.h"
 #include "mjpc/test/testdata/particle_residual.h"
@@ -30,7 +30,7 @@ namespace {
 mjModel* model;
 
 // state
-State state;
+Oracle state;
 
 ParticleTestTask task;
 

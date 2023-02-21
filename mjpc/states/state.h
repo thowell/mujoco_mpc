@@ -15,52 +15,39 @@
 #ifndef MJPC_STATES_STATE_H_
 #define MJPC_STATES_STATE_H_
 
-#include <shared_mutex>
 #include <vector>
 
 #include <mujoco/mujoco.h>
 
 namespace mjpc {
 
-// data and methods for state
+// virtual class
 class State {
  public:
-  friend class StateTest;
-
-  // constructor
-  State() = default;
-
   // destructor
-  ~State() = default;
+  virtual ~State() = default;
 
   // ----- methods ----- //
 
   // initialize settings
-  void Initialize(const mjModel* model) {}
+  virtual void Initialize(const mjModel* model) = 0;
 
   // allocate memory
-  void Allocate(const mjModel* model);
+  virtual void Allocate(const mjModel* model) = 0;
 
   // reset memory to zeros
-  void Reset();
+  virtual void Reset() = 0;
 
   // set state from data
-  void Set(const mjModel* model, const mjData* data);
+  virtual void Set(const mjModel* model, const mjData* data) = 0;
 
   // copy into destination
-  void CopyTo(double* dst_state, double* dst_mocap, double* dst_userdata, double* time) const;
+  virtual void CopyTo(double* dst_state, double* dst_mocap, double* dst_userdata, double* time) const = 0;
 
-  const std::vector<double>& state() const { return state_; }
-  const std::vector<double>& mocap() const { return mocap_; }
-  const std::vector<double>& userdata() const { return userdata_; }
-  double time() const { return time_; }
-
- private:
-  std::vector<double> state_;  // (state dimension x 1)
-  std::vector<double> mocap_;  // (mocap dimension x 1)
-  std::vector<double> userdata_; // (nuserdata x 1)
-  double time_;
-  mutable std::shared_mutex mtx_;
+  virtual const std::vector<double>& state() const = 0;
+  virtual const std::vector<double>& mocap() const = 0;
+  virtual const std::vector<double>& userdata() const = 0;
+  virtual double time() const = 0;
 };
 
 }  // namespace mjpc

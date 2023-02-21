@@ -17,6 +17,8 @@
 #include <memory>
 #include <vector>
 
+#include "mjpc/states/direct.h"
+#include "mjpc/states/oracle.h"
 #include "mjpc/states/state.h"
 
 namespace mjpc {
@@ -24,7 +26,8 @@ namespace mjpc {
 // load all available states
 std::vector<std::unique_ptr<mjpc::State>> LoadStates() {
   std::vector<std::unique_ptr<mjpc::State>> states;
-  states.emplace_back(new mjpc::State);
+  states.emplace_back(new mjpc::Oracle);
+  states.emplace_back(new mjpc::DirectEstimation);
   return states;
 }
 

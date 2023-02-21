@@ -22,7 +22,7 @@
 namespace mjpc {
 class StateTest : public ::testing::Test {
  protected:
-  // test Oracle::State class
+  // test State class
   void TestState() {
     // load model
     mjModel* model = LoadTestModel("particle_task.xml");
@@ -34,7 +34,7 @@ class StateTest : public ::testing::Test {
     mj_forward(model, data);
 
     // state
-    Oracle state;
+    State state;
 
     // allocate
     state.Allocate(model);

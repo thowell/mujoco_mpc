@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mjpc/states/state.h"
+#include "mjpc/states/oracle.h"
 
 #include <algorithm>
 #include <mutex>
@@ -24,7 +24,7 @@
 namespace mjpc {
 
 // allocate memory
-void State::Allocate(const mjModel* model) {
+void Oracle::Allocate(const mjModel* model) {
   const std::unique_lock<std::shared_mutex> lock(mtx_);
   state_.resize(model->nq + model->nv + model->na);
   mocap_.resize(7 * model->nmocap);
@@ -32,7 +32,7 @@ void State::Allocate(const mjModel* model) {
 }
 
 // reset memory to zeros
-void State::Reset() {
+void Oracle::Reset() {
   const std::unique_lock<std::shared_mutex> lock(mtx_);
   std::fill(state_.begin(), state_.end(), (double)0.0);
   std::fill(mocap_.begin(), mocap_.end(), 0.0);
@@ -41,7 +41,7 @@ void State::Reset() {
 }
 
 // set state from data
-void State::Set(const mjModel* model, const mjData* data) {
+void Oracle::Set(const mjModel* model, const mjData* data) {
   if (model && data) {
     const std::unique_lock<std::shared_mutex> lock(mtx_);
 
@@ -67,7 +67,7 @@ void State::Set(const mjModel* model, const mjData* data) {
   }
 }
 
-void State::CopyTo(double* dst_state, double* dst_mocap,
+void Oracle::CopyTo(double* dst_state, double* dst_mocap,
                    double* dst_userdata, double* dst_time) const {
   const std::shared_lock<std::shared_mutex> lock(mtx_);
   mju_copy(dst_state, this->state_.data(), this->state_.size());

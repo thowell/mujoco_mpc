@@ -15,7 +15,7 @@
 #include "gtest/gtest.h"
 #include <mujoco/mujoco.h>
 #include "mjpc/planners/ilqg/planner.h"
-#include "mjpc/states/state.h"
+#include "mjpc/states/oracle.h"
 #include "mjpc/task.h"
 #include "mjpc/test/load.h"
 #include "mjpc/test/testdata/particle_residual.h"
@@ -28,7 +28,7 @@ namespace {
 mjModel* model;
 
 // state
-State state;
+Oracle state;
 
 // task
 ParticleTestTask task;
@@ -58,7 +58,7 @@ TEST(iLQGTest, Particle) {
   mj_forward(model, data);
 
   // ----- state ----- //
-  // State state;
+  // Oracle state;
   state.Initialize(model);
   state.Allocate(model);
   state.Reset();

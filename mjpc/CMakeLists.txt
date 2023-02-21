@@ -213,7 +213,10 @@ target_include_directories(threadpool PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/..)
 
 add_library(
   libmjpc STATIC
-  states/state.cc
+  states/direct.cc
+  states/direct.h
+  states/oracle.cc
+  states/oracle.h
   states/state.h
   states/include.cc
   states/include.h
