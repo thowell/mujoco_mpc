@@ -241,7 +241,7 @@ void DirectEstimation::Residual1Jacobian() {
         dim_jacobian_row, dim_jacobian_col, dim_state_derivative,
         dim_state_derivative, dim_state_derivative * t,
         (dim_state_derivative + model_->nv) * t);
-    SetMatrixInMatrix(residual1_state_jacobian_.data(), I_state_.data(), -1.0,
+    SetMatrixInMatrix(residual1_state_jacobian_.data(), I_state_derivative_.data(), -1.0,
                       dim_jacobian_row, dim_jacobian_col, dim_state_derivative,
                       dim_state_derivative, dim_state_derivative * t,
                       (dim_state_derivative + model_->nv) * (t + 1));
@@ -417,8 +417,8 @@ void DirectEstimation::TotalCostGradient() {
 
   // configuration to state projection
   mju_mulMatTVec(total_cost_configuration_gradient_.data(),
-              configuration_to_state_.data(), total_cost_state_gradient_.data(),
-              dim1, dim2);
+                 configuration_to_state_mapping_.data(),
+                 total_cost_state_gradient_.data(), dim1, dim2);
 }
 
 // total cost Hessian wrt configuration
@@ -438,10 +438,82 @@ void DirectEstimation::TotalCostHessian() {
   // M' H M
   mju_mulMatMat(total_cost_state_hessian_cache_.data(),
                 total_cost_state_hessian_.data(),
-                configuration_to_state_.data(), dim1, dim1, dim2);
+                configuration_to_state_mapping_.data(), dim1, dim1, dim2);
   mju_mulMatTMat(total_cost_configuration_hessian_.data(),
-                 configuration_to_state_.data(),
+                 configuration_to_state_mapping_.data(),
                  total_cost_state_hessian_cache_.data(), dim1, dim2, dim2);
+}
+
+// configuration to state mapping 
+void DirectEstimation::ConfigurationToStateMapping() {
+  // time step for finite difference
+  // double h_ = model_->opt.timestep * (horizon_ - 1) / (2 * horizon_ - 1);
+
+  // // dimensions 
+  // int dim1 = 3 * model_->nv * horizon_;
+  // int dim2 = 2 * model_->nq * horizon_;
+
+  // // set to zero 
+  // mju_zero(configuration_to_state_mapping_.data(), dim1 * dim2);
+
+  for (int t = 0; t < horizon_; t++) {
+    // configuration 
+    // mjpc::SetMatrixInMatrix(configuration_to_state_mapping_.data(), I_configuration_.data(), 1.0, dim1, dim2, model_->nq, model_->nq, (3 * model_->nv) * t, 2 * nq * t + nq);
+
+    // // velocity 
+    // mjpc::SetMatrixInMatrix(configuration_to_state_mapping_.data(), Inq.data(), -1.0 / h_, n * T, 2 * nq * T, nv, nv, n * t + nq, 2 * nq * t);
+    // mjpc::SetMatrixInMatrix(configuration_to_state_mapping_.data(), Inq.data(),  1.0 / h_, n * T, 2 * nq * T, nv, nv, n * t + nq, 2 * nq * t + nq);
+
+    // acceleration 
+    // TODO(taylor): check index overflow
+    // mjpc::SetMatrixInMatrix(M, Ina.data(),  1.0 / (h_ * h_), n * T, 2 * nq * T, nv, nv, n * t + nq + nv, 2 * nq * t);
+    // mjpc::SetMatrixInMatrix(M, Ina.data(), -2.0 / (h_ * h_), n * T, 2 * nq * T, nv, nv, n * t + nq + nv, 2 * nq * t + nq);
+    // mjpc::SetMatrixInMatrix(M, Ina.data(),  1.0 / (h_ * h_), n * T, 2 * nq * T, nv, nv, n * t + nq + nv, 2 * nq * t + nq + nq);
+  }
+}
+
+// velocity from configuration 
+void DirectEstimation::VelocityFromConfiguration() {
+  // time step for finite difference
+  double h_ = model_->opt.timestep * (horizon_ - 1) / (2 * horizon_ - 1);
+
+  // loop over time steps
+  for (int t = 0; t < horizon_; t++) {
+    // trajectory elements
+    double* q0 = configurations_.data() + model_->nq * t;
+    double* q1 = configurations_.data() + model_->nq * (t + 1);
+    double* v = velocities_.data() + model_->nv * t;
+
+    // v = (q1 - q0) / h_ 
+    mj_differentiatePos(model_, v, h_, q0, q1);
+  }
+}
+
+// acceleration from configuration 
+void DirectEstimation::AccelerationFromConfiguration() {
+  // time step for finite difference
+  double h_ = model_->opt.timestep * (horizon_ - 1) / (2 * horizon_ - 1);
+
+  // loop over time steps 
+  for (int t = 0; t < horizon_ - 1; t++) {
+    // trajectory elements
+    double* q0 = configurations_.data() + model_->nq * t;
+    double* q1 = configurations_.data() + model_->nq * (t + 1);
+    double* q2 = configurations_.data() + model_->nq * (t + 2);
+    double* a = accelerations_.data() + model_->nv * t;
+
+    // a = (q2 - 2q1 + q0) / h_^2 = ((q2 - q1) / h_ + (-q1 + q0) / h_) / h_ = (v1 - v0) / h_
+    mj_differentiatePos(model_, velocity1_.data(), h_, q0, q1);
+    mj_differentiatePos(model_, velocity2_.data(), h_, q1, q2);
+
+    mju_scl(a, velocity2_.data(), 1.0 / h_, model_->nv);
+    mju_addToScl(a, velocity1_.data(), -1.0 / h_, model_->nv);
+  }
+}
+
+// optimize 
+void DirectEstimation::Optimize() {
+
 }
 
 }  // namespace mjpc

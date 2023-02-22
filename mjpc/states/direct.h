@@ -78,19 +78,21 @@ class DirectEstimation : public State {
   std::vector<double> state1_;
   std::vector<double> state2_;
 
+  // velocities for difference 
+  std::vector<double> velocity1_;
+  std::vector<double> velocity2_;
+
   // Jacobians
   std::vector<double> A_;        // dynamics state Jacobian
   std::vector<double> C_;        // sensor state Jacobian
   std::vector<double> E_;        // inverse dynamics current state Jacobian
 
   // identity matrices
-  std::vector<double> I_state_;         // identity (state dimension)
-  std::vector<double> I_configuration_; // identity (configuration dimension)
-  std::vector<double> I_velocity_;      // identity (velocity dimension)
-  std::vector<double> I_acceleration_;  // identity (acceleration dimension)
+  std::vector<double> I_state_derivative_; // identity (state dimension)
+  std::vector<double> I_configuration_;    // identity (configuration dimension)
+  std::vector<double> I_velocity_;         // identity (velocity dimension)
 
   // ----- cost (1): dynamics ----- //
-  double cost1_;
   std::vector<double> cost1_state_gradient_;
   std::vector<double> cost1_state_hessian_;
   std::vector<double> residual1_;
@@ -99,7 +101,6 @@ class DirectEstimation : public State {
   std::vector<double> cost1_scratch_;
 
   // ----- cost (2): sensors ----- //
-  double cost2_;
   std::vector<double> cost2_state_gradient_;
   std::vector<double> cost2_state_hessian_;
   std::vector<double> residual2_;
@@ -108,7 +109,6 @@ class DirectEstimation : public State {
   std::vector<double> cost2_scratch_;
 
   // ----- cost (3): actions ----- //
-  double cost3_;
   std::vector<double> cost3_state_gradient_;
   std::vector<double> cost3_state_hessian_;
   std::vector<double> residual3_;
@@ -117,7 +117,6 @@ class DirectEstimation : public State {
   std::vector<double> cost3_scratch_;
 
   // total cost 
-  double total_cost_;
   std::vector<double> total_cost_configuration_gradient_;
   std::vector<double> total_cost_configuration_hessian_;  
   std::vector<double> total_cost_state_gradient_;
@@ -125,7 +124,7 @@ class DirectEstimation : public State {
   std::vector<double> total_cost_state_hessian_cache_;
 
   // configuration to state mapping
-  std::vector<double> configuration_to_state_;
+  std::vector<double> configuration_to_state_mapping_;
 
   // search direction 
   std::vector<double> search_direction_;
@@ -165,6 +164,18 @@ class DirectEstimation : public State {
   double TotalCost();
   void TotalCostGradient();
   void TotalCostHessian();
+
+  // configuration to state mapping 
+  void ConfigurationToStateMapping();
+
+  // velocity from configuration 
+  void VelocityFromConfiguration();
+
+  // acceleration from configuration 
+  void AccelerationFromConfiguration();
+
+  // optimize 
+  void Optimize();
 
  private:
   std::vector<double> state_;     // (state dimension x 1)
