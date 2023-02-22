@@ -232,6 +232,18 @@ int Hull2D(int* hull, int num_points, const mjtNum* points);
 void SetMatrixInMatrix(double* A1, const double* A2, double s, int r1, int c1,
                        int r2, int c2, int ri, int ci);
 
+// attitude Jacobian
+void AttitudeJacobian(double* jac, const double* quat);
+
+// set attitude Jacobian for quaternion
+void SetAttitudeJacobian(double* jac, const double* quat, int nr, int nc,
+                         int row, int col);
+
+// set attitude Jacobian for complete state
+void ConfigurationAttitudeJacobian(double* jac, const mjModel* m,
+                                   const double* q, int nr, int nc, int row,
+                                   int col);
+
 }  // namespace mjpc
 
 #endif  // MJPC_UTILITIES_H_

@@ -919,4 +919,96 @@ void SetMatrixInMatrix(double* A1, const double* A2, double s, int r1, int c1,
   }
 }
 
+// attitude Jacobian
+void AttitudeJacobian(double* jac, const double* quat) {
+  // quaternion
+  double s = quat[0];
+  double q1 = quat[1];
+  double q2 = quat[2];
+  double q3 = quat[3];
+
+  // row 1
+  jac[0] = -q1;
+  jac[1] = -q2;
+  jac[2] = -q3;
+
+  // row 2
+  jac[3] = s;
+  jac[4] = -q3;
+  jac[5] = q2;
+
+  // row 3
+  jac[6] = q3;
+  jac[7] = s;
+  jac[8] = -q1;
+
+  // row 4
+  jac[9] = -q2;
+  jac[10] = q1;
+  jac[11] = s;
+}
+
+// set attitude Jacobian for quaternion
+void SetAttitudeJacobian(double* jac, const double* quat, int nr, int nc,
+                         int row, int col) {
+  // quaternion
+  double s = quat[0];
+  double q1 = quat[1];
+  double q2 = quat[2];
+  double q3 = quat[3];
+
+  // row 1
+  jac[row * nc + col + 0] = -q1;
+  jac[row * nc + col + 1] = -q2;
+  jac[row * nc + col + 2] = -q3;
+
+  // row 2
+  jac[(row + 1) * nc + col + 0] = s;
+  jac[(row + 1) * nc + col + 1] = -q3;
+  jac[(row + 1) * nc + col + 2] = q2;
+
+  // row 3
+  jac[(row + 2) * nc + col + 0] = q3;
+  jac[(row + 2) * nc + col + 1] = s;
+  jac[(row + 2) * nc + col + 2] = -q1;
+
+  // row 4
+  jac[(row + 3) * nc + col + 0] = -q2;
+  jac[(row + 3) * nc + col + 1] = q1;
+  jac[(row + 3) * nc + col + 2] = s;
+}
+
+// set attitude Jacobian for complete state
+void ConfigurationAttitudeJacobian(double* jac, const mjModel* m,
+                                   const double* q, int nr, int nc, int row,
+                                   int col) {
+  int padr;
+
+  // loop over joints
+  for (int j = 0; j < m->njnt; j++) {
+    // get addresses in qpos
+    padr = m->jnt_qposadr[j];
+
+    switch (m->jnt_type[j]) {
+      case mjJNT_FREE:
+        for (int i = 0; i < 3; i++) {
+          jac[(row + padr + i) * nc + col + padr + i] = 1.0;
+        }
+        padr += 3;
+
+        // continute with rotations
+        [[fallthrough]];
+
+      case mjJNT_BALL:
+        SetAttitudeJacobian(jac, q + padr, nr, nc, row + padr, col + padr);
+        break;
+
+      case mjJNT_HINGE:
+        [[fallthrough]];
+      case mjJNT_SLIDE:
+        jac[(row + padr) * nc + col + padr] = 1.0;
+    }
+  }
+}
+
 }  // namespace mjpc
