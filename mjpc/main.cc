@@ -183,7 +183,7 @@ int main(int argc, char** argv) {
   // ppo.Rollouts(obs_init, pool);
   // ppo.RewardToGo();
   // ppo.Advantage();
-  ppo.Learn(250, pool);
+  ppo.Learn(100, pool);
 
   // printf("actor t = %i\n", ppo.actor_opt.t);
   // printf("critic t = %i\n", ppo.critic_opt.t);

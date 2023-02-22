@@ -86,8 +86,8 @@ class PPO {
   double LogProb(const double* action, const double* observation, MLP& mlp);
 
   // logarithmic probability of action gradient
-  double LogProbGradient(double* gradient, const double* action,
-                         const double* observation);
+  void LogProbGradient(double* gradient, const double* action,
+                       const double* observation);
 
   // policy loss
   double PolicyLoss(const double* observation, const double* action,

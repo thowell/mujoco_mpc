@@ -99,8 +99,8 @@ void PPO::Initialize(int dim_obs, int dim_action, int num_steps, int num_env,
   critic_opt.Initialize(critic_mlp.num_parameters);
 
   // loss gradient
-  loss_gradient.resize(dim_action);
-  mju_zero(loss_gradient.data(), dim_action);
+  loss_gradient.resize(actor_mlp.dim_layer[actor_mlp.dim_layer.size() - 1]);
+  mju_zero(loss_gradient.data(), loss_gradient.size());
 
   // batch indices
   batch_indices.resize(experience);
@@ -291,12 +291,12 @@ double PPO::LogProb(const double* action, const double* observation, MLP& mlp) {
   }
 
   // log likelihood
-  return -0.5 * sum + data.dim_action * mju_log(2.0 * mjPI);
+  return -0.5 * (sum + data.dim_action * mju_log(2.0 * mjPI));
 }
 
 // logarithmic probability of action
-double PPO::LogProbGradient(double* gradient, const double* action,
-                            const double* observation) {
+void PPO::LogProbGradient(double* gradient, const double* action,
+                          const double* observation) {
   // evaluate forward network
   actor_mlp.Forward(observation);
 
@@ -304,15 +304,12 @@ double PPO::LogProbGradient(double* gradient, const double* action,
   double* output = actor_mlp.Output();
 
   // compute quadratic
-  double sum = 0.0;
   for (int i = 0; i < data.dim_action; i++) {
     double diff = action[i] - output[i];
     double sigma = mju_exp(output[data.dim_action + i]);
-    sum += diff / (sigma * sigma);
+    gradient[i] = diff / (sigma * sigma);
+    gradient[data.dim_action + i] = diff * diff / sigma / sigma - 1.0;
   }
-
-  // log likelihood gradient
-  return sum;
 }
 
 // policy loss
@@ -377,25 +374,58 @@ void PPO::PolicyLossGradient(double* gradient, const double* observation,
   return;
 
   // compute log probabilty for (action, observation) given new parameters
-  double logprob_new = this->LogProb(action, observation, actor_mlp);
+  // double logprob_new = this->LogProb(action, observation, actor_mlp);
 
-  // policy ratio
-  double ratio = mju_exp(logprob_new - logprob);
+  // // policy ratio
+  // double ratio = mju_exp(logprob_new - logprob);
+
+  // // // gradient
+  // if (ratio < 1.0 + clip && ratio > 1.0 - clip) {
+  //   mju_zero(loss_gradient.data(), loss_gradient.size());
+
+  //   this->LogProbGradient(loss_gradient.data(), action, observation);
+  //   mju_scl(loss_gradient.data(), loss_gradient.data(), -ratio * advantage,
+  //           loss_gradient.size());
+
+  //   actor_mlp.Backward(loss_gradient.data());
+
+  //   mju_addTo(gradient, actor_mlp.gradient.data(), actor_mlp.gradient.size());
+  // }
+
+  // compute log probabilty for (action, observation) given new parameters
+  // double logprob_new = this->LogProb(action, observation, actor_mlp);
+
+  // // policy ratio
+  // double ratio = mju_exp(logprob_new - logprob);
 
   // gradient
-  if (ratio <= 1.0 + clip && ratio >= 1.0 - clip) {
-    std::vector<double> loss_gradient;
-    loss_gradient.resize(data.dim_action);
-    mju_zero(loss_gradient.data(), data.dim_action);
+  // if (ratio < 1.0 + clip && ratio > 1.0 - clip) {
+  //   auto lp = [&ppo = *this, &action, &logprob, &advantage](const double* x, int n) {
 
-    this->LogProbGradient(loss_gradient.data(), action, observation);
-    mju_scl(loss_gradient.data(), loss_gradient.data(), -ratio * advantage,
-            data.dim_action);
+  //     // compute quadratic
+  //     double sum = 0.0;
+  //     for (int i = 0; i < ppo.data.dim_action; i++) {
+  //       double diff = action[i] - x[i];
+  //       double sigma = mju_exp(x[ppo.data.dim_action + i]);
+  //       sum += diff * diff / (sigma * sigma) + 2.0 * mju_log(sigma);
+  //     }
 
-    actor_mlp.Backward(loss_gradient.data());
+  //     // log likelihood
+  //     return mju_exp(-0.5 * (sum + ppo.data.dim_action * mju_log(2.0 * mjPI)) - logprob) * advantage;
+  //   };
 
-    mju_addTo(gradient, actor_mlp.gradient.data(), actor_mlp.gradient.size());
-  }
+  //   mjpc::FiniteDifferenceGradient fd_pl;
+  //   fd_pl.Allocate(lp, actor_mlp.dim_layer[actor_mlp.dim_layer.size() - 1], 1.0e-6);
+  //   fd_pl.Gradient(actor_mlp.Output());
+    
+  //   // this->LogProbGradient(fd_pl.gradient.data(), action, observation);
+  //   mju_scl(fd_pl.gradient.data(), fd_pl.gradient.data(), -1.0,
+  //           fd_pl.gradient.size());
+
+  //   actor_mlp.Backward(fd_pl.gradient.data());
+
+  //   mju_addTo(gradient, actor_mlp.gradient.data(), actor_mlp.gradient.size());
+  // // }
   // zero gradient
 }
 
