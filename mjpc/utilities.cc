@@ -982,31 +982,33 @@ void SetAttitudeJacobian(double* jac, const double* quat, int nr, int nc,
 void ConfigurationAttitudeJacobian(double* jac, const mjModel* m,
                                    const double* q, int nr, int nc, int row,
                                    int col) {
-  int padr;
+  int padr, vadr;
 
   // loop over joints
   for (int j = 0; j < m->njnt; j++) {
     // get addresses in qpos
     padr = m->jnt_qposadr[j];
+    vadr = m->jnt_dofadr[j];
 
     switch (m->jnt_type[j]) {
       case mjJNT_FREE:
         for (int i = 0; i < 3; i++) {
-          jac[(row + padr + i) * nc + col + padr + i] = 1.0;
+          jac[(row + padr + i) * nc + col + vadr + i] = 1.0;
         }
         padr += 3;
+        vadr += 3;
 
         // continute with rotations
         [[fallthrough]];
 
       case mjJNT_BALL:
-        SetAttitudeJacobian(jac, q + padr, nr, nc, row + padr, col + padr);
+        SetAttitudeJacobian(jac, q + padr, nr, nc, row + padr, col + vadr);
         break;
 
       case mjJNT_HINGE:
         [[fallthrough]];
       case mjJNT_SLIDE:
-        jac[(row + padr) * nc + col + padr] = 1.0;
+        jac[(row + padr) * nc + col + vadr] = 1.0;
     }
   }
 }
