@@ -1,43 +1,28 @@
 #include "mjpc/learning/ppo.h"
+#include "mjpc/learning/utilities.h"
 
 #include <absl/random/random.h>
 #include <mujoco/mujoco.h>
-#include <functional>
 
 #include <algorithm>
+#include <functional>
 #include <random>
 #include <vector>
 
 #include "mjpc/threadpool.h"
+#include "mjpc/learning/env.h"
+#include "mjpc/learning/mlp.h"
 
 namespace mjpc {
 
-// ----- test problem ----- //
-// reward function
-double Reward(const double* observation, const double* action) {
-  double Q = 1.0;
-  double R = 1.0e-3;
-  return mju_exp(-1.0 * (0.5 * Q * observation[0] * observation[0] +
-                         0.5 * Q * observation[1] * observation[1] +
-                         0.5 * R * action[0] * action[0]));
-}
-
-// dynamics
-void Dynamics(double* next_obs, const double* observation,
-              const double* action) {
-  next_obs[0] = observation[0] + 0.1 * observation[1];
-  next_obs[1] = observation[1] + mju_max(mju_min(action[0], 1.0), -1.0);
-}
-// ----- test problem ----- //
-
 // initialize
-void RolloutData::Initialize(int dim_obs, int dim_action, int num_steps,
+void RolloutData::Initialize(int dim_observation, int dim_action, int num_steps,
                              int num_env) {
   // total experience
   int experience = num_steps * num_env;
 
   // allocate memory
-  observation.resize(dim_obs * experience);
+  observation.resize(dim_observation * experience);
   action.resize(dim_action * experience);
   reward.resize(experience);
   logprob.resize(experience);
@@ -47,30 +32,36 @@ void RolloutData::Initialize(int dim_obs, int dim_action, int num_steps,
   done.resize(experience);
 
   // dimensions
-  this->dim_obs = dim_obs;
+  this->dim_observation = dim_observation;
   this->dim_action = dim_action;
   this->num_steps = num_steps;
   this->num_env = num_env;
 }
 
 // ----- PPO ----- //
-void PPO::Initialize(int dim_obs, int dim_action, int num_steps, int num_env,
-                     int dim_minibatch,
-                     std::function<void(MLP& mlp)> actor_initialization,
-                     std::function<void(MLP& mlp)> critic_initialization) {
+void PPO::Initialize(Environment* env, int num_steps,
+                     int num_env, int dim_minibatch,
+                     MLPInitialization actor_initialization,
+                     MLPInitialization critic_initialization,
+                     ThreadPool* pool) {
+
+  // environment 
+  this->env = env;
+
+  // pool 
+  this->pool = pool;
+
   // data
-  data.Initialize(dim_obs, dim_action, num_steps, num_env);
+  data.Initialize(env->ObservationDimension(), env->ActionDimension(), num_steps, num_env);
 
   // experience steps
   int experience = num_steps * num_env;
 
   // actor network
   actor_initialization(actor_mlp);
-  // actor_mlp.Initialize(dim_obs, 2 * dim_action, dim_hidden, actor_activations);
   for (int i = 0; i < num_env; i++) {
     actors.emplace_back(new MLP);
     actor_initialization(*actors[i]);
-    // actors[i]->Initialize(dim_obs, 2 * dim_action, dim_hidden, actor_activations);
   }
 
   // actor optimizer
@@ -82,11 +73,9 @@ void PPO::Initialize(int dim_obs, int dim_action, int num_steps, int num_env,
   actor_opt.Initialize(actor_mlp.num_parameters);
 
   // critic network
-  // critic_mlp.Initialize(dim_obs, 1, dim_hidden, critic_activations);
   critic_initialization(critic_mlp);
   for (int i = 0; i < num_env; i++) {
     critics.emplace_back(new MLP);
-    // critics[i]->Initialize(dim_obs, 1, dim_hidden, critic_activations);
     critic_initialization(*critics[i]);
   }
 
@@ -100,7 +89,7 @@ void PPO::Initialize(int dim_obs, int dim_action, int num_steps, int num_env,
 
   // loss gradient
   loss_gradient.resize(actor_mlp.dim_layer[actor_mlp.dim_layer.size() - 1]);
-  mju_zero(loss_gradient.data(), loss_gradient.size());
+  Zero(loss_gradient.data(), loss_gradient.size());
 
   // batch indices
   batch_indices.resize(experience);
@@ -110,29 +99,32 @@ void PPO::Initialize(int dim_obs, int dim_action, int num_steps, int num_env,
 
   // number of minibatches
   num_minibatch = std::floor(actor_opt.dim_batch / actor_opt.dim_minibatch);
+
+  // mode 
+  stochastic_policy = 1;
 }
 
 // parallel rollouts
-void PPO::Rollouts(const double* obs_init, ThreadPool& pool) {
-  int count_before = pool.GetCount();
+void PPO::Rollouts() {
+  int count_before = pool->GetCount();
   for (int i = 0; i < data.num_env; i++) {
-    pool.Schedule([&data = this->data, &obs_init, &ppo = *this, i]() {
+    pool->Schedule([&env = this->env, &data = this->data, &ppo = *this, i]() {
       // copy parameters
       ppo.actors[i]->parameters = ppo.actor_mlp.parameters;
       ppo.critics[i]->parameters = ppo.critic_mlp.parameters;
 
+      // initial state 
+      env->Reset(data.observation.data() + i * data.dim_observation * data.num_steps);
+      data.done[i * data.num_steps] = 1;
+
       // collect experience
       for (int t = 0; t < data.num_steps; t++) {
         // shift by environment and time
-        int obs_shift = i * data.dim_obs * data.num_steps + t * data.dim_obs;
+        int obs_shift = i * data.dim_observation * data.num_steps +
+                        t * data.dim_observation;
         int action_shift =
             i * data.dim_action * data.num_steps + t * data.dim_action;
         int time_shift = i * data.num_steps + t;
-
-        // observation reset
-        if (t == 0 || (t > 0 && data.done[time_shift - 1] == 1)) {
-          mju_copy(data.observation.data() + obs_shift, obs_init, data.dim_obs);
-        }
 
         // value
         data.value[time_shift] =
@@ -148,23 +140,25 @@ void PPO::Rollouts(const double* obs_init, ThreadPool& pool) {
                         data.observation.data() + obs_shift, *ppo.actors[i]);
 
         // reward
-        data.reward[time_shift] = Reward(data.observation.data() + obs_shift,
-                                         data.action.data() + action_shift);
+        data.reward[time_shift] =
+            env->Reward(data.observation.data() + obs_shift,
+                       data.action.data() + action_shift);
 
         // step
-        if (t == (data.num_steps - 1)) {
+        if (t == data.num_steps - 1) {
           data.done[time_shift] = 1;
         } else {
+          // step
+          env->Step(data.observation.data() + obs_shift + data.dim_observation,
+                    data.observation.data() + obs_shift,
+                    data.action.data() + action_shift);
           data.done[time_shift] = 0;
-          Dynamics(data.observation.data() + obs_shift + data.dim_obs,
-                   data.observation.data() + obs_shift,
-                   data.action.data() + action_shift);
         }
       }
     });
   }
-  pool.WaitCount(count_before + data.num_env);
-  pool.ResetCount();
+  pool->WaitCount(count_before + data.num_env);
+  pool->ResetCount();
 }
 
 // reward-to-go
@@ -194,27 +188,28 @@ void PPO::Advantage() {
   // double nextvalues = 0.0;
   // double delta = 0.0;
 
-  // mju_zero(data.advantage.data(), experience);
-  // mju_zero(data.rewardtogo.data(), experience);
+  // Zero(data.advantage.data(), experience);
+  // Zero(data.rewardtogo.data(), experience);
 
   // // advantage
   // for (int i = experience - 1; i >= 0; i--) {
-  //   if (i == experience - 1) { 
+  //   if (i == experience - 1) {
   //     nextnonterminal = 1.0 - data.done[experience - 1];
   //     nextvalues = next_value;
   //   } else {
   //     nextnonterminal = 1.0 - data.done[i + 1];
   //     nextvalues = data.value[i + 1];
   //   }
-  //   delta = data.reward[i] + discount_factor * nextvalues * nextnonterminal - data.value[i];
-  //   lastgaelam = delta + discount_factor * GAE_factor * nextnonterminal * lastgaelam;
-  //   data.advantage[i] = lastgaelam;
+  //   delta = data.reward[i] + discount_factor * nextvalues * nextnonterminal -
+  //   data.value[i]; lastgaelam = delta + discount_factor * GAE_factor *
+  //   nextnonterminal * lastgaelam; data.advantage[i] = lastgaelam;
   // }
-  
-  // reward-to-go
-  // mju_add(data.rewardtogo.data(), data.advantage.data(), data.value.data(), experience);
 
-  mju_sub(data.advantage.data(), data.rewardtogo.data(), data.value.data(),
+  // reward-to-go
+  // Add(data.rewardtogo.data(), data.advantage.data(), data.value.data(),
+  // experience);
+
+  Sub(data.advantage.data(), data.rewardtogo.data(), data.value.data(),
           experience);
 }
 
@@ -243,7 +238,7 @@ void PPO::NormalizeAdvantages() {
       double diff = data.advantage[minibatch[i]] - mean;
       std += diff * diff;
     }
-    std = mju_sqrt(std / actor_opt.dim_minibatch);
+    std = std::sqrt(std / actor_opt.dim_minibatch);
 
     // shift + scale
     for (int i = 0; i < actor_opt.dim_minibatch; i++) {
@@ -258,19 +253,21 @@ void PPO::Policy(double* action, const double* observation, MLP& mlp) {
   // evaluate forward network
   mlp.Forward(observation);
 
-  // output 
+  // output
   double* output = mlp.Output();
 
   // network output
-  mju_copy(action, output, data.dim_action);
+  Copy(action, output, data.dim_action);
 
   // add Gaussian noise
   absl::BitGen gen_;
 
   // sample noise
-  for (int k = 0; k < data.dim_action; k++) {
-    double sigma = mju_exp(output[data.dim_action + k]);
-    action[k] += sigma * absl::Gaussian<double>(gen_, 0.0, 1.0);
+  if (stochastic_policy) {
+    for (int k = 0; k < data.dim_action; k++) {
+      double sigma = std::exp(output[data.dim_action + k]);
+      action[k] += sigma * absl::Gaussian<double>(gen_, 0.0, 1.0);
+    }
   }
 }
 
@@ -286,12 +283,12 @@ double PPO::LogProb(const double* action, const double* observation, MLP& mlp) {
   double sum = 0.0;
   for (int i = 0; i < data.dim_action; i++) {
     double diff = action[i] - output[i];
-    double sigma = mju_exp(output[data.dim_action + i]);
-    sum += diff * diff / (sigma * sigma) + 2.0 * mju_log(sigma);
+    double sigma = std::exp(output[data.dim_action + i]);
+    sum += diff * diff / (sigma * sigma) + 2.0 * std::log(sigma);
   }
 
   // log likelihood
-  return -0.5 * (sum + data.dim_action * mju_log(2.0 * mjPI));
+  return -0.5 * (sum + data.dim_action * std::log(2.0 * mjPI));
 }
 
 // logarithmic probability of action
@@ -306,7 +303,7 @@ void PPO::LogProbGradient(double* gradient, const double* action,
   // compute quadratic
   for (int i = 0; i < data.dim_action; i++) {
     double diff = action[i] - output[i];
-    double sigma = mju_exp(output[data.dim_action + i]);
+    double sigma = std::exp(output[data.dim_action + i]);
     gradient[i] = diff / (sigma * sigma);
     gradient[data.dim_action + i] = diff * diff / sigma / sigma - 1.0;
   }
@@ -319,14 +316,14 @@ double PPO::PolicyLoss(const double* observation, const double* action,
   double logprob_new = LogProb(action, observation, actor_mlp);
 
   // policy ratio
-  double ratio = mju_exp(logprob_new - logprob);
+  double ratio = std::exp(logprob_new - logprob);
 
   // losses
   double l1 = ratio * advantage;
-  double l2 = mju_min(mju_max(ratio, 1.0 - clip), 1.0 + clip) * advantage;
+  double l2 = std::min(std::max(ratio, 1.0 - clip), 1.0 + clip) * advantage;
 
   // final loss
-  return -mju_min(l1, l2);
+  return -std::min(l1, l2);
 }
 
 // total policy loss over all experience
@@ -334,7 +331,7 @@ double PPO::TotalPolicyLoss() {
   double loss = 0.0;
 
   for (int i = 0; i < data.num_steps * data.num_env; i++) {
-    loss += this->PolicyLoss(data.observation.data() + i * data.dim_obs,
+    loss += this->PolicyLoss(data.observation.data() + i * data.dim_observation,
                              data.action.data() + i * data.dim_action,
                              data.logprob[i], data.advantage[i]);
   }
@@ -346,130 +343,98 @@ double PPO::TotalPolicyLoss() {
 void PPO::PolicyLossGradient(double* gradient, const double* observation,
                              const double* action, double logprob,
                              double advantage) {
-  // ----- finite difference ----- //
-
-  // save current parameters
-  std::vector<double> cache(actor_mlp.num_parameters);
-  cache = actor_mlp.parameters;
-
-  auto policy_loss = [&ppo = *this, &observation, &action, &logprob,
-                      &advantage](const double* x, int n) {
-    // copy parameters
-    mju_copy(ppo.actor_mlp.parameters.data(), x, n);
-
-    // evaluate forward network
-    ppo.actor_mlp.Forward(observation);
-
-    return ppo.PolicyLoss(observation, action, logprob, advantage);
-  };
-
-  mjpc::FiniteDifferenceGradient fd_pl;
-  fd_pl.Allocate(policy_loss, actor_mlp.num_parameters, 1.0e-6);
-  fd_pl.Gradient(actor_mlp.parameters.data());
-  mju_addTo(gradient, fd_pl.gradient.data(), fd_pl.gradient.size());
-
-  // restore current parameters
-  actor_mlp.parameters = cache;
-
-  return;
-
   // compute log probabilty for (action, observation) given new parameters
-  // double logprob_new = this->LogProb(action, observation, actor_mlp);
+  double logprob_new = this->LogProb(action, observation, actor_mlp);
 
-  // // policy ratio
-  // double ratio = mju_exp(logprob_new - logprob);
+  // policy ratio
+  double ratio = std::exp(logprob_new - logprob);
+  double l1 = ratio * advantage;
+  double l2 = std::min(std::max(ratio, 1.0 - clip), 1.0 + clip) * advantage;
 
-  // // // gradient
-  // if (ratio < 1.0 + clip && ratio > 1.0 - clip) {
-  //   mju_zero(loss_gradient.data(), loss_gradient.size());
+  if (l1 <= l2) {
+    // zero gradients
+    Zero(actor_mlp.gradient.data(), actor_mlp.gradient.size());
+    Zero(loss_gradient.data(), loss_gradient.size());
 
-  //   this->LogProbGradient(loss_gradient.data(), action, observation);
-  //   mju_scl(loss_gradient.data(), loss_gradient.data(), -ratio * advantage,
-  //           loss_gradient.size());
+    // logprob gradient
+    this->LogProbGradient(loss_gradient.data(), action, observation);
 
-  //   actor_mlp.Backward(loss_gradient.data());
+    // scale by policy loss
+    Scale(loss_gradient.data(), loss_gradient.data(), -l1,
+            loss_gradient.size());
 
-  //   mju_addTo(gradient, actor_mlp.gradient.data(), actor_mlp.gradient.size());
-  // }
+    // backprop through MLP
+    actor_mlp.Backward(loss_gradient.data());
 
-  // compute log probabilty for (action, observation) given new parameters
-  // double logprob_new = this->LogProb(action, observation, actor_mlp);
+    // add policy loss gradient
+    AddTo(gradient, actor_mlp.gradient.data(), actor_mlp.gradient.size());
 
-  // // policy ratio
-  // double ratio = mju_exp(logprob_new - logprob);
+  } else {
+    if (ratio <= 1.0 + clip && ratio >= 1.0 - clip) {
+      // zero gradients
+      Zero(actor_mlp.gradient.data(), actor_mlp.gradient.size());
+      Zero(loss_gradient.data(), loss_gradient.size());
 
-  // gradient
-  // if (ratio < 1.0 + clip && ratio > 1.0 - clip) {
-  //   auto lp = [&ppo = *this, &action, &logprob, &advantage](const double* x, int n) {
+      // logprob gradient
+      this->LogProbGradient(loss_gradient.data(), action, observation);
 
-  //     // compute quadratic
-  //     double sum = 0.0;
-  //     for (int i = 0; i < ppo.data.dim_action; i++) {
-  //       double diff = action[i] - x[i];
-  //       double sigma = mju_exp(x[ppo.data.dim_action + i]);
-  //       sum += diff * diff / (sigma * sigma) + 2.0 * mju_log(sigma);
-  //     }
+      // scale by policy loss
+      Scale(loss_gradient.data(), loss_gradient.data(), -l2,
+              loss_gradient.size());
 
-  //     // log likelihood
-  //     return mju_exp(-0.5 * (sum + ppo.data.dim_action * mju_log(2.0 * mjPI)) - logprob) * advantage;
-  //   };
+      // backprop through MLP
+      actor_mlp.Backward(loss_gradient.data());
 
-  //   mjpc::FiniteDifferenceGradient fd_pl;
-  //   fd_pl.Allocate(lp, actor_mlp.dim_layer[actor_mlp.dim_layer.size() - 1], 1.0e-6);
-  //   fd_pl.Gradient(actor_mlp.Output());
-    
-  //   // this->LogProbGradient(fd_pl.gradient.data(), action, observation);
-  //   mju_scl(fd_pl.gradient.data(), fd_pl.gradient.data(), -1.0,
-  //           fd_pl.gradient.size());
-
-  //   actor_mlp.Backward(fd_pl.gradient.data());
-
-  //   mju_addTo(gradient, actor_mlp.gradient.data(), actor_mlp.gradient.size());
-  // // }
-  // zero gradient
+      // add policy loss gradient
+      AddTo(gradient, actor_mlp.gradient.data(), actor_mlp.gradient.size());
+    }
+  }
 }
 
-// entropy loss 
+// entropy loss
 double PPO::EntropyLoss(const double* observation, const double* action) {
   // compute log probabilty for (action, observation) given new parameters
   double logprob = LogProb(action, observation, actor_mlp);
 
   // compute prob
-  double prob = mju_exp(logprob);
+  double prob = std::exp(logprob);
 
   return -prob * logprob;
 }
 
-// total entropy loss 
+// total entropy loss
 double PPO::TotalEntropyLoss() {
   double loss = 0.0;
 
   for (int i = 0; i < data.num_steps * data.num_env; i++) {
-    loss += this->EntropyLoss(data.observation.data() + i * data.dim_obs,
-                              data.action.data() + i * data.dim_action);
+    loss +=
+        this->EntropyLoss(data.observation.data() + i * data.dim_observation,
+                          data.action.data() + i * data.dim_action);
   }
 
   return loss / data.num_steps / data.num_env;
 }
 
 // entropy loss gradient
-void PPO::EntropyLossGradient(double* gradient, const double* observation, const double* action) {
+void PPO::EntropyLossGradient(double* gradient, const double* observation,
+                              const double* action) {
   // ----- finite difference ----- //
 
   // save current parameters
   std::vector<double> cache(actor_mlp.num_parameters);
   cache = actor_mlp.parameters;
 
-  auto entropy_loss = [&ppo = *this, &observation, &action](const double* x, int n) {
+  auto entropy_loss = [&ppo = *this, &observation, &action](const double* x,
+                                                            int n) {
     // copy parameters
-    mju_copy(ppo.actor_mlp.parameters.data(), x, n);
+    Copy(ppo.actor_mlp.parameters.data(), x, n);
     return ppo.EntropyLoss(observation, action);
   };
 
   mjpc::FiniteDifferenceGradient fd_pl;
   fd_pl.Allocate(entropy_loss, actor_mlp.num_parameters, 1.0e-6);
   fd_pl.Gradient(actor_mlp.parameters.data());
-  mju_addTo(gradient, fd_pl.gradient.data(), fd_pl.gradient.size());
+  AddTo(gradient, fd_pl.gradient.data(), fd_pl.gradient.size());
 
   // restore current parameters
   actor_mlp.parameters = cache;
@@ -500,7 +465,7 @@ double PPO::TotalCriticLoss() {
   double loss = 0.0;
 
   for (int i = 0; i < data.num_steps * data.num_env; i++) {
-    loss += this->CriticLoss(data.observation.data() + i * data.dim_obs,
+    loss += this->CriticLoss(data.observation.data() + i * data.dim_observation,
                              data.rewardtogo[i]);
   }
 
@@ -513,15 +478,14 @@ void PPO::CriticLossGradient(double* gradient, const double* observation,
   critic_mlp.Forward(observation);
   double loss_gradient[1] = {critic_mlp.Output()[0] - rewardtogo};
   critic_mlp.Backward(loss_gradient);
-  mju_addTo(gradient, critic_mlp.gradient.data(), critic_mlp.gradient.size());
+  AddTo(gradient, critic_mlp.gradient.data(), critic_mlp.gradient.size());
 }
 
 // learn
 void PPO::Learn(int iterations, ThreadPool& pool) {
   for (int k = 0; k < iterations; k++) {
     // rollouts
-    std::vector<double> obs_init = {1.0, 0.0};
-    this->Rollouts(obs_init.data(), pool);
+    this->Rollouts();
 
     // reward-to-go
     this->RewardToGo();
@@ -553,40 +517,42 @@ void PPO::Learn(int iterations, ThreadPool& pool) {
         const int* minibatch = this->Minibatch(j);
 
         // gradient
-        mju_zero(actor_opt.g.data(), actor_opt.g.size());
+        Zero(actor_opt.g.data(), actor_opt.g.size());
 
         // --- entropy loss gradient --- //
-        if (entropy_coeff > 0.0) {
-          for (int q = 0; q < actor_opt.dim_minibatch; q++) {
-            // entropy loss
-            this->EntropyLossGradient(
-                actor_opt.g.data(), actor_opt.g.data(),
-                data.observation.data() + minibatch[q] * data.dim_obs);
-          }
+        // if (entropy_coeff > 0.0) {
+        //   for (int q = 0; q < actor_opt.dim_minibatch; q++) {
+        //     // entropy loss
+        //     this->EntropyLossGradient(
+        //         actor_opt.g.data(), actor_opt.g.data(),
+        //         data.observation.data() + minibatch[q] *
+        //         data.dim_observation);
+        //   }
 
-          // scaling by entropy coefficient
-          mju_scl(actor_opt.g.data(), actor_opt.g.data(),
-                -entropy_coeff, actor_opt.g.size());
-        }
-        
+        //   // scaling by entropy coefficient
+        //   Scale(actor_opt.g.data(), actor_opt.g.data(), -entropy_coeff,
+        //           actor_opt.g.size());
+        // }
+
         // --- policy loss gradient --- //
         for (int q = 0; q < actor_opt.dim_minibatch; q++) {
           // policy loss
           this->PolicyLossGradient(
               actor_opt.g.data(),
-              data.observation.data() + minibatch[q] * data.dim_obs,
+              data.observation.data() + minibatch[q] * data.dim_observation,
               data.action.data() + minibatch[q] * data.dim_action,
               data.logprob[minibatch[q]], data.advantage[minibatch[q]]);
         }
 
         // scale by minibatch size
-        mju_scl(actor_opt.g.data(), actor_opt.g.data(),
+        Scale(actor_opt.g.data(), actor_opt.g.data(),
                 1.0 / actor_opt.dim_minibatch, actor_opt.g.size());
 
         // gradient clipping
-        double gradient_norm = mju_norm(actor_opt.g.data(), actor_opt.g.size());
+        double gradient_norm = Norm(actor_opt.g.data(), actor_opt.g.size());
         if (gradient_norm > gradient_norm_max) {
-          mju_scl(actor_opt.g.data(), actor_opt.g.data(), gradient_norm_max / gradient_norm, actor_opt.g.size());
+          Scale(actor_opt.g.data(), actor_opt.g.data(),
+                  gradient_norm_max / gradient_norm, actor_opt.g.size());
         }
 
         // update
@@ -599,24 +565,26 @@ void PPO::Learn(int iterations, ThreadPool& pool) {
         const int* minibatch = this->Minibatch(j);
 
         // gradient
-        mju_zero(critic_opt.g.data(), critic_opt.g.size());
+        Zero(critic_opt.g.data(), critic_opt.g.size());
 
         // --- critic loss gradient --- //
         for (int q = 0; q < critic_opt.dim_minibatch; q++) {
           this->CriticLossGradient(
               critic_opt.g.data(),
-              data.observation.data() + minibatch[q] * data.dim_obs,
+              data.observation.data() + minibatch[q] * data.dim_observation,
               data.rewardtogo[minibatch[q]]);
         }
 
         // scale by minibatch size
-        mju_scl(critic_opt.g.data(), critic_opt.g.data(),
+        Scale(critic_opt.g.data(), critic_opt.g.data(),
                 value_coeff / critic_opt.dim_minibatch, critic_opt.g.size());
 
         // gradient clipping
-        double gradient_norm = mju_norm(critic_opt.g.data(), critic_opt.g.size());
+        double gradient_norm =
+            Norm(critic_opt.g.data(), critic_opt.g.size());
         if (gradient_norm > gradient_norm_max) {
-          mju_scl(critic_opt.g.data(), critic_opt.g.data(), gradient_norm_max / gradient_norm, critic_opt.g.size());
+          Scale(critic_opt.g.data(), critic_opt.g.data(),
+                  gradient_norm_max / gradient_norm, critic_opt.g.size());
         }
 
         // update
@@ -648,7 +616,7 @@ void FiniteDifferenceGradient::Allocate(
 // compute gradient
 void FiniteDifferenceGradient::Gradient(const double* x) {
   // set workspace
-  mju_copy(workspace.data(), x, dimension);
+  Copy(workspace.data(), x, dimension);
 
   // centered finite difference
   for (int i = 0; i < dimension; i++) {

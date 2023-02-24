@@ -289,10 +289,14 @@ add_library(
   task.h
   learning/adam.cc 
   learning/adam.h 
+  learning/actor_critic.cc 
+  learning/actor_critic.h
+  learning/env.h
   learning/mlp.cc 
   learning/mlp.h 
   learning/ppo.cc 
   learning/ppo.h
+  learning/utilities.h
 )
 set_target_properties(libmjpc PROPERTIES OUTPUT_NAME mjpc)
 target_compile_options(libmjpc PUBLIC ${MJPC_COMPILE_OPTIONS})

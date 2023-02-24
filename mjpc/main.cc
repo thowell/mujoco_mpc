@@ -26,8 +26,10 @@
 #include "mjpc/tasks/tasks.h"
 
 #include "mjpc/learning/adam.h"
+#include "mjpc/learning/env.h"
 #include "mjpc/learning/mlp.h"
 #include "mjpc/learning/ppo.h"
+#include "mjpc/learning/utilities.h"
 
 // machinery for replacing command line error by a macOS dialog box
 // when running under Rosetta
@@ -55,13 +57,59 @@
 //   return 0;
 // }
 
-// double f(const double* x) {
-//   return 0.5 * mju_dot(x, x, 2);
-// }
 
-// void fx(double* gradient, const double* parameters, const int* minibatch) {
-//   mju_copy(gradient, parameters, 2);
-// }
+// environment for linear system
+class LinearSystem : public Environment {
+  public: 
+    // constructor 
+    LinearSystem() {}
+    
+    // destructor
+    ~LinearSystem() override {}
+
+    // step 
+    void Step(double* next_observation, const double* observation, const double* action) override {
+      // limit action
+      double clipped_action = mju_max(mju_min(action[0], 1.0), -1.0);
+
+      // next position
+      next_observation[0] = observation[0] + 0.1 * observation[1];
+
+      // next velocity
+      next_observation[1] = observation[1] + clipped_action;
+    }
+
+    // reward
+    double Reward(const double* observation, const double* action) override {
+      double Q = 1.0;
+      double R = 1.0e-1;
+      return mju_exp(-1.0 * (0.5 * Q * observation[0] * observation[0] +
+                             0.5 * Q * observation[1] * observation[1] +
+                             0.5 * R * action[0] * action[0]));
+    }
+
+    // reset 
+    void Reset(double* observation) override {
+      absl::BitGen gen_;
+
+      // position 
+      observation[0] = 1.0 + 1.0e-2 * absl::Gaussian<double>(gen_, 0.0, 1.0);
+
+      // velocity
+      observation[1] = 0.0 + 1.0e-2 * absl::Gaussian<double>(gen_, 0.0, 1.0);
+    }
+
+    // observation dimension 
+    int ObservationDimension() override {
+      return 2;
+    };
+
+    // action dimension
+    int ActionDimension() override {
+      return 1;
+    };
+};
+
 
 
 // Test PPO and utilities
@@ -114,23 +162,55 @@ int main(int argc, char** argv) {
 
   // printf("MLP tests complete\n");
 
+  // double A = 1.0;
+  // double clip = 0.2;
+
+  // printf("case 0:\n");
+  // printf("loss = %f\n", pl(mju_log(1.0), mju_log(1.0), A, clip));
+  // printf("loss gradient = %f\n", dpl(mju_log(1.0), mju_log(1.0), A, clip));
+
+  // printf("case 1:\n");
+  // printf("loss = %f\n", pl(mju_log(1.2), mju_log(1.0), A, clip));
+  // printf("loss gradient = %f\n", dpl(mju_log(1.2), mju_log(1.0), A, clip));
+
+  // printf("case 2:\n");
+  // printf("loss = %f\n", pl(mju_log(1.3), mju_log(1.0), A, clip));
+  // printf("loss gradient = %f\n", dpl(mju_log(1.3), mju_log(1.0), A, clip));
+
+  // printf("case 3:\n");
+  // printf("loss = %f\n", pl(mju_log(0.8), mju_log(1.0), A, clip));
+  // printf("loss gradient = %f\n", dpl(mju_log(0.8), mju_log(1.0), A, clip));
+
+  // printf("case 4:\n");
+  // printf("loss = %f\n", pl(mju_log(0.7), mju_log(1.0), A, clip));
+  // printf("loss gradient = %f\n", dpl(mju_log(0.7), mju_log(1.0), A, clip));
+
+  // return 0;
+
 
   // printf("PPO tests\n");
   // problem setup
-  int dim_obs = 2;
-  int dim_action = 1;
-  int num_steps = 25;
-  int num_env = 64;
-  int dim_minibatch = 8; // num_env * num_steps; // num_env * num_steps;
+  // int dim_observation = 2;
+  // int dim_action = 1;
+  LinearSystem env;
+  int num_steps = 200;
+  int num_env = 32;
+  int dim_minibatch = 64; // num_env * num_steps; // num_env * num_steps;
+
+  // int dim_observation = 2;
+  // int dim_action = 1;
+  // int num_steps = 3;
+  // int num_env = 2;
+  // int dim_minibatch = 2; // num_env * num_steps; // num_env * num_steps;
 
   // initialization
-  auto actor_initialization = [&dim_obs, &dim_action](mjpc::MLP& mlp) {
+  auto actor_initialization = [&env](mjpc::MLP& mlp) {
     std::vector<int> dim_hidden = {2, 2};
     std::vector<mjpc::Activations> activations = {mjpc::kTanh, mjpc::kTanh,
                                                   mjpc::kPassThrough};
 
     // setup
-    mlp.Initialize(dim_obs, 2 * dim_action, dim_hidden, activations);
+    mlp.Initialize(env.ObservationDimension(), 2 * env.ActionDimension(), dim_hidden, activations);
 
     // parameter initialization
     absl::BitGen gen_;
@@ -151,13 +231,13 @@ int main(int argc, char** argv) {
   };
 
   // initialization
-  auto critic_initialization = [&dim_obs](mjpc::MLP& mlp) {
+  auto critic_initialization = [&env](mjpc::MLP& mlp) {
     std::vector<int> dim_hidden = {2, 2};
     std::vector<mjpc::Activations> activations = {mjpc::kTanh, mjpc::kTanh,
                                                   mjpc::kPassThrough};
 
     // setup
-    mlp.Initialize(dim_obs, 1, dim_hidden, activations);
+    mlp.Initialize(env.ObservationDimension(), 1, dim_hidden, activations);
 
     // parameter initialization
     absl::BitGen gen_;
@@ -174,16 +254,31 @@ int main(int argc, char** argv) {
     }
   };
 
-  mjpc::ThreadPool pool(1);
+  mjpc::ThreadPool pool(8);
   mjpc::PPO ppo;
-  ppo.Initialize(dim_obs, dim_action, num_steps, num_env, dim_minibatch,
-                 actor_initialization, critic_initialization);
+  ppo.Initialize(&env, num_steps, num_env, dim_minibatch,
+                 actor_initialization, critic_initialization,
+                 &pool);
 
   // double obs_init[2] = {1.0, 0.0};
   // ppo.Rollouts(obs_init, pool);
   // ppo.RewardToGo();
   // ppo.Advantage();
+
   ppo.Learn(100, pool);
+
+  printf("final state:\n");
+
+  // deterministic policy 
+  ppo.stochastic_policy = 1;
+  ppo.Rollouts();
+
+  for (int i = 0; i < ppo.data.num_env; i++) {
+    double* xT = ppo.data.observation.data() +
+                       i * ppo.data.num_steps * ppo.data.dim_observation +
+                       (ppo.data.num_steps - 2) * ppo.data.dim_observation;
+    mju_printMat(xT, 1, ppo.data.dim_observation);
+  }
 
   // printf("actor t = %i\n", ppo.actor_opt.t);
   // printf("critic t = %i\n", ppo.critic_opt.t);
@@ -228,7 +323,7 @@ int main(int argc, char** argv) {
   // // int i = 2;
   // mju_zero(ppo.actor_opt.g.data(), ppo.actor_opt.g.size());
   // // ppo.PolicyLossGradient(ppo.actor_opt.g.data(),
-  // //                        ppo.data.observation.data() + i * ppo.data.dim_obs,
+  // //                        ppo.data.observation.data() + i * ppo.data.dim_observation,
   // //                        ppo.data.action.data() + i * ppo.data.dim_action,
   // //                        ppo.data.logprob[i], ppo.data.advantage[i]);
   // ppo.PolicyLossGradient(ppo.actor_opt.g.data(),
@@ -244,7 +339,7 @@ int main(int argc, char** argv) {
 
   // // auto policy_loss = [&ppo, i](const double* x, int n) {
   // //   mju_copy(ppo.actor_mlp.parameters.data(), x, n);
-  // //   return ppo.PolicyLoss(ppo.data.observation.data() + i * ppo.data.dim_obs,
+  // //   return ppo.PolicyLoss(ppo.data.observation.data() + i * ppo.data.dim_observation,
   // //                         ppo.data.action.data() + i * ppo.data.dim_action,
   // //                         ppo.data.logprob[i], ppo.data.advantage[i]);
   // // };
@@ -264,7 +359,7 @@ int main(int argc, char** argv) {
   // // critic loss gradient 
   // mju_zero(ppo.critic_opt.g.data(), ppo.critic_opt.g.size());
   // // ppo.CriticLossGradient(ppo.critic_opt.g.data(),
-  // //                        ppo.data.observation.data() + i * ppo.data.dim_obs,
+  // //                        ppo.data.observation.data() + i * ppo.data.dim_observation,
   // //                        ppo.data.rewardtogo[i]);
   // ppo.CriticLossGradient(ppo.critic_opt.g.data(), observation, rewardtogo);
 
@@ -276,7 +371,7 @@ int main(int argc, char** argv) {
 
   // auto critic_loss = [&ppo, i](const double* x, int n) {
   //   mju_copy(ppo.critic_mlp.parameters.data(), x, n);
-  //   return ppo.CriticLoss(ppo.data.observation.data() + i * ppo.data.dim_obs,
+  //   return ppo.CriticLoss(ppo.data.observation.data() + i * ppo.data.dim_observation,
   //                         ppo.data.rewardtogo[i]);
   // };
   // auto critic_loss = [&ppo, &observation, &rewardtogo](const double* x, int n) {
@@ -391,7 +486,7 @@ int main(int argc, char** argv) {
 
   // printf("observation: \n");
   // for (int i = 0; i < ppo.data.num_env; i++) {
-  //   mju_printMat(ppo.data.observation.data() + i * ppo.data.num_steps * ppo.data.dim_obs, ppo.data.num_steps, ppo.data.dim_obs);
+  //   mju_printMat(ppo.data.observation.data() + i * ppo.data.num_steps * ppo.data.dim_observation, ppo.data.num_steps, ppo.data.dim_observation);
   // }
   // printf("action: \n");
   // for (int i = 0; i < ppo.data.num_env; i++) {
@@ -420,11 +515,11 @@ int main(int argc, char** argv) {
 
   // int t = 2;
   // printf("policy loss: %f\n",
-  //        ppo.PolicyLoss(ppo.data.observation.data() + t * ppo.data.dim_obs, ppo.data.action.data() + t * ppo.data.dim_action,
+  //        ppo.PolicyLoss(ppo.data.observation.data() + t * ppo.data.dim_observation, ppo.data.action.data() + t * ppo.data.dim_action,
   //                       ppo.data.logprob[t], ppo.data.advantage[t]));
 
   // t = 2;
-  // printf("critic loss: %f\n", ppo.CriticLoss(ppo.data.observation.data() + t * ppo.data.dim_obs, ppo.data.rewardtogo[t]));
+  // printf("critic loss: %f\n", ppo.CriticLoss(ppo.data.observation.data() + t * ppo.data.dim_observation, ppo.data.rewardtogo[t]));
 
 
   // double x[2] = {2.0, 0.5};

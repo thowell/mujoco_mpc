@@ -1,4 +1,5 @@
 #include "mjpc/learning/adam.h"
+#include "mjpc/learning/utilities.h"
 
 #include <mujoco/mujoco.h>
 
@@ -25,11 +26,11 @@ void AdamOptimizer::Initialize(int dim) {
   }
 
   // reset
-  mju_zero(g.data(), dim);
-  mju_zero(m.data(), dim);
-  mju_zero(v.data(), dim);
-  mju_zero(m_hat.data(), dim);
-  mju_zero(v_hat.data(), dim);
+  Zero(g.data(), dim);
+  Zero(m.data(), dim);
+  Zero(v.data(), dim);
+  Zero(m_hat.data(), dim);
+  Zero(v_hat.data(), dim);
   t = 0;
 }
 
@@ -40,43 +41,43 @@ void AdamOptimizer::Step(std::vector<double>& x) {
 
   // update biased first moment estimate
   // m = β1 * opt.m + (1.0 - β1) * g
-  mju_scl(m.data(), m.data(), beta1, m.size());
-  mju_addToScl(m.data(), g.data(), 1.0 - beta1, m.size());
+  Scale(m.data(), m.data(), beta1, m.size());
+  AddToScale(m.data(), g.data(), 1.0 - beta1, m.size());
 
   // update biased second raw moment estimate
   // v = β2 * v + (1.0 - β2) * g.^2.0
-  mju_scl(v.data(), v.data(), beta2, v.size());
+  Scale(v.data(), v.data(), beta2, v.size());
   for (int i = 0; i < v.size(); i++) {
     v[i] += (1.0 - beta2) * g[i] * g[i];
   }
 
   // compute bias-corrected first moment estimate
   // m̂ = m ./ (1.0 - β1^t)
-  mju_scl(m_hat.data(), m.data(), 1.0 / (1.0 - mju_pow(beta1, t)),
+  Scale(m_hat.data(), m.data(), 1.0 / (1.0 - std::pow(beta1, t)),
           m_hat.size());
 
   // compute bias-corrected second raw moment estimate
   // v̂ .= v ./ (1.0 - β2^t)
-  mju_scl(v_hat.data(), v.data(), 1.0 / (1.0 - mju_pow(beta2, t)),
+  Scale(v_hat.data(), v.data(), 1.0 / (1.0 - std::pow(beta2, t)),
           v_hat.size());
 
   // update parameters
   // θ .= θ - α .* m̂ ./ (sqrt.(v̂) .+ ϵ)
   for (int i = 0; i < x.size(); i++) {
-    x[i] = x[i] - alpha * m_hat[i] / (mju_sqrt(v_hat[i]) + eps);
+    x[i] = x[i] - alpha * m_hat[i] / (std::sqrt(v_hat[i]) + eps);
   }
-  // mju_addToScl(x.data(), g.data(), -1.0 * alpha, g.size());
+  // AddToScale(x.data(), g.data(), -1.0 * alpha, g.size());
 }
 
 // optimize
 void AdamOptimizer::Optimize(std::vector<double>& parameters,
                              GradientFunction gradient) {
   // reset
-  mju_zero(g.data(), g.size());
-  mju_zero(m.data(), m.size());
-  mju_zero(v.data(), v.size());
-  mju_zero(m_hat.data(), m_hat.size());
-  mju_zero(v_hat.data(), v_hat.size());
+  Zero(g.data(), g.size());
+  Zero(m.data(), m.size());
+  Zero(v.data(), v.size());
+  Zero(m_hat.data(), m_hat.size());
+  Zero(v_hat.data(), v_hat.size());
   t = 0;
 
   // shuffle minibatches
@@ -92,7 +93,7 @@ void AdamOptimizer::Optimize(std::vector<double>& parameters,
       const int* minibatch = batch.data() + dim_minibatch * j;
 
       // gradient
-      mju_zero(g.data(), g.size());
+      Zero(g.data(), g.size());
       gradient(g.data(), parameters.data(), minibatch, dim_minibatch);
 
       // TODO(taylor): normalize / clip gradient
@@ -192,7 +193,7 @@ void AdamOptimizer::Optimize(std::vector<double>& parameters,
 //     double ly[1] = {0.0};
 //     loss_y(ly, out, y);
 //     mlp.Backward(ly);
-//     mju_addToScl(gradient, mlp.gradient.data(), 1.0 / dim_minibatch,
+//     AddToScale(gradient, mlp.gradient.data(), 1.0 / dim_minibatch,
 //     mlp.gradient.size());
 //   }
 // };
@@ -203,7 +204,7 @@ void AdamOptimizer::Optimize(std::vector<double>& parameters,
 // // printf("parameters gradient: \n");
 // // mju_printMat(opt.g.data(), 1, opt.g.size());
 
-// // mju_zero(mlp.gradient.data(), mlp.num_parameters);
+// // Zero(mlp.gradient.data(), mlp.num_parameters);
 // // gradient(opt.g.data(), mlp.parameters.data(), minibatch,
 // opt.dim_minibatch);
 

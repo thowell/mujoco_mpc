@@ -1,7 +1,9 @@
 #include "mjpc/learning/mlp.h"
+#include "mjpc/learning/utilities.h"
 
 #include <absl/random/random.h>
 #include <mujoco/mujoco.h>
+#include <stdexcept>
 
 namespace mjpc {
 
@@ -14,10 +16,10 @@ void Activation(double* output, const double* input, int dim,
       output[i] = input[i];
       // relu
     } else if (type == kReLU) {
-      output[i] = mju_max(0.0, input[i]);
+      output[i] = std::max(0.0, input[i]);
       // tanh
     } else if (type == kTanh) {
-      output[i] = mju_tanh(input[i]);
+      output[i] = std::tanh(input[i]);
     }
   }
 }
@@ -38,7 +40,7 @@ void ActivationDerivative(double* output, const double* input, int dim,
       }
       // tanh
     } else if (type == kTanh) {
-      output[i] = 1.0 - mju_tanh(input[i]) * mju_tanh(input[i]);
+      output[i] = 1.0 - std::tanh(input[i]) * std::tanh(input[i]);
     }
   }
 }
@@ -47,7 +49,7 @@ void ActivationDerivative(double* output, const double* input, int dim,
 void MLP::Initialize(int dim_input, int dim_output, std::vector<int> dim_hidden,
                      std::vector<Activations> activations) {
   if (!(dim_hidden.size() == activations.size() - 1)) {
-    mju_error(
+    throw std::invalid_argument(
         "Hidden layer dimensions and number of activations do not match\n");
   }
 
@@ -96,21 +98,22 @@ void MLP::Initialize(int dim_input, int dim_output, std::vector<int> dim_hidden,
   layer_output_activation_deriv.resize(dim_layers - dim_layer[0]);
   delta.resize(dim_layers - dim_layer[0]);
   gradient.resize(num_parameters);
+  loss_gradient.resize(dim_layer[dim_layer.size() - 1]);
 }
 
 // forward
 void MLP::Forward(const double* input) {
   // initial activation is input
-  mju_copy(layer_activation.data(), input, dim_layer[0]);
+  Copy(layer_activation.data(), input, dim_layer[0]);
 
   // ----- layers ----- //
   for (int i = 1; i < dim_layer.size(); i++) {
     // layer output
-    mju_mulMatVec(layer_output.data() + this->OutputIndex(i - 1),
+    MultiplyMatVec(layer_output.data() + this->OutputIndex(i - 1),
                   parameters.data() + this->WeightIndex(i - 1),
                   layer_activation.data() + this->ActivationIndex(i - 1),
                   dim_layer[i], dim_layer[i - 1]);
-    mju_addTo(layer_output.data() + this->OutputIndex(i - 1),
+    AddTo(layer_output.data() + this->OutputIndex(i - 1),
               parameters.data() + this->BiasIndex(i - 1), dim_layer[i]);
 
     // activation
@@ -134,11 +137,11 @@ void MLP::Backward(const double* loss_gradient) {
     // compute deltaL = [loss_gradient | (W^(l + 1))^T delta^(l + 1)] .*
     // sigma'(zl)
     if (i == dim_layer.size() - 1) {
-      mju_copy(deltal, loss_gradient, dim_layer[i]);
+      Copy(deltal, loss_gradient, dim_layer[i]);
     } else {
       double* deltap = delta.data() + this->OutputIndex(i);
       double* Wp = parameters.data() + this->WeightIndex(i);
-      mju_mulMatTVec(deltal, Wp, deltap, dim_layer[i + 1], dim_layer[i]);
+      MultiplyMatTVec(deltal, Wp, deltap, dim_layer[i + 1], dim_layer[i]);
     }
 
     for (int j = 0; j < dim_layer[i]; j++) {
@@ -146,7 +149,7 @@ void MLP::Backward(const double* loss_gradient) {
     }
 
     // set d loss / d b
-    mju_copy(gradient.data() + this->BiasIndex(i - 1), deltal, dim_layer[i]);
+    Copy(gradient.data() + this->BiasIndex(i - 1), deltal, dim_layer[i]);
 
     // set d loss / d W
     for (int j = 0; j < dim_layer[i]; j++) {
@@ -163,12 +166,12 @@ double* MLP::Output() {
   return layer_output.data() + this->OutputIndex(dim_layer.size() - 2);
 }
 
-// get weight 
+// get weight
 double* MLP::Weight(int layer) {
   return parameters.data() + this->WeightIndex(layer);
 }
 
-// get bias 
+// get bias
 double* MLP::Bias(int layer) {
   return parameters.data() + this->BiasIndex(layer);
 }

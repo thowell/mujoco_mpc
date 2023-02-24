@@ -2,6 +2,7 @@
 #define MJPC_LEARNING_MLP_H_
 
 #include <vector>
+#include <functional>
 
 namespace mjpc {
 
@@ -37,10 +38,10 @@ class MLP {
   // output
   double* Output();
 
-  // get weight 
+  // get weight
   double* Weight(int layer);
 
-  // get bias 
+  // get bias
   double* Bias(int layer);
 
   // parameters
@@ -60,6 +61,7 @@ class MLP {
 
   // loss gradient
   std::vector<double> gradient;
+  std::vector<double> loss_gradient;
 
   // layer dimensions
   std::vector<int> dim_layer;
@@ -77,6 +79,8 @@ class MLP {
   // index shift for activations
   int ActivationIndex(int layer);
 };
+
+using MLPInitialization = std::function<void(MLP& mlp)>;
 
 }  // namespace mjpc
 

@@ -2,16 +2,14 @@
 #define MJPC_LEARNING_PPO_H_
 
 #include <vector>
+#include <functional>
 
 #include "mjpc/learning/adam.h"
+#include "mjpc/learning/env.h"
 #include "mjpc/learning/mlp.h"
 #include "mjpc/threadpool.h"
 
 namespace mjpc {
-
-double Reward(const double* observation, const double* action);
-void Dynamics(double* next_obs, const double* observation,
-              const double* action);
 
 // data for rollouts
 class RolloutData {
@@ -23,7 +21,8 @@ class RolloutData {
   ~RolloutData() = default;
 
   // initialize
-  void Initialize(int dim_obs, int dim_action, int num_steps, int num_env);
+  void Initialize(int dim_observation, int dim_action, int num_steps,
+                  int num_env);
 
   // memory
   std::vector<double> observation;  // observation
@@ -36,7 +35,7 @@ class RolloutData {
   std::vector<int> done;            // done
 
   // dimensions
-  int dim_obs;
+  int dim_observation;
   int dim_action;
   int num_steps;
   int num_env;
@@ -59,13 +58,13 @@ class PPO {
   ~PPO() = default;
 
   // initialize
-  void Initialize(int dim_obs, int dim_action, int num_steps, int num_env,
-                  int dim_minibatch,
-                  std::function<void(MLP& mlp)> actor_initialization,
-                  std::function<void(MLP& mlp)> critic_initialization);
+  void Initialize(Environment* env, int num_steps, int num_env,
+                  int dim_minibatch, MLPInitialization actor_initialization,
+                  MLPInitialization critic_initialization,
+                  ThreadPool* pool);
 
   // rollouts
-  void Rollouts(const double* obs_init, ThreadPool& pool);
+  void Rollouts();
 
   // reward-to-go
   void RewardToGo();
@@ -101,14 +100,15 @@ class PPO {
                           const double* action, double logprob,
                           double advantage);
 
-  // entropy loss 
+  // entropy loss
   double EntropyLoss(const double* observation, const double* action);
 
-  // total entropy loss 
+  // total entropy loss
   double TotalEntropyLoss();
 
   // entropy loss gradient
-  void EntropyLossGradient(double* gradient, const double* observation, const double* action);
+  void EntropyLossGradient(double* gradient, const double* observation,
+                           const double* action);
 
   // value
   double Value(const double* observation, MLP& mlp);
@@ -126,6 +126,12 @@ class PPO {
   // learn
   void Learn(int iterations, ThreadPool& pool);
 
+  // environment 
+  Environment* env; 
+
+  // pool 
+  ThreadPool* pool;
+
   // actor network
   MLP actor_mlp;
   std::vector<std::unique_ptr<MLP>> actors;
@@ -139,7 +145,7 @@ class PPO {
   // loss gradient
   std::vector<double> loss_gradient;
 
-  // rollout data
+  // rollouts
   RolloutData data;
 
   // batch indices
@@ -153,6 +159,9 @@ class PPO {
   double value_coeff;
   double entropy_coeff;
   double gradient_norm_max;
+
+  // mode 
+  int stochastic_policy;
 };
 
 // finite difference gradient for scalar output functions
