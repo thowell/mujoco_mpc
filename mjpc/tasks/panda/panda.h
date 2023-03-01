@@ -28,6 +28,16 @@ class Panda : public Task {
                 double* residual) const override;
   void Transition(const mjModel* model, mjData* data, mjvScene* scene) override;
 };
+
+class PandaBlocks : public Task {
+ public:
+  std::string Name() const override;
+  std::string XmlPath() const override;
+  void Residual(const mjModel* model, const mjData* data,
+                double* residual) const override;
+  void Transition(const mjModel* model, mjData* data, mjvScene* scene) override;
+};
+
 }  // namespace mjpc
 
 

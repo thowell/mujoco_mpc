@@ -49,6 +49,7 @@ std::vector<std::shared_ptr<Task>> GetTasks() {
   taskVector.push_back(std::make_shared<humanoid::Walk>());
 // DEEPMIND INTERNAL TASKS
   taskVector.push_back(std::make_shared<Panda>());
+  taskVector.push_back(std::make_shared<PandaBlocks>());
   taskVector.push_back(std::make_shared<Particle>());
   taskVector.push_back(std::make_shared<Quadrotor>());
   taskVector.push_back(std::make_shared<QuadrupedFlat>());

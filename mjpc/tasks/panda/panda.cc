@@ -97,4 +97,45 @@ void Panda::Transition(const mjModel* model, mjData* data, mjvScene* scene) {
     mju_normalize4(data->mocap_quat);
   }
 }
+
+std::string PandaBlocks::XmlPath() const {
+  return GetModelPath("panda/task_blocks.xml");
+}
+std::string PandaBlocks::Name() const { return "Panda Blocks"; }
+
+// ---------- Residuals for in-panda manipulation task ---------
+//   Number of residuals: 5
+//     Residual (0): cube_position - palm_position
+//     Residual (1): cube_orientation - cube_goal_orientation
+//     Residual (2): cube linear velocity
+//     Residual (3): cube angular velocity
+//     Residual (4): control
+// ------------------------------------------------------------
+void PandaBlocks::Residual(const mjModel* model, const mjData* data,
+                     double* residual) const {
+  int counter = 0;
+
+  // reach
+  mju_zero(residual + counter, 3);
+  counter += 3;
+
+  // sensor dim sanity check
+  // TODO: use this pattern everywhere and make this a utility function
+  int user_sensor_dim = 0;
+  for (int i = 0; i < model->nsensor; i++) {
+    if (model->sensor_type[i] == mjSENS_USER) {
+      user_sensor_dim += model->sensor_dim[i];
+    }
+  }
+  if (user_sensor_dim != counter) {
+    mju_error_i(
+        "mismatch between total user-sensor dimension "
+        "and actual length of residual %d",
+        counter);
+  }
+}
+
+void PandaBlocks::Transition(const mjModel* model, mjData* data, mjvScene* scene) {
+}
+
 }  // namespace mjpc
