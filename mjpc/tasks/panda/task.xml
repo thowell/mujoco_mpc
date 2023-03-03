@@ -6,13 +6,13 @@
   <custom>
     <numeric name="agent_planner" data="0" />
     <numeric name="agent_horizon" data="0.5" />
-    <numeric name="agent_timestep" data="0.009" />
+    <numeric name="agent_timestep" data="0.01" />
     <numeric name="agent_sample_width" data="0.0025" />
     <numeric name="agent_policy_width" data="0.0035" />
-    <numeric name="sampling_trajectories" data="60"/>
-    <numeric name="sampling_spline_points" data="7" />
+    <numeric name="sampling_trajectories" data="10"/>
+    <numeric name="sampling_spline_points" data="5" />
     <numeric name="sampling_exploration" data="0.1" />
-    <numeric name="gradient_spline_points" data="6" />
+    <numeric name="gradient_spline_points" data="5" />
   </custom>
 
   <statistic extent="1.5" center="0.1 0.2 0.3"/>
@@ -62,7 +62,7 @@
   <sensor>
     <user name="Reach" dim="3" user="2 1 0 5 0.01"/>
     <user name="Bring" dim="6" user="2 .1 0 1 0.003"/>
-    <user name="Actuator" dim="7" user="0 0.001 0 1"/>
+    <user name="Actuator" dim="7" user="0 0.0 0 1"/>
     <framepos name="hand" objtype="site" objname="eeff"/>
     <framepos name="box" objtype="geom" objname="box"/>
     <framepos name="box1" objtype="site" objname="box1"/>

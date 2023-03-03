@@ -119,8 +119,23 @@ void PandaBlocks::Residual(const mjModel* model, const mjData* data,
   int counter = 0;
 
   // reach
-  mju_zero(residual + counter, 3);
+  double* hand = SensorByName(model, data, "hand");
+  double* box = SensorByName(model, data, "box");
+  mju_sub3(residual + counter, hand, box);
   counter += 3;
+
+  // bring
+  double* box1 = SensorByName(model, data, "box1");
+  double* target1 = SensorByName(model, data, "target1");
+  mju_sub3(residual + counter, box1, target1);
+  counter += 3;
+  double* box2 = SensorByName(model, data, "box2");
+  double* target2 = SensorByName(model, data, "target2");
+  mju_sub3(residual + counter, box2, target2);
+  counter += 3;
+
+  mju_copy(residual + counter, data->actuator_force, model->nu);
+  counter += model->nu;
 
   // sensor dim sanity check
   // TODO: use this pattern everywhere and make this a utility function
@@ -139,6 +154,30 @@ void PandaBlocks::Residual(const mjModel* model, const mjData* data,
 }
 
 void PandaBlocks::Transition(const mjModel* model, mjData* data, mjvScene* scene) {
+  double residuals[100];
+  double terms[10];
+  Residual(model, data, residuals);
+  CostTerms(terms, residuals);
+  double bring_dist = (mju_norm3(residuals+3) + mju_norm3(residuals+6)) / 2;
+
+  // reset:
+  if (data->time > 0 && bring_dist < .015) {
+    // box:
+    absl::BitGen gen_;
+    data->qpos[0] = absl::Uniform<double>(gen_, -.5, .5);
+    data->qpos[1] = absl::Uniform<double>(gen_, -.5, .5);
+    data->qpos[2] = .05;
+
+    // target:
+    data->mocap_pos[0] = absl::Uniform<double>(gen_, -.5, .5);
+    data->mocap_pos[1] = absl::Uniform<double>(gen_, -.5, .5);
+    data->mocap_pos[2] = absl::Uniform<double>(gen_, .03, 1);
+    data->mocap_quat[0] = absl::Uniform<double>(gen_, -1, 1);
+    data->mocap_quat[1] = absl::Uniform<double>(gen_, -1, 1);
+    data->mocap_quat[2] = absl::Uniform<double>(gen_, -1, 1);
+    data->mocap_quat[3] = absl::Uniform<double>(gen_, -1, 1);
+    mju_normalize4(data->mocap_quat);
+  }
 }
 
 }  // namespace mjpc
