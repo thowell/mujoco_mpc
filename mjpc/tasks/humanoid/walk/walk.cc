@@ -49,12 +49,24 @@ void humanoid::Walk::Residual(const mjModel* model,
   double torso_height = SensorByName(model, data, "torso_position")[2];
   residual[counter++] = torso_height - parameters[0];
 
+  // ----- actuation ----- //
+  mju_copy(&residual[counter], data->actuator_force, model->nu);
+  counter += model->nu;
+
   // ----- pelvis / feet ----- //
   double* foot_right = SensorByName(model, data, "foot_right");
   double* foot_left = SensorByName(model, data, "foot_left");
   double pelvis_height = SensorByName(model, data, "pelvis_position")[2];
   residual[counter++] =
       0.5 * (foot_left[2] + foot_right[2]) - pelvis_height - 0.2;
+
+  // if fallen, prioritize getting up
+  if (torso_height < 0.85 * parameters[0]) {
+    // increase cost on torso
+    residual[0] = 5.0 * (torso_height - parameters[0]);
+    // don't use other costs
+    return;
+  }
 
   // ----- balance ----- //
   // capture point
@@ -157,11 +169,8 @@ void humanoid::Walk::Residual(const mjModel* model,
 
   mju_copy(&residual[counter], move_feet, 2);
   mju_scl(&residual[counter], &residual[counter], standing, 2);
-  counter += 2;
 
-  // ----- control ----- //
-  mju_copy(&residual[counter], data->ctrl, model->nu);
-  counter += model->nu;
+  counter += 2;
 
   // sensor dim sanity check
   // TODO: use this pattern everywhere and make this a utility function
