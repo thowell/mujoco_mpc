@@ -40,10 +40,27 @@ std::string humanoid::Walk::Name() const { return "Humanoid Walk"; }
 //   Number of parameters:
 //     Parameter (0): torso height goal
 //     Parameter (1): speed goal
+//     Parameter (2): feet-pelvis distance
+//     Parameter (3): forward velocity scaling
 // ----------------------------------------------------------------
 void humanoid::Walk::Residual(const mjModel* model,
                               const mjData* data, double* residual) const {
   int counter = 0;
+
+  // position error
+  double* torso_position = SensorByName(model, data, "torso_position");
+  double* goal = SensorByName(model, data, "goal_position");
+  double goal_position_error[2];
+
+  // goal position error
+  mju_sub(goal_position_error, goal, torso_position, 2);
+
+  double speed = parameters[1];
+  double vel_scaling = parameters[3];
+  if (mju_norm(goal_position_error, 2) < 0.25) {
+    speed = 0.0;
+    vel_scaling = 0.0;
+  }
 
   // ----- torso height ----- //
   double torso_height = SensorByName(model, data, "torso_position")[2];
@@ -58,7 +75,7 @@ void humanoid::Walk::Residual(const mjModel* model,
   double* foot_left = SensorByName(model, data, "foot_left");
   double pelvis_height = SensorByName(model, data, "pelvis_position")[2];
   residual[counter++] =
-      0.5 * (foot_left[2] + foot_right[2]) - pelvis_height - 0.2;
+      0.5 * (foot_left[2] + foot_right[2]) - pelvis_height - parameters[2];
 
   // if fallen, prioritize getting up
   if (torso_height < 0.85 * parameters[0]) {
@@ -74,7 +91,7 @@ void humanoid::Walk::Residual(const mjModel* model,
   double* subcomvel = SensorByName(model, data, "torso_subcomvel");
 
   double capture_point[3];
-  mju_addScl(capture_point, subcom, subcomvel, 0.3, 3);
+  mju_addScl(capture_point, subcom, subcomvel, vel_scaling, 3);
   capture_point[2] = 1.0e-3;
 
   // project onto line segment
@@ -131,9 +148,32 @@ void humanoid::Walk::Residual(const mjModel* model,
   counter += 3;
 
   // ----- posture ----- //
-  mju_copy(&residual[counter], data->qpos + 7, model->nq - 7);
+  double joint_ref[21] = {0, 0, 0, -0.1, 0, -0.25, -0.5, -0.25, 0, -0.1, 0, -0.25, -0.5, -0.25, 0, 0.5, -0.5, -1.5, 0.5, -0.5, -1.5};
+  mju_sub(&residual[counter], data->qpos + 7, joint_ref, model->nq - 7);
   counter += model->nq - 7;
 
+  // ----- goal ----- //
+
+  if (torso_height > 0.85 * parameters[0]) {
+    // ----- position error ----- //
+    mju_copy(&residual[counter], goal_position_error, 2);
+    counter += 2;
+
+    // ----- orientation error ----- //
+    // direction to goal
+    double goal_direction[2];
+    mju_copy(goal_direction, goal_position_error, 2);
+    mju_normalize(goal_direction, 2);
+
+    // torso direction
+    double* torso_xaxis = SensorByName(model, data, "torso_xaxis");
+
+    mju_sub(&residual[counter], goal_direction, torso_xaxis, 2);
+    counter += 2;
+  } else {
+    mju_zero(&residual[counter], 4);
+  }
+  
   // ----- walk ----- //
   double* torso_forward = SensorByName(model, data, "torso_forward");
   double* pelvis_forward = SensorByName(model, data, "pelvis_forward");
@@ -157,7 +197,7 @@ void humanoid::Walk::Residual(const mjModel* model,
 
   // walk forward
   residual[counter++] =
-      standing * (mju_dot(com_vel, forward, 2) - parameters[1]);
+      standing * (mju_dot(com_vel, forward, 2) - speed);
 
   // ----- move feet ----- //
   double* foot_right_vel = SensorByName(model, data, "foot_right_velocity");
