@@ -62,6 +62,7 @@
   <sensor>
     <user name="Reach" dim="3" user="2 1 0 5 0.01"/>
     <user name="Bring" dim="6" user="2 .1 0 1 0.003"/>
+    <user name="Actuator" dim="7" user="0 0.001 0 1"/>
     <framepos name="hand" objtype="site" objname="eeff"/>
     <framepos name="box" objtype="geom" objname="box"/>
     <framepos name="box1" objtype="site" objname="box1"/>

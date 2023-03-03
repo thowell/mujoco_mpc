@@ -55,6 +55,9 @@ void Panda::Residual(const mjModel* model, const mjData* data,
   mju_sub3(residual + counter, box2, target2);
   counter += 3;
 
+  mju_copy(residual + counter, data->actuator_force, model->nu);
+  counter += model->nu;
+
   // sensor dim sanity check
   // TODO: use this pattern everywhere and make this a utility function
   int user_sensor_dim = 0;
