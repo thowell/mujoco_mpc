@@ -57,7 +57,7 @@ void humanoid::Walk::Residual(const mjModel* model,
 
   double speed = parameters[1];
   double vel_scaling = parameters[3];
-  if (mju_norm(goal_position_error, 2) < 0.25) {
+  if (mju_norm(goal_position_error, 2) < 0.1) {
     speed = 0.0;
     vel_scaling = 0.0;
   }
