@@ -27,18 +27,22 @@ class Walk : public Task {
   std::string XmlPath() const override;
 
   // ------------------ Residuals for humanoid walk task ------------
-  //   Number of residuals:
+  //   Number of residuals: 10
   //     Residual (0): torso height
   //     Residual (1): pelvis-feet aligment
   //     Residual (2): balance
   //     Residual (3): upright
   //     Residual (4): posture
-  //     Residual (5): walk
-  //     Residual (6): move feet
-  //     Residual (7): control
-  //   Number of parameters:
+  //     Residual (5): goal position 
+  //     Residual (6): goal direction
+  //     Residual (7): walk
+  //     Residual (8): move feet
+  //     Residual (9): control
+  //   Number of parameters: 4
   //     Parameter (0): torso height goal
   //     Parameter (1): speed goal
+  //     Parameter (2): feet-pelvis distance
+  //     Parameter (3): forward velocity scaling
   // ----------------------------------------------------------------
   void Residual(const mjModel* model, const mjData* data,
                 double* residual) const override;
