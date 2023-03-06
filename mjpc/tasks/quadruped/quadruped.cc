@@ -41,18 +41,16 @@ void QuadrupedFlat::Residual(const mjModel* model, const mjData* data,
   for (A1Foot foot : kFootAll)
     foot_pos[foot] = data->geom_xpos + 3 * foot_geom_id_[foot];
 
-  double* shoulder_pos[kNumFoot];
-  for (A1Foot foot : kFootAll)
-    shoulder_pos[foot] = data->xpos + 3 * shoulder_body_id_[foot];
-
   // average foot position
   double avg_foot_pos[3];
   AverageFootPos(avg_foot_pos, foot_pos);
 
+  // torso
   double* torso_xmat = data->xmat + 9*torso_body_id_;
-  double* goal_pos = data->mocap_pos + 3*goal_mocap_id_;
   double* compos = SensorByName(model, data, "torso_subtreecom");
 
+  // goal
+  double* goal_pos = data->mocap_pos + 3*goal_mocap_id_;
 
   // ---------- Upright ----------
   if (current_stage_ != kStageFlip) {
@@ -176,11 +174,6 @@ void QuadrupedFlat::Residual(const mjModel* model, const mjData* data,
                flip_time < jump_time_ + flight_time_) {
       // free legs during flight phase
       mju_zero(residual + counter, model->nu);
-    }
-  }
-  for (A1Foot foot : kFootAll) {
-    for (int joint = 0; joint < 3; joint++) {
-      residual[counter + 3*foot + joint] *= kJointPostureGain[joint];
     }
   }
   if (current_stage_ == kStageBiped) {

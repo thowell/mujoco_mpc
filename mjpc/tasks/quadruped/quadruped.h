@@ -129,17 +129,14 @@ class QuadrupedFlat : public Task {
   // below this target yaw velocity, walk straight
   constexpr static double kMinAngvel = 0.01;        // radian/second
 
-  // posture gain factors for abduction, hip, knee
-  constexpr static double kJointPostureGain[3] = {2, 1, 1};  // unitless
-
   // flip: crouching height, from which leap is initiated
   constexpr static double kCrouchHeight = 0.13;     // meter
 
   // flip: leap height, beginning of flight phase
-  constexpr static double kLeapHeight = 0.6;        // meter
+  constexpr static double kLeapHeight = 0.55;        // meter
 
   // flip: maximum height of flight phase
-  constexpr static double kMaxHeight = 0.9;         // meter
+  constexpr static double kMaxHeight = 0.75;         // meter
 
   //  ============  methods  ============
   // return internal phase clock
