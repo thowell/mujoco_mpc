@@ -157,7 +157,8 @@ void StateDiff(const mjModel* m, mjtNum* ds, const mjtNum* s1, const mjtNum* s2,
                mjtNum h);
 
 // return global height of nearest group 0 geom under given position
-mjtNum Ground(const mjModel* model, const mjData* data, const mjtNum pos[3]);
+mjtNum Ground(const mjModel* model, const mjData* data, const mjtNum pos[3],
+              double offset);
 
 // set x to be the point on the segment [p0 p1] that is nearest to x
 void ProjectToSegment(double x[3], const double p0[3], const double p1[3]);

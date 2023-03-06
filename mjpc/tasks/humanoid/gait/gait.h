@@ -70,43 +70,6 @@ class Gait : public Task {
     kNumGait,
   };
 
-  //  ============  constants  ============
-  constexpr static HumanoidFoot kFootAll[kNumFoot] = {kFootLeft, kFootRight};
-  constexpr static HumanoidGait kGaitAll[kNumGait] = {kGaitStand, kGaitWalk,
-                                                      kGaitHighWalk, kGaitRun};
-
-  // gait phase signature (normalized)
-  constexpr static double kGaitPhase[kNumGait][kNumFoot] =
-  {
-  // left     right
-    {0.0,     0.0},   // stand
-    {0.0,     0.5},   // walk
-    {0.0,     0.5},   // high walk
-    {0.0,     0.5},   // run
-  };
-
-  // gait parameters, set when switching into gait
-  constexpr static double kGaitParam[kNumGait][6] =
-  {
-  // duty ratio  cadence  amplitude  balance   upright   height
-  // unitless    Hz       meter      unitless  unitless  unitless
-    {0.5,         1,       0.1,       1,        1,        1},      // stand
-    {0.5,         1,       0.1,       1,        1,        1},      // walk
-    {0.5,         1,       0.1,       1,        1,        1},      // high walk
-    {0.5,         1,       0.1,       1,        1,      0.2},      // run
-  };
-
-  // velocity ranges for automatic gait switching, meter/second
-  constexpr static double kGaitAuto[kNumGait] =
-  {
-    0.0,  // stand
-    0.0,  // walk
-    0.0,  // high walk
-    0.0,  // run
-  };
-  // notes:
-  // - walk is never triggered by auto-gait
-
   // automatic gait switching: time constant for com speed filter
   constexpr static double kAutoGaitFilter = 0.2;    // second
 
@@ -114,26 +77,20 @@ class Gait : public Task {
   constexpr static double kAutoGaitMinTime = 1;     // second
 
   // target torso height over feet when humanoid
-  constexpr static double kHeightHumanoid = 1.3;    // meter
-
-  // radius of foot
-  constexpr static double kFootRadius = 0.025;      // meter
+  constexpr static double kHeightHumanoid = 1.3;  // meter
 
   // flip: crouching height, from which leap is initiated
   constexpr static double kCrouchHeight = 0.85;     // meter
 
   // flip: leap height, beginning of flight phase
-  constexpr static double kLeapHeight = 1.15;       // meter
+  constexpr static double kLeapHeight = 1.25;        // meter
 
   // flip: maximum height of flight phase
-  constexpr static double kMaxHeight = 1.45;        // meter
+  constexpr static double kMaxHeight = 1.65;         // meter
 
   //  ============  methods  ============
   // return internal phase clock
   double GetPhase(double time) const;
-
-  // return current gait
-  HumanoidGait GetGait() const;
 
   // return normalized target step height
   double StepHeight(double time, double footphase, double duty_ratio) const;

@@ -22,7 +22,7 @@
 namespace mjpc {
 namespace humanoid {
 
-class Gait : public Task {
+class Flip : public Task {
  public:
   std::string Name() const override;
   std::string XmlPath() const override;

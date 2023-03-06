@@ -71,8 +71,14 @@ void humanoid::Gait::FlipQuat(double quat[4], double time) const {
 }
 
 // ------------------ Residuals for humanoid walk task ------------
-//   Number of residuals: 
-//   Number of parameters:
+//   Number of residuals: 5
+//     Residual (0): torso height
+//     Residual (1): actuation
+//     Residual (2): balance
+//     Residual (3): upright
+//     Residual (4): posture
+//   Number of parameters: 4
+//     Parameter (0): torso height goal
 // ----------------------------------------------------------------
 void humanoid::Gait::Residual(const mjModel* model, const mjData* data,
                               double* residual) const {
@@ -146,7 +152,7 @@ void humanoid::Gait::Residual(const mjModel* model, const mjData* data,
   mju_sub(&residual[counter], capture_point, pcp, 2);
   mju_scl(&residual[counter], &residual[counter], standing, 2);
 
-  counter += 1;
+  counter += 2;
 
   // ----- upright ----- //
   double* torso_up = SensorByName(model, data, "torso_up");
@@ -177,22 +183,27 @@ void humanoid::Gait::Residual(const mjModel* model, const mjData* data,
 
   // ----- goal ----- //
 
-  // ----- position error ----- //
-  mju_copy(&residual[counter], goal_position_error, 2);
-  counter += 2;
+  if (torso_height > 0.85 * parameters[torso_height_param_id_]) {
+    // ----- position error ----- //
+    mju_copy(&residual[counter], goal_position_error, 2);
+    counter += 2;
 
-  // ----- orientation error ----- //
-  // direction to goal
-  double goal_direction[2];
-  mju_copy(goal_direction, goal_position_error, 2);
-  mju_normalize(goal_direction, 2);
+    // ----- orientation error ----- //
+    // direction to goal
+    double goal_direction[2];
+    mju_copy(goal_direction, goal_position_error, 2);
+    mju_normalize(goal_direction, 2);
 
-  // torso direction
-  double* torso_xaxis = SensorByName(model, data, "torso_xaxis");
+    // torso direction
+    double* torso_xaxis = SensorByName(model, data, "torso_xaxis");
 
-  mju_sub(&residual[counter], goal_direction, torso_xaxis, 2);
-  counter += 2;
- 
+    mju_sub(&residual[counter], goal_direction, torso_xaxis, 2);
+    counter += 2;
+  } else {
+    mju_zero(&residual[counter], 4);
+    counter += 4;
+  }
+
   // ----- walk ----- //
   double* torso_forward = SensorByName(model, data, "torso_forward");
   double* pelvis_forward = SensorByName(model, data, "pelvis_forward");
@@ -240,14 +251,26 @@ void humanoid::Gait::Residual(const mjModel* model, const mjData* data,
 
   for (int i = 0; i < 2; i++) {
     double query[3] = {foot_pos[i][0], foot_pos[i][1], foot_pos[i][2]};
-    double ground_height = Ground(model, data, query);
-    double height_target = ground_height + kFootRadius + step[i];
+    double ground_height = Ground(model, data, query, 0.5);
+    double height_target = ground_height + 0.025 + step[i];
     double height_difference = foot_pos[i][2] - height_target;
     residual[counter++] = step[i] ? height_difference : 0;
   }
 
   // sensor dim sanity check
-  CheckSensorDim(model, counter);
+  // TODO: use this pattern everywhere and make this a utility function
+  int user_sensor_dim = 0;
+  for (int i = 0; i < model->nsensor; i++) {
+    if (model->sensor_type[i] == mjSENS_USER) {
+      user_sensor_dim += model->sensor_dim[i];
+    }
+  }
+  if (user_sensor_dim != counter) {
+    mju_error_i(
+        "mismatch between total user-sensor dimension "
+        "and actual length of residual %d",
+        counter);
+  }
 }
 
 // transition
@@ -290,7 +313,7 @@ void humanoid::Gait::Transition(const mjModel* model, mjData* data) {
 
       // save body orientation, ground height
       mju_copy4(orientation_, data->xquat + 4 * torso_body_id_);
-      ground_ = Ground(model, data, compos);
+      ground_ = Ground(model, data, compos, 0.5);
 
       // save parameters
       save_weight_ = weight;
@@ -368,57 +391,45 @@ void humanoid::Gait::Reset(const mjModel* model) {
   //   foot_index++;
   // }
 
-  // ----------  derived kinematic quantities for Flip  ----------
-  // gravity
-  gravity_ = mju_norm3(model->opt.gravity);
+  // shoulder body ids
+  // int shoulder_index = 0;
+  // for (const char* shouldername : {"FL_hip", "HL_hip", "FR_hip", "HR_hip"}) {
+  //   int foot_id = mj_name2id(model, mjOBJ_BODY, shouldername);
+  //   if (foot_id < 0) mju_error_s("body '%s' not found", shouldername);
+  //   shoulder_body_id_[shoulder_index] = foot_id;
+  //   shoulder_index++;
+  // }
 
+  // ----------  derived kinematic quantities for Flip  ----------
+  gravity_ = mju_norm3(model->opt.gravity);
   // velocity at takeoff
   jump_vel_ = mju_sqrt(2 * gravity_ * (kMaxHeight - kLeapHeight));
-
   // time in flight phase
   flight_time_ = 2 * jump_vel_ / gravity_;
-
   // acceleration during jump phase
   jump_acc_ = jump_vel_ * jump_vel_ / (2 * (kLeapHeight - kCrouchHeight));
-
   // time in crouch sub-phase of jump
   crouch_time_ = mju_sqrt(2 * (kHeightHumanoid - kCrouchHeight) / jump_acc_);
-
   // time in leap sub-phase of jump
   leap_time_ = jump_vel_ / jump_acc_;
-
   // jump total time
   jump_time_ = crouch_time_ + leap_time_;
-
   // velocity at beginning of crouch
   crouch_vel_ = -jump_acc_ * crouch_time_;
-
   // time of landing phase
   land_time_ = 2 * (kLeapHeight - kHeightHumanoid) / jump_vel_;
-
   // acceleration during landing
   land_acc_ = jump_vel_ / land_time_;
-
   // rotational velocity during flight phase (rotates 1.25 pi)
   flight_rot_vel_ = 1.25 * mjPI / flight_time_;
-
   // rotational velocity at start of leap (rotates 0.5 pi)
   jump_rot_vel_ = mjPI / leap_time_ - flight_rot_vel_;
-
   // rotational acceleration during leap (rotates 0.5 pi)
   jump_rot_acc_ = (flight_rot_vel_ - jump_rot_vel_) / leap_time_;
-
   // rotational deceleration during land (rotates 0.25 pi)
   land_rot_acc_ =
       2 * (flight_rot_vel_ * land_time_ - mjPI / 4) / (land_time_ * land_time_);
 }
-
-// colors of visualisation elements drawn in ModifyScene()
-constexpr float kFlipRgba[4] = {0, 1, 0, 0.5};       // flip body
-constexpr float kCapRgba[4] = {1.0, 0.0, 1.0, 1.0};  // capture point
-constexpr float kHullRgba[4] = {1.0, 0.0, 0.0, 1};   // convex hull
-constexpr float kPcpRgba[4] = {1.0, 0.0, 0.0, 1.0};  // projected capture point
-constexpr float kStepRgba[4] = {1.0, 0.0, 1.0, 1.0}; // gait step height
 
 // draw task-related geometry in the scene
 void humanoid::Gait::ModifyScene(const mjModel* model, const mjData* data,
@@ -433,12 +444,13 @@ void humanoid::Gait::ModifyScene(const mjModel* model, const mjData* data,
     double mat[9];
     mju_quat2Mat(mat, quat);
     double size[3] = {0.05, 0.15, 0.25};
-    AddGeom(scene, mjGEOM_BOX, size, pos, mat, kFlipRgba);
+    float rgba[4] = {0, 1, 0, 0.5};
+    AddGeom(scene, mjGEOM_BOX, size, pos, mat, rgba);
 
     // don't draw anything else during flip
     return;
   }
-
+  
   // feet site positions (xy plane)
   double foot_pos[4][3];
   mju_copy(foot_pos[0], SensorByName(model, data, "sp0"), 3);
@@ -458,12 +470,13 @@ void humanoid::Gait::ModifyScene(const mjModel* model, const mjData* data,
   }
   int hull[4];
   int num_hull = Hull2D(hull, 4, polygon);
+  float HullRgba[4] = {1.0, 0.0, 0.0, 1};  // convex hull
 
   // draw connectors
   for (int i = 0; i < num_hull; i++) {
     int j = (i + 1) % num_hull;
     AddConnector(scene, mjGEOM_CAPSULE, 0.015, foot_pos[hull[i]],
-                 foot_pos[hull[j]], kHullRgba);
+                 foot_pos[hull[j]], HullRgba);
   }
 
   // capture point
@@ -475,12 +488,13 @@ void humanoid::Gait::ModifyScene(const mjModel* model, const mjData* data,
   mju_addScl3(capture, compos, comvel, fall_time);
 
   // ground under CoM
-  double com_ground = Ground(model, data, compos);
+  double com_ground = Ground(model, data, compos, 0.0);
 
   // capture point
-  double foot_size[3] = {kFootRadius, 0, 0};
+  double foot_size[3] = {0.02, 0, 0};
 
   capture[2] = com_ground;
+  float kCapRgba[4] = {1.0, 0.0, 1.0, 1.0};  // capture point
 
   AddGeom(scene, mjGEOM_SPHERE, foot_size, capture, /*mat=*/nullptr, kCapRgba);
 
@@ -488,9 +502,10 @@ void humanoid::Gait::ModifyScene(const mjModel* model, const mjData* data,
   double pcp2[2];
   NearestInHull(pcp2, capture, polygon, hull, num_hull);
   double pcp[3] = {pcp2[0], pcp2[1], com_ground};
+  float kPcpRgba[4] = {1.0, 0.0, 0.0, 1.0};  // projected capture point
   AddGeom(scene, mjGEOM_SPHERE, foot_size, pcp, /*mat=*/nullptr, kPcpRgba);
 
-  // step height
+  // step height 
   double* lf = SensorByName(model, data, "foot_left");
   double* rf = SensorByName(model, data, "foot_right");
 
@@ -498,36 +513,28 @@ void humanoid::Gait::ModifyScene(const mjModel* model, const mjData* data,
   FootStep(step, GetPhase(data->time));
 
   double ql[3] = {lf[0], lf[1], lf[2]};
-  double ghl = Ground(model, data, ql);
-  double hl = ghl + step[0] + kFootRadius;
+  double ghl = Ground(model, data, ql, 0.5);
+  double hl = ghl + step[0] + 0.025;
 
   double hull_left[3] = {lf[0], lf[1], ghl};
   double step_left[3] = {lf[0], lf[1], hl};
 
-  AddConnector(scene, mjGEOM_CAPSULE, kFootRadius, hull_left, step_left,
-               kCapRgba);
+  AddConnector(scene, mjGEOM_CAPSULE, 0.02, hull_left, step_left, kCapRgba);
 
   double qr[3] = {rf[0], rf[1], rf[2]};
-  double ghr = Ground(model, data, qr);
-  double hr = ghr + step[1] + kFootRadius;
+  double ghr = Ground(model, data, qr, 0.5);
+  double hr = ghr + step[1] + 0.025;
   qr[2] = hr;
 
   double hull_right[3] = {rf[0], rf[1], ghr};
   double step_right[3] = {rf[0], rf[1], hr};
 
-  AddConnector(scene, mjGEOM_CAPSULE, kFootRadius, hull_right, step_right,
-               kStepRgba);
+  AddConnector(scene, mjGEOM_CAPSULE, 0.02, hull_right, step_right, kCapRgba);
 }
 
 // return phase as a function of time
 double humanoid::Gait::GetPhase(double time) const {
   return phase_start_ + (time - phase_start_time_) * phase_velocity_;
-}
-
-// get gait
-humanoid::Gait::HumanoidGait humanoid::Gait::GetGait() const {
-  return static_cast<HumanoidGait>(
-      ReinterpretAsInt(parameters[gait_param_id_]));
 }
 
 // return normalized target step height
@@ -546,7 +553,6 @@ double humanoid::Gait::StepHeight(double time, double footphase,
 void humanoid::Gait::FootStep(double* step, double time) const {
   double amplitude = parameters[amplitude_param_id_];
   double duty_ratio = parameters[duty_param_id_];
-  // TODO(taylor): set from gait list
   double gait_phase[2] = {0.0, 0.5};
   for (int i = 0; i < 2; i++) {
     double footphase = 2 * mjPI * gait_phase[i];

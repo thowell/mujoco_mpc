@@ -137,7 +137,7 @@ void QuadrupedFlat::Residual(const mjModel* model, const mjData* data,
       mju_addToScl3(query, torso_to_goal, 0.15);
     }
 
-    double ground_height = Ground(model, data, query);
+    double ground_height = Ground(model, data, query, 0.5);
     double height_target = ground_height + kFootRadius + step[foot];
     double height_difference = foot_pos[foot][2] - height_target;
     if (current_stage_ == kStageScramble) {
@@ -341,7 +341,7 @@ void QuadrupedFlat::Transition(const mjModel* model, mjData* data) {
 
       // save body orientation, ground height
       mju_copy4(orientation_, data->xquat + 4*torso_body_id_);
-      ground_ = Ground(model, data, compos);
+      ground_ = Ground(model, data, compos, 0.5);
 
       // save parameters
       save_weight_ = weight;
@@ -419,7 +419,7 @@ void QuadrupedFlat::ModifyScene(const mjModel* model, const mjData* data,
   // ground height below feet
   double ground[kNumFoot];
   for (A1Foot foot : kFootAll) {
-    ground[foot] = Ground(model, data, foot_pos[foot]);
+    ground[foot] = Ground(model, data, foot_pos[foot], 0.5);
   }
 
   // step heights
@@ -468,7 +468,7 @@ void QuadrupedFlat::ModifyScene(const mjModel* model, const mjData* data,
   mju_addScl3(capture, compos, comvel, fall_time);
 
   // ground under CoM
-  double com_ground = Ground(model, data, compos);
+  double com_ground = Ground(model, data, compos, 0.5);
 
   // average foot position
   double feet_pos[3];

@@ -573,13 +573,15 @@ void StateDiff(const mjModel* m, mjtNum* ds, const mjtNum* s1, const mjtNum* s2,
 
 
 // return global height of nearest group 0 geom under given position
-mjtNum Ground(const mjModel* model, const mjData* data, const mjtNum pos[3]) {
+mjtNum Ground(const mjModel* model, const mjData* data, const mjtNum pos[3],
+              double offset) {
   const mjtByte geomgroup[6] = {1, 0, 0, 0, 0, 0};  // only detect group 0
-  mjtNum down[3] = {0, 0, -1};      // aim ray straight down
-  const mjtNum height_offset = .5;  // add some height in case of penetration
-  const mjtByte flg_static = 1;     // include static geoms
-  const int bodyexclude = -1;       // don't exclude any bodies
-  int geomid;                       // id of intersecting geom
+  mjtNum down[3] = {0, 0, -1};                      // aim ray straight down
+  const mjtNum height_offset =
+      offset;                    // add some height in case of penetration
+  const mjtByte flg_static = 1;  // include static geoms
+  const int bodyexclude = -1;    // don't exclude any bodies
+  int geomid;                    // id of intersecting geom
   mjtNum query[3] = {pos[0], pos[1], pos[2] + height_offset};
   mjtNum dist = mj_ray(model, data, query, down, geomgroup, flg_static,
                        bodyexclude, &geomid);
@@ -591,7 +593,6 @@ mjtNum Ground(const mjModel* model, const mjData* data, const mjtNum pos[3]) {
 
   return pos[2] + height_offset - dist;
 }
-
 
 // find frame that best matches 4 feet, z points to body
 void FootFrame(double feet_pos[3], double feet_mat[9], double feet_quat[4],

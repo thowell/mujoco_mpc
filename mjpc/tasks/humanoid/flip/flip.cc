@@ -23,13 +23,13 @@
 #include "mjpc/utilities.h"
 
 namespace mjpc {
-std::string humanoid::Gait::XmlPath() const {
+std::string humanoid::Flip::XmlPath() const {
   return GetModelPath("humanoid/flip/task.xml");
 }
-std::string humanoid::Gait::Name() const { return "Humanoid Flip"; }
+std::string humanoid::Flip::Name() const { return "Humanoid Flip"; }
 
 // height during flip
-double humanoid::Gait::FlipHeight(double time) const {
+double humanoid::Flip::FlipHeight(double time) const {
   if (time >= jump_time_ + flight_time_ + land_time_) {
     return kHeightHumanoid + ground_;
   }
@@ -49,7 +49,7 @@ double humanoid::Gait::FlipHeight(double time) const {
 // orientation during flip
 //  total rotation = leap + flight + land
 //            2*pi = pi/2 + 5*pi/4 + pi/4
-void humanoid::Gait::FlipQuat(double quat[4], double time) const {
+void humanoid::Flip::FlipQuat(double quat[4], double time) const {
   double angle = 0;
   if (time >= jump_time_ + flight_time_ + land_time_) {
     angle = 2 * mjPI;
@@ -74,7 +74,7 @@ void humanoid::Gait::FlipQuat(double quat[4], double time) const {
 //   Number of residuals: 
 //   Number of parameters:
 // ----------------------------------------------------------------
-void humanoid::Gait::Residual(const mjModel* model, const mjData* data,
+void humanoid::Flip::Residual(const mjModel* model, const mjData* data,
                               double* residual) const {
   int counter = 0;
 
@@ -223,7 +223,7 @@ void humanoid::Gait::Residual(const mjModel* model, const mjData* data,
 }
 
 // transition
-void humanoid::Gait::Transition(const mjModel* model, mjData* data) {
+void humanoid::Flip::Transition(const mjModel* model, mjData* data) {
   // ---------- handle mjData reset ----------
   if (data->time < last_transition_time_ || last_transition_time_ == -1) {
     if (stage != kModeHumanoid && stage != kModeHandStand) {
@@ -262,7 +262,7 @@ void humanoid::Gait::Transition(const mjModel* model, mjData* data) {
 
       // save body orientation, ground height
       mju_copy4(orientation_, data->xquat + 4 * torso_body_id_);
-      ground_ = Ground(model, data, compos);
+      ground_ = Ground(model, data, compos, 0.5);
 
       // save parameters
       save_weight_ = weight;
@@ -272,7 +272,7 @@ void humanoid::Gait::Transition(const mjModel* model, mjData* data) {
       // weight[CostTermByName(model, "Upright")] = 0.2;
       // weight[CostTermByName(model, "Height")] = 5;
       // weight[CostTermByName(model, "Position")] = 0;
-      // weight[CostTermByName(model, "Gait")] = 0;
+      // weight[CostTermByName(model, "Flip")] = 0;
       // weight[CostTermByName(model, "Balance")] = 0;
       // weight[CostTermByName(model, "Effort")] = 0.005;
       // weight[CostTermByName(model, "Posture")] = 0.1;
@@ -298,7 +298,7 @@ void humanoid::Gait::Transition(const mjModel* model, mjData* data) {
 }
 
 // reset humanoid task
-void humanoid::Gait::Reset(const mjModel* model) {
+void humanoid::Flip::Reset(const mjModel* model) {
   // call method from base class
   Task::Reset(model);
 
@@ -392,7 +392,7 @@ constexpr float kHullRgba[4] = {1.0, 0.0, 0.0, 1};   // convex hull
 constexpr float kPcpRgba[4] = {1.0, 0.0, 0.0, 1.0};  // projected capture point
 
 // draw task-related geometry in the scene
-void humanoid::Gait::ModifyScene(const mjModel* model, const mjData* data,
+void humanoid::Flip::ModifyScene(const mjModel* model, const mjData* data,
                                  mjvScene* scene) const {
   // flip target pose
   if (current_mode_ == kModeFlip) {
@@ -446,7 +446,7 @@ void humanoid::Gait::ModifyScene(const mjModel* model, const mjData* data,
   mju_addScl3(capture, compos, comvel, fall_time);
 
   // ground under CoM
-  double com_ground = Ground(model, data, compos);
+  double com_ground = Ground(model, data, compos, 0.5);
 
   // capture point
   double foot_size[3] = {kFootRadius, 0, 0};
@@ -463,18 +463,18 @@ void humanoid::Gait::ModifyScene(const mjModel* model, const mjData* data,
 }
 
 // return phase as a function of time
-double humanoid::Gait::GetPhase(double time) const {
+double humanoid::Flip::GetPhase(double time) const {
   return phase_start_ + (time - phase_start_time_) * phase_velocity_;
 }
 
 // get gait
-humanoid::Gait::HumanoidGait humanoid::Gait::GetGait() const {
+humanoid::Flip::HumanoidGait humanoid::Flip::GetGait() const {
   return static_cast<HumanoidGait>(
       ReinterpretAsInt(parameters[gait_param_id_]));
 }
 
 // return normalized target step height
-double humanoid::Gait::StepHeight(double time, double footphase,
+double humanoid::Flip::StepHeight(double time, double footphase,
                                   double duty_ratio) const {
   double angle = std::fmod(time + mjPI - footphase, 2 * mjPI) - mjPI;
   double value = 0;
@@ -486,7 +486,7 @@ double humanoid::Gait::StepHeight(double time, double footphase,
 }
 
 // compute target step height for all feet
-void humanoid::Gait::FootStep(double* step, double time) const {
+void humanoid::Flip::FootStep(double* step, double time) const {
   double amplitude = parameters[amplitude_param_id_];
   double duty_ratio = parameters[duty_param_id_];
   // TODO(taylor): set from gait list
