@@ -22,6 +22,7 @@
 #include "mjpc/tasks/hand/hand.h"
 #include "mjpc/tasks/humanoid/flip/flip.h"
 #include "mjpc/tasks/humanoid/gait/gait.h"
+#include "mjpc/tasks/humanoid/handstand/handstand.h"
 #include "mjpc/tasks/humanoid/stand/stand.h"
 #include "mjpc/tasks/humanoid/tracking/tracking.h"
 #include "mjpc/tasks/humanoid/walk/walk.h"
@@ -40,6 +41,7 @@ std::vector<std::shared_ptr<Task>> GetTasks() {
     std::make_shared<Acrobot>(),
     std::make_shared<Cartpole>(),
     std::make_shared<Hand>(),
+    std::make_shared<humanoid::Handstand>(),
     std::make_shared<humanoid::Flip>(),
     std::make_shared<humanoid::Gait>(),
     std::make_shared<humanoid::Stand>(),

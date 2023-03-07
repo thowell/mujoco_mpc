@@ -235,6 +235,8 @@ add_library(
   tasks/humanoid/flip/flip.h
   tasks/humanoid/gait/gait.cc
   tasks/humanoid/gait/gait.h
+  tasks/humanoid/handstand/handstand.cc
+  tasks/humanoid/handstand/handstand.h
   tasks/humanoid/stand/stand.cc
   tasks/humanoid/stand/stand.h
   tasks/humanoid/tracking/tracking.cc

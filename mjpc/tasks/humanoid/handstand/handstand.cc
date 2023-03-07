@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "mjpc/tasks/humanoid/gait/gait.h"
+#include "mjpc/tasks/humanoid/handstand/handstand.h"
 
 #include <mujoco/mujoco.h>
 
@@ -23,13 +23,13 @@
 #include "mjpc/utilities.h"
 
 namespace mjpc {
-std::string humanoid::Gait::XmlPath() const {
-  return GetModelPath("humanoid/gait/task.xml");
+std::string humanoid::Handstand::XmlPath() const {
+  return GetModelPath("humanoid/handstand/task.xml");
 }
-std::string humanoid::Gait::Name() const { return "Humanoid Gait"; }
+std::string humanoid::Handstand::Name() const { return "Humanoid Handstand"; }
 
 // height during flip
-double humanoid::Gait::FlipHeight(double time) const {
+double humanoid::Handstand::FlipHeight(double time) const {
   if (time >= jump_time_ + flight_time_ + land_time_) {
     return kHeightHumanoid + ground_;
   }
@@ -49,7 +49,7 @@ double humanoid::Gait::FlipHeight(double time) const {
 // orientation during flip
 //  total rotation = leap + flight + land
 //            2*pi = pi/2 + 5*pi/4 + pi/4
-void humanoid::Gait::FlipQuat(double quat[4], double time) const {
+void humanoid::Handstand::FlipQuat(double quat[4], double time) const {
   double angle = 0;
   if (time >= jump_time_ + flight_time_ + land_time_) {
     angle = 2 * mjPI;
@@ -80,7 +80,7 @@ void humanoid::Gait::FlipQuat(double quat[4], double time) const {
 //   Number of parameters: 4
 //     Parameter (0): torso height goal
 // ----------------------------------------------------------------
-void humanoid::Gait::Residual(const mjModel* model, const mjData* data,
+void humanoid::Handstand::Residual(const mjModel* model, const mjData* data,
                               double* residual) const {
   int counter = 0;
 
@@ -93,18 +93,25 @@ void humanoid::Gait::Residual(const mjModel* model, const mjData* data,
   mju_sub(goal_position_error, goal, torso_position, 2);
 
   // set speed terms
-  double speed = parameters[speed_param_id_];
+  // double speed = parameters[speed_param_id_];
   double vel_scaling = parameters[velscl_param_id_];
-  if (mju_norm(goal_position_error, 2) < 0.1 ||
-      torso_position[2] < 0.85 * parameters[torso_height_param_id_]) {
-    speed = 0.0;
-    vel_scaling = 0.0;
-  }
+
+  // if (mju_norm(goal_position_error, 2) < 0.1 ||
+  //     torso_position[2] < 0.85 * parameters[torso_height_param_id_]) {
+  //   // speed = 0.0;
+  //   vel_scaling = 0.0;
+  // }
 
   // ----- height ----- //
   double torso_height = SensorByName(model, data, "torso_position")[2];
   double* foot_right = SensorByName(model, data, "foot_right");
   double* foot_left = SensorByName(model, data, "foot_left");
+
+  if (current_mode_ == kModeHandStand) {
+    foot_right = SensorByName(model, data, "hand_right");
+    foot_left = SensorByName(model, data, "hand_left");
+  }
+
   double foot_height_avg = 0.5 * (foot_right[2] + foot_left[2]);
 
   residual[counter++] =
@@ -119,22 +126,9 @@ void humanoid::Gait::Residual(const mjModel* model, const mjData* data,
   double* subcom = SensorByName(model, data, "torso_subcom");
   double* subcomvel = SensorByName(model, data, "torso_subcomvel");
 
-  double capture_point[2];
-  mju_addScl(capture_point, subcom, subcomvel, vel_scaling, 2);
-
-  // convex hull
-  // const int num_points = 4;
-  // int hull[num_points];
-  // double points[2 * num_points];
-  // mju_copy(points + 0, SensorByName(model, data, "sp0"), 2);
-  // mju_copy(points + 2, SensorByName(model, data, "sp1"), 2);
-  // mju_copy(points + 4, SensorByName(model, data, "sp2"), 2);
-  // mju_copy(points + 6, SensorByName(model, data, "sp3"), 2);
-  // int num_hull = Hull2D(hull, num_points, points); 
-
-  // // nearest point to hull
-  // double nearest_point[2];
-  // NearestInHull(nearest_point, capture_point, points, hull, )
+  double capture_point[3];
+  mju_addScl(capture_point, subcom, subcomvel, vel_scaling, 3);
+  capture_point[2] = 1.0e-3;
 
   // project onto line segment
 
@@ -159,100 +153,127 @@ void humanoid::Gait::Residual(const mjModel* model, const mjData* data,
   pcp[2] = 1.0e-3;
 
   // is standing
-  double standing =
-      torso_height / mju_sqrt(torso_height * torso_height + 0.45 * 0.45) - 0.4;
+  double standing = torso_height / mju_sqrt(torso_height * torso_height + 0.45 * 0.45) - 0.4;
 
   mju_sub(&residual[counter], capture_point, pcp, 2);
   mju_scl(&residual[counter], &residual[counter], standing, 2);
 
-  counter += 1;
+  counter += 2;
 
   // ----- upright ----- //
   double* torso_up = SensorByName(model, data, "torso_up");
   double* pelvis_up = SensorByName(model, data, "pelvis_up");
   double* foot_right_up = SensorByName(model, data, "foot_right_up");
   double* foot_left_up = SensorByName(model, data, "foot_left_up");
-  double z_ref[3] = {0.0, 0.0, 1.0};
+
+  // printf("torso_up: %f %f %f\n", torso_up[0], torso_up[1], torso_up[2]);
+  // printf("pelvis_up: %f %f %f\n", pelvis_up[0], pelvis_up[1], pelvis_up[2]);
+  // printf("foot_right_up: %f %f %f\n", foot_right_up[0], foot_right_up[1], foot_right_up[2]);
+  // printf("foot_left_up: %f %f %f\n", foot_left_up[0], foot_left_up[1], foot_left_up[2]);
 
   // torso
-  residual[counter++] = torso_up[2] - 1.0;
+  if (current_mode_ == kModeHandStand) {
+    residual[counter++] = torso_up[2] + 1.0;
 
-  // pelvis
-  residual[counter++] = 0.3 * (pelvis_up[2] - 1.0);
+    // pelvis
+    residual[counter++] = 0.3 * (pelvis_up[2] + 1.0);
 
-  // right foot
-  mju_sub3(&residual[counter], foot_right_up, z_ref);
-  mju_scl3(&residual[counter], &residual[counter], 0.1 * standing);
-  counter += 3;
+    double z_ref[3] = {0.0, 0.0, -1.0};
 
-  mju_sub3(&residual[counter], foot_left_up, z_ref);
-  mju_scl3(&residual[counter], &residual[counter], 0.1 * standing);
-  counter += 3;
+    // right foot
+    mju_sub3(&residual[counter], foot_right_up, z_ref);
+    mju_scl3(&residual[counter], &residual[counter], 0.1 * standing);
+    counter += 3;
+
+    mju_sub3(&residual[counter], foot_left_up, z_ref);
+    mju_scl3(&residual[counter], &residual[counter], 0.1 * standing);
+    counter += 3;
+  } else {
+    residual[counter++] = torso_up[2] - 1.0;
+
+    // pelvis
+    residual[counter++] = 0.3 * (pelvis_up[2] - 1.0);
+
+    double z_ref[3] = {0.0, 0.0, 1.0};
+
+    // right foot
+    mju_sub3(&residual[counter], foot_right_up, z_ref);
+    mju_scl3(&residual[counter], &residual[counter], 0.1 * standing);
+    counter += 3;
+
+    mju_sub3(&residual[counter], foot_left_up, z_ref);
+    mju_scl3(&residual[counter], &residual[counter], 0.1 * standing);
+    counter += 3;
+  }
 
   // ----- posture ----- //
-  mju_sub(&residual[counter], data->qpos + 7,
-          model->key_qpos + qpos_reference_id_ * model->nq + 7, model->nq - 7);
+  if (current_mode_ == kModeHandStand) {
+    mju_sub(&residual[counter], data->qpos + 7,
+          model->key_qpos + qpos_handstand_id_ * model->nq + 7, model->nq - 7);
+  } else if (current_mode_ == kModeCrouch) {
+    mju_sub(&residual[counter], data->qpos + 7,
+          model->key_qpos + qpos_crouch_id_ * model->nq + 7, model->nq - 7);
+  } else {
+    mju_sub(&residual[counter], data->qpos + 7,
+              model->key_qpos + qpos_reference_id_ * model->nq + 7, model->nq - 7);
+  }
+  
   counter += model->nq - 7;
 
   // ----- goal ----- //
 
-  if (torso_height > 0.85 * parameters[torso_height_param_id_]) {
-    // ----- position error ----- //
-    mju_copy(&residual[counter], goal_position_error, 2);
-    counter += 2;
-
-    // ----- orientation error ----- //
-    // direction to goal
-    double goal_direction[2];
-    mju_copy(goal_direction, goal_position_error, 2);
-    mju_normalize(goal_direction, 2);
-
-    // torso direction
-    double* torso_xaxis = SensorByName(model, data, "torso_xaxis");
-
-    mju_sub(&residual[counter], goal_direction, torso_xaxis, 2);
-    counter += 2;
-  } else {
-    mju_zero(&residual[counter], 4);
-    counter += 4;
-  }
-
-  // ----- walk ----- //
-  double* torso_forward = SensorByName(model, data, "torso_forward");
-  double* pelvis_forward = SensorByName(model, data, "pelvis_forward");
-  double* foot_right_forward = SensorByName(model, data, "foot_right_forward");
-  double* foot_left_forward = SensorByName(model, data, "foot_left_forward");
-
-  double forward[2];
-  mju_copy(forward, torso_forward, 2);
-  mju_addTo(forward, pelvis_forward, 2);
-  mju_addTo(forward, foot_right_forward, 2);
-  mju_addTo(forward, foot_left_forward, 2);
-  mju_normalize(forward, 2);
-
-  // com vel
-  double* waist_lower_subcomvel =
-      SensorByName(model, data, "waist_lower_subcomvel");
-  double* torso_velocity = SensorByName(model, data, "torso_velocity");
-  double com_vel[2];
-  mju_add(com_vel, waist_lower_subcomvel, torso_velocity, 2);
-  mju_scl(com_vel, com_vel, 0.5, 2);
-
-  // walk forward
-  residual[counter++] = standing * (mju_dot(com_vel, forward, 2) - speed);
-
-  // ----- move feet ----- //
-  double* foot_right_vel = SensorByName(model, data, "foot_right_velocity");
-  double* foot_left_vel = SensorByName(model, data, "foot_left_velocity");
-  double move_feet[2];
-  mju_copy(move_feet, com_vel, 2);
-  mju_addToScl(move_feet, foot_right_vel, -0.5, 2);
-  mju_addToScl(move_feet, foot_left_vel, -0.5, 2);
-
-  mju_copy(&residual[counter], move_feet, 2);
-  mju_scl(&residual[counter], &residual[counter], standing, 2);
-
+  // ----- position error ----- //
+  mju_copy(&residual[counter], goal_position_error, 2);
   counter += 2;
+
+  // ----- orientation error ----- //
+  // direction to goal
+  double goal_direction[2];
+  mju_copy(goal_direction, goal_position_error, 2);
+  mju_normalize(goal_direction, 2);
+
+  // torso direction
+  double* torso_xaxis = SensorByName(model, data, "torso_xaxis");
+
+  mju_sub(&residual[counter], goal_direction, torso_xaxis, 2);
+  counter += 2;
+
+  // // ----- walk ----- //
+  // double* torso_forward = SensorByName(model, data, "torso_forward");
+  // double* pelvis_forward = SensorByName(model, data, "pelvis_forward");
+  // double* foot_right_forward = SensorByName(model, data, "foot_right_forward");
+  // double* foot_left_forward = SensorByName(model, data, "foot_left_forward");
+
+  // double forward[2];
+  // mju_copy(forward, torso_forward, 2);
+  // mju_addTo(forward, pelvis_forward, 2);
+  // mju_addTo(forward, foot_right_forward, 2);
+  // mju_addTo(forward, foot_left_forward, 2);
+  // mju_normalize(forward, 2);
+
+  // // com vel
+  // double* waist_lower_subcomvel =
+  //     SensorByName(model, data, "waist_lower_subcomvel");
+  // double* torso_velocity = SensorByName(model, data, "torso_velocity");
+  // double com_vel[2];
+  // mju_add(com_vel, waist_lower_subcomvel, torso_velocity, 2);
+  // mju_scl(com_vel, com_vel, 0.5, 2);
+
+  // // walk forward
+  // residual[counter++] = standing * (mju_dot(com_vel, forward, 2) - speed);
+
+  // // ----- move feet ----- //
+  // double* foot_right_vel = SensorByName(model, data, "foot_right_velocity");
+  // double* foot_left_vel = SensorByName(model, data, "foot_left_velocity");
+  // double move_feet[2];
+  // mju_copy(move_feet, com_vel, 2);
+  // mju_addToScl(move_feet, foot_right_vel, -0.5, 2);
+  // mju_addToScl(move_feet, foot_left_vel, -0.5, 2);
+
+  // mju_copy(&residual[counter], move_feet, 2);
+  // mju_scl(&residual[counter], &residual[counter], standing, 2);
+
+  // counter += 2;
 
   // ----- gait ----- //
   double step[2];
@@ -287,7 +308,7 @@ void humanoid::Gait::Residual(const mjModel* model, const mjData* data,
 }
 
 // transition
-void humanoid::Gait::Transition(const mjModel* model, mjData* data) {
+void humanoid::Handstand::Transition(const mjModel* model, mjData* data) {
   // ---------- handle mjData reset ----------
   if (data->time < last_transition_time_ || last_transition_time_ == -1) {
     if (stage != kModeHumanoid && stage != kModeHandStand) {
@@ -336,7 +357,7 @@ void humanoid::Gait::Transition(const mjModel* model, mjData* data) {
       // weight[CostTermByName(model, "Upright")] = 0.2;
       // weight[CostTermByName(model, "Height")] = 5;
       // weight[CostTermByName(model, "Position")] = 0;
-      // weight[CostTermByName(model, "Gait")] = 0;
+      // weight[CostTermByName(model, "Handstand")] = 0;
       // weight[CostTermByName(model, "Balance")] = 0;
       // weight[CostTermByName(model, "Effort")] = 0.005;
       // weight[CostTermByName(model, "Posture")] = 0.1;
@@ -356,13 +377,75 @@ void humanoid::Gait::Transition(const mjModel* model, mjData* data) {
     }
   }
 
+  // handstand 
+  if (stage == kModeHandStand) {
+    // initialization
+    if (stage != current_mode_) {
+      // printf("reset handstand mode\n");
+      hand_stand_phase_ = 0;
+      weight[CostTermByName(model, "Height")] = 0.0;
+      weight[CostTermByName(model, "Actuation")] = 0.1;
+      weight[CostTermByName(model, "Balance")] = 0.0;
+      weight[CostTermByName(model, "Upright")] = 0.0;
+      weight[CostTermByName(model, "Posture")] = 1.0;
+      parameters[torso_height_param_id_] = 1.3;
+      parameters[amplitude_param_id_] = 0.0;
+      qpos_handstand_id_ = 1;
+      hand_stand_time_ = 0.0;
+    }
+
+    // crouch
+    if (hand_stand_phase_ == 0) {
+      double position_error[26];
+      mju_sub(position_error, data->qpos + 2, model->key_qpos + qpos_handstand_id_ * model->nq + 2, 26);
+      position_error[0] *= 0.5;
+      // check near crouch position
+      if (mju_norm(position_error, 26) / 26 < 0.025) {
+        // reset crouch time
+        if (hand_stand_time_ == 0.0) {
+          hand_stand_time_ = data->time;
+        }
+
+        // check duration of crouch
+        if (data->time - hand_stand_time_ > 0.5) {
+          // set costs and parameters
+          weight[CostTermByName(model, "Height")] = 1.0;
+          weight[CostTermByName(model, "Actuation")] = 0.005;
+          weight[CostTermByName(model, "Balance")] = 1.0;
+          weight[CostTermByName(model, "Upright")] = 1.0;
+          weight[CostTermByName(model, "Posture")] = 0.075;
+          parameters[torso_height_param_id_] = 0.645;
+          parameters[amplitude_param_id_] = 0.0;
+          qpos_handstand_id_ = 2;
+
+          // reset time
+          hand_stand_time_ = 0.0;
+
+          // handstand phase
+          hand_stand_phase_ = 1;
+        }
+      }
+    } 
+    // in handstand
+    if (hand_stand_phase_ == 1) {
+      // set amplitude
+      if (data->time - hand_stand_time_ > 2.5) {
+        parameters[amplitude_param_id_] = 0.1;
+      }
+    }
+  } else {
+    // reset
+    hand_stand_phase_ = 0;
+  }
+  
+
   // save stage
   current_mode_ = static_cast<HumanoidMode>(stage);
   last_transition_time_ = data->time;
 }
 
 // reset humanoid task
-void humanoid::Gait::Reset(const mjModel* model) {
+void humanoid::Handstand::Reset(const mjModel* model) {
   // call method from base class
   Task::Reset(model);
 
@@ -381,6 +464,7 @@ void humanoid::Gait::Reset(const mjModel* model) {
   height_cost_id_ = CostTermByName(model, "Height");
   qpos_reference_id_ = 0;
   qpos_crouch_id_ = 1;
+  qpos_handstand_id_ = 2;
 
   // ----------  model identifiers  ----------
   torso_body_id_ = mj_name2id(model, mjOBJ_XBODY, "torso");
@@ -445,7 +529,7 @@ void humanoid::Gait::Reset(const mjModel* model) {
 }
 
 // draw task-related geometry in the scene
-void humanoid::Gait::ModifyScene(const mjModel* model, const mjData* data,
+void humanoid::Handstand::ModifyScene(const mjModel* model, const mjData* data,
                                  mjvScene* scene) const {
   // flip target pose
   if (current_mode_ == kModeFlip) {
@@ -546,12 +630,12 @@ void humanoid::Gait::ModifyScene(const mjModel* model, const mjData* data,
 }
 
 // return phase as a function of time
-double humanoid::Gait::GetPhase(double time) const {
+double humanoid::Handstand::GetPhase(double time) const {
   return phase_start_ + (time - phase_start_time_) * phase_velocity_;
 }
 
 // return normalized target step height
-double humanoid::Gait::StepHeight(double time, double footphase,
+double humanoid::Handstand::StepHeight(double time, double footphase,
                                   double duty_ratio) const {
   double angle = std::fmod(time + mjPI - footphase, 2 * mjPI) - mjPI;
   double value = 0;
@@ -563,7 +647,7 @@ double humanoid::Gait::StepHeight(double time, double footphase,
 }
 
 // compute target step height for all feet
-void humanoid::Gait::FootStep(double* step, double time) const {
+void humanoid::Handstand::FootStep(double* step, double time) const {
   double amplitude = parameters[amplitude_param_id_];
   double duty_ratio = parameters[duty_param_id_];
   double gait_phase[2] = {0.0, 0.5};
