@@ -231,18 +231,12 @@ add_library(
   tasks/cartpole/cartpole.h
   tasks/hand/hand.cc
   tasks/hand/hand.h
-  tasks/humanoid/flip/flip.cc
-  tasks/humanoid/flip/flip.h
   tasks/humanoid/gait/gait.cc
   tasks/humanoid/gait/gait.h
-  tasks/humanoid/handstand/handstand.cc
-  tasks/humanoid/handstand/handstand.h
   tasks/humanoid/stand/stand.cc
   tasks/humanoid/stand/stand.h
   tasks/humanoid/tracking/tracking.cc
   tasks/humanoid/tracking/tracking.h
-  tasks/humanoid/walk/walk.cc
-  tasks/humanoid/walk/walk.h
   tasks/panda/panda.cc
   tasks/panda/panda.h
   tasks/particle/particle.cc

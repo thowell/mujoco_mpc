@@ -70,12 +70,12 @@ class Gait : public Task {
   };
 
   // mode residual parameters, set when switching into modes
-  constexpr static double kModeParameter[kNumMode][6] =
+  constexpr static double kModeParameter[kNumMode][5] =
   {
-    {1.3, 0.0, 0.1, 0.0, 0.0, 0.0},      // stand
-    {1.3, 1.0, 0.1, 1.0, 0.1, 0.5},      // walk
-    {1.3, 1.0, 0.1, 1.0, 0.1, 0.5},      // flip
-    {1.3, 0.0, 0.1, 1.0, 0.1, 0.5},      // hand stand
+    {1.3, 0.0, 0.0, 0.0, 0.0},      // stand
+    {1.3, 1.0, 1.0, 0.1, 0.5},      // walk
+    {1.3, 1.0, 1.0, 0.1, 0.5},      // flip
+    {1.3, 0.0, 1.0, 0.1, 0.5},      // hand stand
   };
 
   // automatic gait switching: time constant for com speed filter
@@ -92,6 +92,9 @@ class Gait : public Task {
 
   // radius of foot
   constexpr static double kFootRadius = 0.025;  // meter
+
+  // below this target yaw velocity, walk straight
+  constexpr static double kMinAngvel = 0.01;        // radian/second
 
   // flip: crouching height, from which leap is initiated
   constexpr static double kCrouchHeight = 0.8;     // meter
@@ -112,6 +115,9 @@ class Gait : public Task {
   // compute target step height for all feet
   void FootStep(double* step, double time) const;
 
+  // walk horizontal position given time
+  void Walk(double pos[2], double time) const;
+
   // height during flip
   double FlipHeight(double time) const;
 
@@ -125,6 +131,11 @@ class Gait : public Task {
   // common stage states
   double mode_start_time_  = 0;
   double position_[3]       = {0};
+
+  // walk states
+  double heading_[2]        = {0};
+  double speed_             = 0;
+  double angvel_            = 0;
 
   // backflip states
   double ground_            = 0;
@@ -150,9 +161,9 @@ class Gait : public Task {
   int gait_param_id_         = -1;
   int gait_switch_param_id_  = -1;
   int flip_dir_param_id_     = -1;
+  int walk_mode_param_id_    = -1;
   int torso_height_param_id_ = -1;
   int speed_param_id_        = -1;
-  int velscl_param_id_       = -1;
   int cadence_param_id_      = -1;
   int amplitude_param_id_    = -1;
   int duty_param_id_         = -1;

@@ -500,7 +500,7 @@ void QuadrupedFlat::Reset(const mjModel* model) {
   // ----------  task identifiers  ----------
   gait_param_id_ = ParameterIndex(model, "select_Gait");
   gait_switch_param_id_ = ParameterIndex(model, "select_Gait switch");
-  flip_dir_param_id_ = ParameterIndex(model, "select_Flip dir");
+  flip_dir_param_id_ = ParameterIndex(model, "select_Flip Dir.");
   biped_type_param_id_ = ParameterIndex(model, "select_Biped type");
   cadence_param_id_ = ParameterIndex(model, "Cadence");
   amplitude_param_id_ = ParameterIndex(model, "Amplitude");

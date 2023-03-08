@@ -22,8 +22,8 @@
     <numeric name="residual_Duty ratio" data="0 0 1"/>
     <numeric name="residual_Walk speed" data="0 0 4"/>
     <numeric name="residual_Walk turn" data="0 -2 2"/>
-    <numeric name="residual_select_Flip dir" data="0"/>
-    <text name="residual_list_Flip dir" data="Back Flip|Front Flip"/>
+    <numeric name="residual_select_Flip Dir." data="0"/>
+    <text name="residual_list_Flip Dir." data="Back Flip|Front Flip"/>
     <numeric name="residual_select_Biped type" data="0"/>
     <text name="residual_list_Biped type" data="Foot Stand|Hand Stand"/>
     <numeric name="residual_Heading" data="0 -3.14 3.14" />

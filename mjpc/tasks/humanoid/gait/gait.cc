@@ -87,7 +87,7 @@ void humanoid::Gait::Residual(const mjModel* model, const mjData* data,
   mju_sub(goal_position_error, goal, torso_position, 2);
 
   // set speed terms
-  double vel_scaling = parameters[velscl_param_id_];
+  double vel_scaling = 0.1;
   double speed = parameters[speed_param_id_];
 
   // ----- height ----- //
@@ -317,7 +317,7 @@ void humanoid::Gait::Transition(const mjModel* model, mjData* data) {
   // set weights and residual parameters
   if (stage != current_mode_) {
     mju_copy(weight.data(), kModeWeight[stage], weight.size());
-    mju_copy(parameters.data(), kModeParameter[stage], 6);
+    mju_copy(parameters.data(), kModeParameter[stage], 5);
   }
 
   // ---------- handle mjData reset ----------
@@ -347,6 +347,46 @@ void humanoid::Gait::Transition(const mjModel* model, mjData* data) {
 
   // ---------- Walk ----------
   double* goal_pos = data->mocap_pos + 3 * goal_mocap_id_;
+  if (stage == kModeWalk && parameters[walk_mode_param_id_] == 0) {
+    double angvel = parameters[ParameterIndex(model, "Walk Turn")];
+    double speed = parameters[ParameterIndex(model, "Walk Speed")];
+
+    // current torso direction
+    double* torso_xmat = data->xmat + 9 * torso_body_id_;
+    double forward[2] = {torso_xmat[0], torso_xmat[3]};
+    mju_normalize(forward, 2);
+    double leftward[2] = {-forward[1], forward[0]};
+
+    // switching into Walk or parameters changed, reset task state
+    if (stage != current_mode_ || angvel_ != angvel || speed_ != speed) {
+      // save time
+      mode_start_time_ = data->time;
+
+      // save current speed and angvel
+      speed_ = speed;
+      angvel_ = angvel;
+
+      // compute and save rotation axis / walk origin
+      double axis[2] = {data->xpos[3 * torso_body_id_],
+                        data->xpos[3 * torso_body_id_+1]};
+      if (mju_abs(angvel) > kMinAngvel) {
+        // don't allow turning with very small angvel
+        double d = speed / angvel;
+        axis[0] += d * leftward[0];
+        axis[1] += d * leftward[1];
+      }
+      position_[0] = axis[0];
+      position_[1] = axis[1];
+
+      // save vector from axis to initial goal position
+      heading_[0] = goal_pos[0] - axis[0];
+      heading_[1] = goal_pos[1] - axis[1];
+    }
+
+    // move goal
+    double time = data->time - mode_start_time_;
+    Walk(goal_pos, time);
+  }
 
   // ---------- Flip ----------
   double* compos = SensorByName(model, data, "torso_subcom");
@@ -410,7 +450,7 @@ void humanoid::Gait::Transition(const mjModel* model, mjData* data) {
       mju_sub(position_error, data->qpos + 2, model->key_qpos + qpos_handstand_id_ * model->nq + 2, 26);
       position_error[0] *= 0.5;
       // check near crouch position
-      if (mju_norm(position_error, 26) / 26 < 0.05) {
+      if (mju_norm(position_error, 26) / 26 < 0.1) {
         // reset crouch time
         if (hand_stand_time_ == 0.0) {
           hand_stand_time_ = data->time;
@@ -447,6 +487,7 @@ void humanoid::Gait::Transition(const mjModel* model, mjData* data) {
   } else {
     // reset
     hand_stand_phase_ = 0;
+    hand_stand_time_ = 0.0;
   }
 
   // save stage
@@ -460,10 +501,10 @@ void humanoid::Gait::Reset(const mjModel* model) {
   Task::Reset(model);
 
   // ----------  task identifiers  ----------
-  flip_dir_param_id_ = ParameterIndex(model, "select_Flip dir");
+  flip_dir_param_id_ = ParameterIndex(model, "select_Flip Dir.");
+  walk_mode_param_id_ = ParameterIndex(model, "select_Walk Mode");
   torso_height_param_id_ = ParameterIndex(model, "Torso");
   speed_param_id_ = ParameterIndex(model, "Speed");
-  velscl_param_id_ = ParameterIndex(model, "VelScl");
   cadence_param_id_ = ParameterIndex(model, "Cadence");
   amplitude_param_id_ = ParameterIndex(model, "Amplitude");
   duty_param_id_ = ParameterIndex(model, "DutyRatio");
@@ -494,15 +535,6 @@ void humanoid::Gait::Reset(const mjModel* model) {
   //   if (foot_id < 0) mju_error_s("geom '%s' not found", footname);
   //   foot_geom_id_[foot_index] = foot_id;
   //   foot_index++;
-  // }
-
-  // shoulder body ids
-  // int shoulder_index = 0;
-  // for (const char* shouldername : {"FL_hip", "HL_hip", "FR_hip", "HR_hip"}) {
-  //   int foot_id = mj_name2id(model, mjOBJ_BODY, shouldername);
-  //   if (foot_id < 0) mju_error_s("body '%s' not found", shouldername);
-  //   shoulder_body_id_[shoulder_index] = foot_id;
-  //   shoulder_index++;
   // }
 
   // ----------  derived kinematic quantities for Flip  ----------
@@ -616,6 +648,25 @@ void humanoid::Gait::ModifyScene(const mjModel* model, const mjData* data,
 // return phase as a function of time
 double humanoid::Gait::GetPhase(double time) const {
   return phase_start_ + (time - phase_start_time_) * phase_velocity_;
+}
+
+// horizontal Walk trajectory
+void humanoid::Gait::Walk(double pos[2], double time) const {
+  if (mju_abs(angvel_) < kMinAngvel) {
+    // no rotation, go in straight line
+    double forward[2] = {heading_[0], heading_[1]};
+    mju_normalize(forward, 2);
+    pos[0] = position_[0] + heading_[0] + time*speed_*forward[0];
+    pos[1] = position_[1] + heading_[1] + time*speed_*forward[1];
+  } else {
+    // walk on a circle
+    double angle = time * angvel_;
+    double mat[4] = {mju_cos(angle), -mju_sin(angle),
+                     mju_sin(angle),  mju_cos(angle)};
+    mju_mulMatVec(pos, mat, heading_, 2, 2);
+    pos[0] += position_[0];
+    pos[1] += position_[1];
+  }
 }
 
 // return normalized target step height
