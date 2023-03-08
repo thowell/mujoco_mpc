@@ -63,11 +63,8 @@
           <joint pos="0 0 .04" stiffness="3"/>
         </default>
       </default>
-      <!-- <default class="shoulder">
-        <joint range="-180 180"/>
-      </default> -->
       <default class="shoulder">
-        <joint range="-85 60"/>
+        <joint range="-180 180"/>
       </default>
       <default class="elbow">
         <joint range="-100 50" stiffness="0"/>
@@ -207,7 +204,7 @@
     </fixed>
   </tendon>
 
-  <!-- <actuator>
+  <actuator>
     <motor name="abdomen_y"       gear="80"  joint="abdomen_y"/>
     <motor name="abdomen_z"       gear="80"  joint="abdomen_z"/>
     <motor name="abdomen_x"       gear="80"  joint="abdomen_x"/>
@@ -229,9 +226,9 @@
     <motor name="shoulder1_left"  gear="40"  joint="shoulder1_left"/>
     <motor name="shoulder2_left"  gear="40"  joint="shoulder2_left"/>
     <motor name="elbow_left"      gear="80"  joint="elbow_left"/>
-  </actuator> -->
+  </actuator>
 
-  <actuator>
+  <!-- <actuator>
     <motor name="abdomen_y"       gear="40"  joint="abdomen_y"/>
     <motor name="abdomen_z"       gear="40"  joint="abdomen_z"/>
     <motor name="abdomen_x"       gear="40"  joint="abdomen_x"/>
@@ -253,5 +250,5 @@
     <motor name="shoulder1_left"  gear="20"  joint="shoulder1_left"/>
     <motor name="shoulder2_left"  gear="20"  joint="shoulder2_left"/>
     <motor name="elbow_left"      gear="40"  joint="elbow_left"/>
-  </actuator>
+  </actuator> -->
 </mujoco>

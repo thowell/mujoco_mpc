@@ -171,7 +171,6 @@ class Gait : public Task {
   int balance_cost_id_       = -1;
   int height_cost_id_        = -1;
   int foot_geom_id_[kNumFoot];
-  int shoulder_body_id_[kNumFoot];
   int qpos_reference_id_         = -1;
   int qpos_flip_crouch_id_       = -1;
   int qpos_handstand_id_         = -1;
