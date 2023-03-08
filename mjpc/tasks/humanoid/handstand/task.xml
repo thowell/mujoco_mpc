@@ -1,6 +1,6 @@
 <mujoco model="Humanoid Locomotion">
   <include file="../../common.xml"/>
-  <include file="../humanoid.xml" />
+  <include file="../humanoid_strong.xml" />
   <size memory="400K" nkey="3"/>
   
   <custom>

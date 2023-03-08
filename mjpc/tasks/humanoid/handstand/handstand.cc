@@ -285,7 +285,7 @@ void humanoid::Handstand::Residual(const mjModel* model, const mjData* data,
 
   for (int i = 0; i < 2; i++) {
     double query[3] = {foot_pos[i][0], foot_pos[i][1], foot_pos[i][2]};
-    double ground_height = Ground(model, data, query, 0.5);
+    double ground_height = Ground(model, data, query);
     double height_target = ground_height + 0.025 + step[i];
     double height_difference = foot_pos[i][2] - height_target;
     residual[counter++] = step[i] ? height_difference : 0;
@@ -347,7 +347,7 @@ void humanoid::Handstand::Transition(const mjModel* model, mjData* data) {
 
       // save body orientation, ground height
       mju_copy4(orientation_, data->xquat + 4 * torso_body_id_);
-      ground_ = Ground(model, data, compos, 0.5);
+      ground_ = Ground(model, data, compos);
 
       // save parameters
       save_weight_ = weight;
@@ -431,6 +431,7 @@ void humanoid::Handstand::Transition(const mjModel* model, mjData* data) {
       // set amplitude
       if (data->time - hand_stand_time_ > 2.5) {
         parameters[amplitude_param_id_] = 0.1;
+        hand_stand_time_ = 0.0;
       }
     }
   } else {
@@ -585,7 +586,7 @@ void humanoid::Handstand::ModifyScene(const mjModel* model, const mjData* data,
   mju_addScl3(capture, compos, comvel, fall_time);
 
   // ground under CoM
-  double com_ground = Ground(model, data, compos, 0.0);
+  double com_ground = Ground(model, data, compos);
 
   // capture point
   double foot_size[3] = {0.02, 0, 0};
@@ -610,7 +611,7 @@ void humanoid::Handstand::ModifyScene(const mjModel* model, const mjData* data,
   FootStep(step, GetPhase(data->time));
 
   double ql[3] = {lf[0], lf[1], lf[2]};
-  double ghl = Ground(model, data, ql, 0.5);
+  double ghl = Ground(model, data, ql);
   double hl = ghl + step[0] + 0.025;
 
   double hull_left[3] = {lf[0], lf[1], ghl};
@@ -619,7 +620,7 @@ void humanoid::Handstand::ModifyScene(const mjModel* model, const mjData* data,
   AddConnector(scene, mjGEOM_CAPSULE, 0.02, hull_left, step_left, kCapRgba);
 
   double qr[3] = {rf[0], rf[1], rf[2]};
-  double ghr = Ground(model, data, qr, 0.5);
+  double ghr = Ground(model, data, qr);
   double hr = ghr + step[1] + 0.025;
   qr[2] = hr;
 

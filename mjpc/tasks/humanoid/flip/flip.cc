@@ -262,7 +262,7 @@ void humanoid::Flip::Transition(const mjModel* model, mjData* data) {
 
       // save body orientation, ground height
       mju_copy4(orientation_, data->xquat + 4 * torso_body_id_);
-      ground_ = Ground(model, data, compos, 0.5);
+      ground_ = Ground(model, data, compos);
 
       // save parameters
       save_weight_ = weight;
@@ -446,7 +446,7 @@ void humanoid::Flip::ModifyScene(const mjModel* model, const mjData* data,
   mju_addScl3(capture, compos, comvel, fall_time);
 
   // ground under CoM
-  double com_ground = Ground(model, data, compos, 0.5);
+  double com_ground = Ground(model, data, compos);
 
   // capture point
   double foot_size[3] = {kFootRadius, 0, 0};

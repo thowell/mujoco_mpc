@@ -46,9 +46,8 @@ class Gait : public Task {
   //  ============  enums  ============
   // stages
   enum HumanoidMode {
-    kModeHumanoid = 0,
-    kModeGait,
-    kModeGetUp,
+    kModeStand = 0,
+    kModeWalk,
     kModeFlip,
     kModeHandStand,
     kNumMode,
@@ -61,13 +60,22 @@ class Gait : public Task {
     kNumFoot
   };
 
-  // gaits
-  enum HumanoidGait {
-    kGaitStand = 0,
-    kGaitWalk,
-    kGaitHighWalk,
-    kGaitRun,
-    kNumGait,
+  // mode weights, set when switching modes
+  constexpr static double kModeWeight[kNumMode][10] =
+  {
+    {3.0,  0.05, 2.5, 2.5, 0.075, 0.0,  0.0,   0.0,   0.0, 0.0},      // stand
+    {1.0, 0.035, 1.0, 1.0, 0.075, 0.05, 0.1, 0.125, 0.125, 1.0},      // walk
+    {1.0,  0.01, 1.0, 1.0, 0.075,  0.0, 0.0,   0.0,   0.0, 0.0},      // flip
+    {2.5, 0.001, 2.5, 1.0, 0.05,   0.0, 0.0,   0.0,   0.0, 1.0},      // hand stand
+  };
+
+  // mode residual parameters, set when switching into modes
+  constexpr static double kModeParameter[kNumMode][6] =
+  {
+    {1.3, 0.0, 0.1, 0.0, 0.0, 0.0},      // stand
+    {1.3, 1.0, 0.1, 1.0, 0.1, 0.5},      // walk
+    {1.3, 1.0, 0.1, 1.0, 0.1, 0.5},      // flip
+    {1.3, 0.0, 0.1, 1.0, 0.1, 0.5},      // hand stand
   };
 
   // automatic gait switching: time constant for com speed filter
@@ -79,14 +87,20 @@ class Gait : public Task {
   // target torso height over feet when humanoid
   constexpr static double kHeightHumanoid = 1.3;  // meter
 
+  // target torso height over feet when bipedal
+  constexpr static double kHeightHandstand = 0.645;    // meter
+
+  // radius of foot
+  constexpr static double kFootRadius = 0.025;  // meter
+
   // flip: crouching height, from which leap is initiated
-  constexpr static double kCrouchHeight = 0.85;     // meter
+  constexpr static double kCrouchHeight = 0.8;     // meter
 
   // flip: leap height, beginning of flight phase
-  constexpr static double kLeapHeight = 1.25;        // meter
+  constexpr static double kLeapHeight = 1.1;       // meter
 
   // flip: maximum height of flight phase
-  constexpr static double kMaxHeight = 1.65;         // meter
+  constexpr static double kMaxHeight = 1.35;         // meter
 
   //  ============  methods  ============
   // return internal phase clock
@@ -105,7 +119,7 @@ class Gait : public Task {
   void FlipQuat(double quat[4], double time) const;
 
   //  ============  task state variables, managed by Transition  ============
-  HumanoidMode current_mode_   = kModeHumanoid;
+  HumanoidMode current_mode_   = kModeStand;
   double last_transition_time_ = -1;
 
   // common stage states
@@ -119,12 +133,15 @@ class Gait : public Task {
   std::vector<double> save_weight_;
 
   // gait-related states
-  double current_gait_      = kGaitStand;
   double phase_start_       = 0;
   double phase_start_time_  = 0;
   double phase_velocity_    = 0;
   double com_vel_[2]        = {0};
   double gait_switch_time_  = 0;
+
+  // handstand states 
+  double hand_stand_phase_ = 0;
+  double hand_stand_time_ = 0.0;
 
   //  ============  constants, computed in Reset()  ============
   int torso_body_id_         = -1;
@@ -144,8 +161,9 @@ class Gait : public Task {
   int height_cost_id_        = -1;
   int foot_geom_id_[kNumFoot];
   int shoulder_body_id_[kNumFoot];
-  int qpos_reference_id_     = -1;
-  int qpos_crouch_id_        = -1;
+  int qpos_reference_id_         = -1;
+  int qpos_flip_crouch_id_       = -1;
+  int qpos_handstand_id_         = -1;
 
   // derived kinematic quantities describing flip trajectory
   double gravity_           = 0;
