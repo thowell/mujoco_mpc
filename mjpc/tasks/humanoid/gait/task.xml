@@ -1,10 +1,10 @@
 <mujoco model="Humanoid Locomotion">
   <include file="../../common.xml"/>
   <include file="../humanoid_strong.xml" />
-  <size memory="400K"/>
+  <size memory="1M"/>
   
   <custom>
-    <text name="task_transition" data="Stand|Walk|Flip|Hand Stand" />
+    <text name="task_transition" data="Stand|Walk|Flip|Handstand" />
     <numeric name="agent_planner" data="2" />
     <numeric name="agent_horizon" data="0.5" />
     <numeric name="agent_timestep" data="0.015" />
@@ -27,7 +27,44 @@
 
   <worldbody>
     <body name="goal" mocap="true" pos="0.0 0.0 1.1" quat="0.0 1.0 0.0 0.0">
-      <geom type="capsule" size="0.1 0.05 0.1" contype="0" conaffinity="0" rgba="0 1 0 .5" fromto="0 0 -0.1 0 0 0.1"/>
+      <geom type="capsule" size="0.1 0.05 0.1" contype="0" conaffinity="0" rgba="0 1 0 0" fromto="0 0 -0.1 0 0 0.1"/>
+    </body>
+
+    <body name="box1" mocap="true" pos="1.0 -0.25 0">
+      <geom type="box" rgba="0.5 0.5 0.5 1" size="0.1 0.1 0.05"/>
+    </body>
+    <body name="box2" mocap="true" pos="1.4 0.15 0">
+      <geom type="box" rgba="0.5 0.5 0.5 1" size="0.1 0.2 0.05"/>
+    </body>
+    <body name="box3" mocap="true" pos="1.95 0.25 0">
+      <geom type="box" rgba="0.5 0.5 0.5 1" size="0.075 0.05 0.045"/>
+    </body>
+    <body name="box4" mocap="true" pos="1.85 -0.1 0">
+      <geom type="box" rgba="0.5 0.5 0.5 1" size="0.1 0.075 0.035"/>
+    </body>
+    <body name="box5" mocap="true" pos="1.25 0.5 0">
+      <geom type="box" rgba="0.5 0.5 0.5 1" size="0.225 0.01 0.025"/>
+    </body>
+    <body name="box6" mocap="true" pos="1.75 -0.4 0">
+      <geom type="box" rgba="0.5 0.5 0.5 1" size="0.225 0.075 0.025"/>
+    </body>
+    <body name="box7" mocap="true" pos="2.2 0.65 0">
+      <geom type="box" rgba="0.5 0.5 0.5 1" size="0.15 0.15 0.03"/>
+    </body>
+    <body name="box8" mocap="true" pos="1.9 0.95 0">
+      <geom type="box" rgba="0.5 0.5 0.5 1" size="0.1 0.2 0.015"/>
+    </body>
+    <body name="box9" mocap="true" pos="2.1 -0.35 0">
+      <geom type="box" rgba="0.5 0.5 0.5 1" size="0.05 0.2 0.03"/>
+    </body>
+    <body name="box10" mocap="true" pos="2.35 -0.45 0">
+      <geom type="box" rgba="0.5 0.5 0.5 1" size="0.05 0.2 0.035"/>
+    </body>
+    <body name="box11" mocap="true" pos="2.35 0.0 0">
+      <geom type="box" rgba="0.5 0.5 0.5 1" size="0.35 0.015 0.06"/>
+    </body>
+    <body name="box12" mocap="true" pos="2.55 0.25 0">
+      <geom type="box" rgba="0.5 0.5 0.5 1" size="0.15 0.15 0.03"/>
     </body>
   </worldbody>
 
@@ -42,6 +79,7 @@
     <user name="Velocity" dim="2" user="7 0.0 0 25.0 0.2 4.0" />
     <user name="Walk" dim="1" user="7 0.0 0.0 25.0 0.5 3.0" />
     <user name="Gait" dim="2" user="6 0.0 0 10 0.03" />
+    <user name="CoM Vel." dim="2" user="0 0.1 0.0 1.0" />
     <framepos name="trace0" objtype="body" objname="torso"/>
     <framepos name="torso_position" objtype="body" objname="torso"/>
     <framexaxis name="torso_xaxis" objtype="body" objname="torso"/>
@@ -74,7 +112,7 @@
   </sensor>
 
   <keyframe> 
-    <key name="home" qpos="0 0 1.265 1 0 0 0 0 0 0 -0.1 0 -0.25 -0.5 -0.25 0 -0.1 0 -0.25 -0.5 -0.25 0 0.5 -0.5 -1.5 0.5 -0.5 -1.5" />
+    <key name="home" qpos="0 0 1.27 1 0 0 0 0 0 0 -0.1 0 -0.25 -0.5 -0.25 0 -0.1 0 -0.25 -0.5 -0.25 0 0.5 -0.5 -1.5 0.5 -0.5 -1.5" />
     <key name="flip_crouch" qpos="0.376171 -0.00225238 0.728037 0.848827 -0.00463601 0.528639 0.00343255 -0.007854 -0.475167 -0.024436 -0.203101 -0.00289591 -1.87622 -2.1143 -0.855246 0.140758 -0.203101 -0.00289591 -1.9059 -2.1143 -0.855246 0.140758 0.26239 0.46487 -1.75054 0.26239 0.46487 -1.75054"/>
     <key name="handstand_crouch" qpos="0.376171 -0.00225238 0.825 0.848827 -0.00463601 0.528639 0.00343255 -0.007854 -0.475167 -0.024436 -0.203101 -0.00289591 -1.45 -2.1143 -0.855246 0.140758 -0.203101 -0.00289591 -1.45 -2.1143 -0.855246 0.140758 0.26239 0.975 -1.75054 0.26239 0.975 -1.75054"/>
     <key name="handstand" qpos="0 0 0.645 0.0457563 -0.0130115 0.998868 -0.000468346 0 0 0 -0.1 0 -0.156239 -0.5 -0.25 0 -0.1 0 0.156239 -0.5 -0.25 0 1.13112 2.29366 -1.03822 1.13112 2.29366 -1.03822" />

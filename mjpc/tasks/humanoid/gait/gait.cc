@@ -95,7 +95,7 @@ void humanoid::Gait::Residual(const mjModel* model, const mjData* data,
   double* foot_right = SensorByName(model, data, "foot_right");
   double* foot_left = SensorByName(model, data, "foot_left");
 
-  if (current_mode_ == kModeHandStand) {
+  if (current_mode_ == kModeHandstand) {
     foot_right = SensorByName(model, data, "hand_right");
     foot_left = SensorByName(model, data, "hand_left");
   }
@@ -187,7 +187,7 @@ void humanoid::Gait::Residual(const mjModel* model, const mjData* data,
     counter += 5;
   } else {
     // torso
-    if (current_mode_ == kModeHandStand) {
+    if (current_mode_ == kModeHandstand) {
       residual[counter++] = torso_up[2] + 1.0;
 
       // pelvis
@@ -227,7 +227,7 @@ void humanoid::Gait::Residual(const mjModel* model, const mjData* data,
     mju_sub(&residual[counter], data->qpos + 7,
             model->key_qpos + qpos_flip_crouch_id_ * model->nq + 7, model->nq - 7);
   } else {
-    if (current_mode_ == kModeHandStand) {
+    if (current_mode_ == kModeHandstand) {
       mju_sub(&residual[counter], data->qpos + 7,
             model->key_qpos + qpos_handstand_id_ * model->nq + 7, model->nq - 7);
     } else {
@@ -308,6 +308,10 @@ void humanoid::Gait::Residual(const mjModel* model, const mjData* data,
     residual[counter++] = step[i] ? height_difference : 0;
   }
 
+  // ----- COM xy velocity should be 0 ----- //
+  mju_copy(&residual[counter], subcomvel, 2);
+  counter += 2;
+
   // sensor dim sanity check
   CheckSensorDim(model, counter);
 }
@@ -322,7 +326,7 @@ void humanoid::Gait::Transition(const mjModel* model, mjData* data) {
 
   // ---------- handle mjData reset ----------
   if (data->time < last_transition_time_ || last_transition_time_ == -1) {
-    if (stage != kModeStand && stage != kModeHandStand) {
+    if (stage != kModeStand && stage != kModeHandstand) {
       stage = kModeStand;  // stage is stateful, switch to Quadruped
     }
     last_transition_time_ = phase_start_time_ = phase_start_ = data->time;
@@ -375,23 +379,23 @@ void humanoid::Gait::Transition(const mjModel* model, mjData* data) {
         axis[0] += d * leftward[0];
         axis[1] += d * leftward[1];
       }
-      position_[0] = axis[0];
-      position_[1] = axis[1];
-
       // reset goal position if walk mode is "automatic"
-      if (parameters[ParameterIndex(model, "select_Walk Mode")] == 0) {
+      if (parameters[ParameterIndex(model, "select_Walk Mode")] == 0 && stage != current_mode_) {
+        position_[0] = axis[0];
+        position_[1] = axis[1];
+
         goal_pos[0] = data->xpos[3 * torso_body_id_];
         goal_pos[1] = data->xpos[3 * torso_body_id_ + 1];
-      }
 
-      // save vector from axis to initial goal position
-      heading_[0] = goal_pos[0] - axis[0];
-      heading_[1] = goal_pos[1] - axis[1];
+        // save vector from axis to initial goal position
+        heading_[0] = goal_pos[0] - axis[0];
+        heading_[1] = goal_pos[1] - axis[1];
+      }
     }
 
     // move goal
     double time = data->time - mode_start_time_;
-    if (stage == current_mode_) Walk(goal_pos, time);
+    Walk(goal_pos, time);
   }
 
   // ---------- Flip ----------
@@ -431,10 +435,10 @@ void humanoid::Gait::Transition(const mjModel* model, mjData* data) {
   }
 
   // ----- handstand ----- // 
-  if (current_mode_ != kModeHandStand && hand_stand_phase_ != 0) {
+  if (current_mode_ != kModeHandstand && hand_stand_phase_ != 0) {
     hand_stand_phase_ = 0;
   }
-  if (stage == kModeHandStand) {
+  if (stage == kModeHandstand) {
     // initialization
     if (stage != current_mode_) {
       // printf("reset handstand mode\n");

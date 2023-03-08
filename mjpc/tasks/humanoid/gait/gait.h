@@ -49,7 +49,7 @@ class Gait : public Task {
     kModeStand = 0,
     kModeWalk,
     kModeFlip,
-    kModeHandStand,
+    kModeHandstand,
     kNumMode,
   };
 
@@ -61,12 +61,12 @@ class Gait : public Task {
   };
 
   // mode weights, set when switching modes
-  constexpr static double kModeWeight[kNumMode][10] =
+  constexpr static double kModeWeight[kNumMode][11] =
   {
-    {3.0,  0.05, 2.5, 2.5, 0.075, 0.0,  0.0,   0.0,   0.0, 0.0},      // stand
-    {1.0, 0.035, 1.0, 1.0, 0.075, 0.05, 0.1, 0.125, 0.125, 1.0},      // walk
-    {1.0,  0.01, 1.0, 1.0, 0.075,  0.0, 0.0,   0.0,   0.0, 0.0},      // flip
-    {2.5, 0.001, 2.5, 1.0, 0.05,   0.0, 0.0,   0.0,   0.0, 1.0},      // hand stand
+    {3.0,  0.05, 2.5, 2.5, 0.075, 0.0,  0.0,   0.0,   0.0, 0.0, 0.1},      // stand
+    {1.0, 0.035, 1.0, 1.0, 0.075, 0.05, 0.1, 0.125, 0.125, 1.0, 0.0},      // walk
+    {1.0,  0.01, 1.0, 1.0, 0.075,  0.0, 0.0,   0.0,   0.0, 0.0, 0.0},      // flip
+    {2.5, 0.001, 2.5, 1.0, 0.05,   0.0, 0.0,   0.0,   0.0, 1.0, 0.0},      // hand stand
   };
 
   // mode residual parameters, set when switching into modes
@@ -129,7 +129,7 @@ class Gait : public Task {
   double last_transition_time_ = -1;
 
   // common stage states
-  double mode_start_time_  = 0;
+  double mode_start_time_  = 0.0;
   double position_[3]       = {0};
 
   // walk states
