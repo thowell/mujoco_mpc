@@ -27,7 +27,7 @@
 
   <worldbody>
     <body name="goal" mocap="true" pos="0.0 0.0 1.1" quat="0.0 1.0 0.0 0.0">
-      <geom type="capsule" size="0.1 0.05 0.1" contype="0" conaffinity="0" rgba="0 1 0 0" fromto="0 0 -0.1 0 0 0.1"/>
+      <geom type="capsule" size="0.1 0.05 0.1" contype="0" conaffinity="0" rgba="0 1 0 0.5" fromto="0 0 -0.1 0 0 0.1"/>
     </body>
 
     <body name="box1" mocap="true" pos="1.0 -0.25 0">
