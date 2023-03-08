@@ -347,7 +347,7 @@ void humanoid::Gait::Transition(const mjModel* model, mjData* data) {
 
   // ---------- Walk ----------
   double* goal_pos = data->mocap_pos + 3 * goal_mocap_id_;
-  if (stage == kModeWalk && parameters[walk_mode_param_id_] == 0) {
+  if (stage == kModeWalk) {
     double angvel = parameters[ParameterIndex(model, "Walk Turn")];
     double speed = parameters[ParameterIndex(model, "Walk Speed")];
 
@@ -378,6 +378,12 @@ void humanoid::Gait::Transition(const mjModel* model, mjData* data) {
       position_[0] = axis[0];
       position_[1] = axis[1];
 
+      // reset goal position if walk mode is "automatic"
+      if (parameters[ParameterIndex(model, "select_Walk Mode")] == 0) {
+        goal_pos[0] = data->xpos[3 * torso_body_id_];
+        goal_pos[1] = data->xpos[3 * torso_body_id_ + 1];
+      }
+
       // save vector from axis to initial goal position
       heading_[0] = goal_pos[0] - axis[0];
       heading_[1] = goal_pos[1] - axis[1];
@@ -385,7 +391,7 @@ void humanoid::Gait::Transition(const mjModel* model, mjData* data) {
 
     // move goal
     double time = data->time - mode_start_time_;
-    Walk(goal_pos, time);
+    if (stage == current_mode_) Walk(goal_pos, time);
   }
 
   // ---------- Flip ----------
@@ -527,15 +533,6 @@ void humanoid::Gait::Reset(const mjModel* model) {
 
   goal_mocap_id_ = model->body_mocapid[goal_id];
   if (goal_mocap_id_ < 0) mju_error("body 'goal' is not mocap");
-
-  // foot geom ids
-  // int foot_index = 0;
-  // for (const char* footname : {"FL", "HL", "FR", "HR"}) {
-  //   int foot_id = mj_name2id(model, mjOBJ_GEOM, footname);
-  //   if (foot_id < 0) mju_error_s("geom '%s' not found", footname);
-  //   foot_geom_id_[foot_index] = foot_id;
-  //   foot_index++;
-  // }
 
   // ----------  derived kinematic quantities for Flip  ----------
   gravity_ = mju_norm3(model->opt.gravity);
