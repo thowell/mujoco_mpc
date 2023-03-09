@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef MJPC_TASKS_HUMANOID_GAIT_TASK_H_
-#define MJPC_TASKS_HUMANOID_GAIT_TASK_H_
+#ifndef MJPC_TASKS_HUMANOID_BEHAVIOR_TASK_H_
+#define MJPC_TASKS_HUMANOID_BEHAVIOR_TASK_H_
 
 #include <mujoco/mujoco.h>
 
@@ -22,14 +22,30 @@
 namespace mjpc {
 namespace humanoid {
 
-class Gait : public Task {
+class Behavior : public Task {
  public:
   std::string Name() const override;
   std::string XmlPath() const override;
 
   // ------------------ Residuals for humanoid gait task ------------
-  //   Number of residuals: 
-  //   Number of parameters: 
+  //   Number of residuals: 11
+  //     Residual (0): torso height
+  //     Residual (1): actuation
+  //     Residual (2): balance
+  //     Residual (3): upright
+  //     Residual (4): posture
+  //     Residual (5): goal-position error
+  //     Residual (6): goal-direction error
+  //     Residual (7): feet velocity
+  //     Residual (8): body velocity
+  //     Residual (9): gait feet height
+  //     Residual (10): center-of-mass xy velocity
+  //   Number of parameters: 5
+  //     Parameter (0): torso height 
+  //     Parameter (1): walking speed
+  //     Parameter (2): walking cadence
+  //     Parameter (3): walking gait feet amplitude
+  //     Parameter (4): walking gait cadence
   // ----------------------------------------------------------------
   void Residual(const mjModel* model, const mjData* data,
                 double* residual) const override;
@@ -195,4 +211,4 @@ class Gait : public Task {
 }  // namespace humanoid
 }  // namespace mjpc
 
-#endif  // MJPC_TASKS_HUMANOID_GAIT_TASK_H_
+#endif  // MJPC_TASKS_HUMANOID_BEHAVIOR_TASK_H_

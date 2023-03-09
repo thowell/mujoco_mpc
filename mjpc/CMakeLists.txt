@@ -231,8 +231,8 @@ add_library(
   tasks/cartpole/cartpole.h
   tasks/hand/hand.cc
   tasks/hand/hand.h
-  tasks/humanoid/gait/gait.cc
-  tasks/humanoid/gait/gait.h
+  tasks/humanoid/behavior/behavior.cc
+  tasks/humanoid/behavior/behavior.h
   tasks/humanoid/stand/stand.cc
   tasks/humanoid/stand/stand.h
   tasks/humanoid/tracking/tracking.cc
