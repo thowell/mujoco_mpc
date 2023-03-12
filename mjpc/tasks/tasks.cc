@@ -42,11 +42,7 @@ std::vector<std::shared_ptr<Task>> GetTasks() {
     std::make_shared<humanoid::Behavior>(),
     std::make_shared<humanoid::Stand>(),
     std::make_shared<humanoid::Tracking>(),
-<<<<<<< HEAD
-=======
-    std::make_shared<humanoid::Walk>(),
     std::make_shared<manipulation::Bring>(),
->>>>>>> upstream/main
     // DEEPMIND INTERNAL TASKS
     std::make_shared<Panda>(),
     std::make_shared<Particle>(),

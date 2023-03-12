@@ -247,15 +247,10 @@ add_library(
   tasks/humanoid/stand/stand.h
   tasks/humanoid/tracking/tracking.cc
   tasks/humanoid/tracking/tracking.h
-<<<<<<< HEAD
-=======
-  tasks/humanoid/walk/walk.cc
-  tasks/humanoid/walk/walk.h
   tasks/manipulation/common.cc
   tasks/manipulation/common.h
   tasks/manipulation/manipulation.cc
   tasks/manipulation/manipulation.h
->>>>>>> upstream/main
   tasks/panda/panda.cc
   tasks/panda/panda.h
   tasks/particle/particle.cc
