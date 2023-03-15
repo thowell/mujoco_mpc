@@ -12,7 +12,7 @@
     <numeric name="sampling_exploration" data="0.05" />
     <numeric name="gradient_spline_points" data="5" />
     <numeric name="ilqg_num_rollouts" data="7" />
-    <numeric name="residual_Torso" data="1.3 1.0 1.7" />
+    <numeric name="residual_Torso" data="1.3 0.5 1.7" />
     <numeric name="residual_Speed" data="1.0 0.0 5.0" />
     <numeric name="residual_Cadence" data="1.0 0.0 2.0" />
     <numeric name="residual_Amplitude" data="0.1 0.0 2.0" />
@@ -27,20 +27,35 @@
     <body name="goal" mocap="true" pos="0.0 0.0 1.1" quat="0.0 1.0 0.0 0.0">
       <geom type="capsule" size="0.1 0.05 0.1" contype="0" conaffinity="0" rgba="0 1 0 0.5" fromto="0 0 -0.1 0 0 0.1" group="2"/>
     </body>
+    <body name="box" pos="0.4 0 .1">
+      <joint type="free"/>
+      <geom type="box" mass="0.01" size=".1 .1 .2" rgba="1 0 0 1"/>
+      <body name="handles" pos="0 0 0.195">
+        <geom type="box" mass="0.01" size=".05 .2 .01" rgba="1 0 0 1"/>
+        <site name="handle_right" class="tracking_site" pos="0.0 -0.1 0.0" />
+        <site name="handle_left" class="tracking_site" pos="0.0 0.1 0.0" />
+      </body>
+    </body>
   </worldbody>
 
   <sensor>
-    <user name="Height" dim="1" user="7 3.0 0 25.0 0.1 4.0" />
-    <user name="Actuation" dim="21" user="3 0.05 0 0.1 0.3" />
+    <user name="Height" dim="1" user="7 2.5 0 25.0 0.1 4.0" />
+    <user name="Actuation" dim="21" user="3 0.005 0 0.1 0.3" />
     <user name="Balance" dim="1" user="1 2.5 0.0 25.0 0.02 4.0" />
     <user name="Upright" dim="8" user="2 2.5 0.0 25.0 0.01" />
-    <user name="Posture" dim="21" user="0 0.075 0 1.0" />
+    <user name="Posture" dim="21" user="0 0.005 0 1.0" />
     <user name="Goal Pos." dim="2" user="0 0.0 0.0 1.0" />
     <user name="Direction" dim="2" user="0 0.0 0.0 1.0" />
     <user name="Velocity" dim="2" user="7 0.0 0 25.0 0.2 4.0" />
     <user name="Walk" dim="1" user="7 0.0 0.0 25.0 0.5 3.0" />
     <user name="Gait" dim="2" user="6 0.0 0 10 0.03" />
     <user name="CoM Vel." dim="2" user="0 0.1 0.0 1.0" />
+    <user name="Adhesion" dim="2" user="0 0.001 0.0 1.0" />
+    <user name="Hand Right" dim="3" user="0 0.35 0.0 1.0" />
+    <user name="Hand Left" dim="3" user="0 0.35 0.0 1.0" />
+    <user name="Box Lin. Vel." dim="3" user="0 0.1 0.0 1.0" />
+    <user name="Box Ang. Vel." dim="3" user="0 0.1 0.0 1.0" />
+    <user name="Box Torso" dim="3" user="0 0 0.0 1.0" />
     <framepos name="trace0" objtype="body" objname="torso"/>
     <framepos name="torso_position" objtype="body" objname="torso"/>
     <framexaxis name="torso_xaxis" objtype="body" objname="torso"/>
@@ -70,9 +85,14 @@
     <framequat name="goal_orientation" objtype="body" objname="goal"/>
     <framepos name="hand_left" objtype="body" objname="hand_left"/>
     <framepos name="hand_right" objtype="body" objname="hand_right"/>
+    <framepos name="handle_left" objtype="site" objname="handle_left"/>
+    <framepos name="handle_right" objtype="site" objname="handle_right"/>
+    <framepos name="box_position" objtype="body" objname="box"/>
+    <framelinvel name="box_linvel" objtype="body" objname="box"/>
+    <frameangvel name="box_angvel" objtype="body" objname="box"/>
   </sensor>
 
   <keyframe> 
-    <key name="home" qpos="0 0 1.27 1 0 0 0 0 0 0 -0.1 0 -0.25 -0.5 -0.25 0 -0.1 0 -0.25 -0.5 -0.25 0 0.5 -0.5 -1.5 0.5 -0.5 -1.5" />
+    <key name="home" qpos="0 0 1.27 1 0 0 0 0 0 0 -0.1 0 -0.25 -0.5 -0.25 0 -0.1 0 -0.25 -0.5 -0.25 0 0.5 -0.5 -1.5 0.5 -0.5 -1.5 0.4 0 0.2 1 0 0 0" />
   </keyframe>
 </mujoco>

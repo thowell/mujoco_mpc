@@ -75,6 +75,15 @@
         <site type="sphere" size="0.027" rgba="1 0 0 1" group="3"/>
       </default>
     </default>
+
+    <default class="active_adhesion">
+      <!--
+        Geoms in the active_adhesion class are "inflated" with a margin of 1cm, but contacts are
+        activated only at a depth gap of 1cm, leading to a layer of inactive contacts at a 1cm
+        distance from the surface. However the contacts can be used by the adhesion actuator.
+      -->
+      <geom rgba=".8 .5 .5 1" margin=".01" gap=".01"/>
+    </default>
   </default>
 
   <worldbody>
@@ -226,6 +235,8 @@
     <motor name="shoulder1_left"  gear="20"  joint="shoulder1_left"/>
     <motor name="shoulder2_left"  gear="20"  joint="shoulder2_left"/>
     <motor name="elbow_left"      gear="40"  joint="elbow_left"/>
+    <adhesion name="left_hand" body="hand_left" ctrlrange="0 1" gain="50"/>
+    <adhesion name="left_right" body="hand_right" ctrlrange="0 1" gain="50"/>
   </actuator>
 
 </mujoco>

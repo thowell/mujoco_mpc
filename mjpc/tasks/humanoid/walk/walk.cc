@@ -75,8 +75,8 @@ void humanoid::Walk::Residual(const mjModel* model, const mjData* data,
       (torso_height - foot_height_avg) - parameters[torso_height_param_id_];
 
   // ----- actuation ----- //
-  mju_copy(&residual[counter], data->actuator_force, model->nu);
-  counter += model->nu;
+  mju_copy(&residual[counter], data->actuator_force, model->nu - 2);
+  counter += model->nu - 2;
 
   // ----- balance ----- //
   // capture point
@@ -141,8 +141,8 @@ void humanoid::Walk::Residual(const mjModel* model, const mjData* data,
 
   // ----- posture ----- //
   mju_sub(&residual[counter], data->qpos + 7,
-          model->key_qpos + qpos_reference_id_ * model->nq + 7, model->nq - 7);
-  counter += model->nq - 7;
+          model->key_qpos + qpos_reference_id_ * model->nq + 7, model->nq - 7 - 7);
+  counter += model->nq - 7 - 7;
 
   // ----- position error ----- //
   mju_copy(&residual[counter], goal_position_error, 2);
@@ -216,6 +216,37 @@ void humanoid::Walk::Residual(const mjModel* model, const mjData* data,
   // ----- COM xy velocity should be 0 ----- //
   mju_copy(&residual[counter], subcomvel, 2);
   counter += 2;
+
+  // ----- actuation ----- //
+  mju_copy(&residual[counter], data->ctrl + 21, 2);
+  counter += 2;
+
+  // ----- hand-box position ----- //
+  double* handle_right = SensorByName(model, data, "handle_right");
+  double* handle_left = SensorByName(model, data, "handle_left");
+  double* hand_right = SensorByName(model, data, "hand_right");
+  double* hand_left = SensorByName(model, data, "hand_left");
+
+  mju_sub3(&residual[counter], hand_right, handle_right);
+  counter += 3;
+
+  mju_sub3(&residual[counter], hand_left, handle_left);
+  counter += 3;
+
+  // ----- box linear velocity ----- //
+  double* box_linvel = SensorByName(model, data, "box_linvel");
+  mju_copy3(&residual[counter], box_linvel);
+  counter += 3;
+
+  // ----- box angular velocity ----- //
+  double* box_angvel = SensorByName(model, data, "box_angvel");
+  mju_copy3(&residual[counter], box_angvel);
+  counter += 3;
+
+  // ----- box height ----- //
+  double* box_position = SensorByName(model, data, "box_position");
+  mju_sub3(&residual[counter], box_position, torso_position);
+  counter += 3;
 
   // sensor dim sanity check
   CheckSensorDim(model, counter);
