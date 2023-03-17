@@ -235,8 +235,8 @@
     <motor name="shoulder1_left"  gear="20"  joint="shoulder1_left"/>
     <motor name="shoulder2_left"  gear="20"  joint="shoulder2_left"/>
     <motor name="elbow_left"      gear="40"  joint="elbow_left"/>
-    <adhesion name="left_hand" body="hand_left" ctrlrange="0 1" gain="50"/>
-    <adhesion name="left_right" body="hand_right" ctrlrange="0 1" gain="50"/>
+    <adhesion name="left_hand" body="hand_left" ctrlrange="0 1" gain="1000"/>
+    <adhesion name="left_right" body="hand_right" ctrlrange="0 1" gain="1000"/>
   </actuator>
 
 </mujoco>
