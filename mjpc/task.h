@@ -60,7 +60,6 @@ class BaseResidualFn : public ResidualFn {
   double CostValue(const double* residual) const override;
   void Update() override;
 
- protected:
   int num_residual_;
   int num_term_;
   int num_trace_;
@@ -92,7 +91,6 @@ class ForwardingResidualFn : public ResidualFn {
   double CostValue(const double* residual) const override;
   void Update() override {}
 
- private:
   const Task* task_;
 };
 }  // namespace internal
@@ -159,7 +157,6 @@ class Task {
   // residual parameters
   std::vector<double> parameters;
 
- private:
   // initial residual parameters from model
   void SetFeatureParameters(const mjModel* model);
   internal::ForwardingResidualFn default_residual_;
@@ -198,7 +195,6 @@ class ThreadSafeTask : public Task {
   // holding a lock
   double CostValue(const double* residual) const final;
 
- protected:
   // returns a pointer to the ResidualFn instance that's used for physics
   // stepping and plotting, and is internal to the class
   virtual BaseResidualFn* InternalResidual() = 0;
