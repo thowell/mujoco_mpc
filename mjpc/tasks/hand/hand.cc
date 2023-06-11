@@ -14,9 +14,11 @@
 
 #include "mjpc/tasks/hand/hand.h"
 
+#include <mujoco/mujoco.h>
+
+#include <random>
 #include <string>
 
-#include <mujoco/mujoco.h>
 #include "mjpc/task.h"
 #include "mjpc/utilities.h"
 
@@ -70,14 +72,14 @@ void Hand::Residual(const mjModel* model, const mjData* data,
   counter += model->nu;
 
   // ---------- Residual (3) ----------
-  residual[counter + 0] = data->qpos[11] - parameters[0]; // red
-  residual[counter + 1] = data->qpos[12] - parameters[1]; // orange
-  residual[counter + 2] = data->qpos[13] - parameters[2]; // blue
-  residual[counter + 3] = data->qpos[14] - parameters[3]; // green
-  residual[counter + 4] = data->qpos[15] - parameters[4]; // white 
-  residual[counter + 5] = data->qpos[16] - parameters[5]; // yellow
+  residual[counter + 0] = data->qpos[11] - goal_[0]; // red
+  residual[counter + 1] = data->qpos[12] - goal_[1]; // orange
+  residual[counter + 2] = data->qpos[13] - goal_[2]; // blue
+  residual[counter + 3] = data->qpos[14] - goal_[3]; // green
+  residual[counter + 4] = data->qpos[15] - goal_[4]; // white 
+  residual[counter + 5] = data->qpos[16] - goal_[5]; // yellow
   counter += 6;
-
+ 
   // sensor dim sanity check
   CheckSensorDim(model, counter);
 }
@@ -87,6 +89,74 @@ void Hand::Residual(const mjModel* model, const mjData* data,
 //   reset cube into hand.
 // -----------------------------------------------
 void Hand::Transition(const mjModel* model, mjData* data) {
+  if (transition_model_) {
+    if (mode == 0) { // wait 
+      mju_copy(goal_, data->qpos + 11, 6);
+    } else if (mode == 2) { // scramble
+      printf("scramble!\n");
+
+      // reset
+      mju_copy(data->qpos, model->qpos0, model->nq);
+      mj_resetData(transition_model_, transition_data_);
+
+      // resize
+      face_.resize(num_scramble_);
+      direction_.resize(num_scramble_);
+      goal_cache_.resize(6 * num_scramble_);
+
+      // set transition model 
+      for (int i = 0; i < num_scramble_; i++) {
+        // copy goal face orientations
+        mju_copy(goal_cache_.data() + i * 6, transition_data_->qpos, 6);
+
+        // random face + direction
+        std::random_device rd;     // Only used once to initialise (seed) engine
+        std::mt19937 rng(rd());    // Random-number engine used (Mersenne-Twister in this case)
+        
+        std::uniform_int_distribution<int> uni_face(0, 5); // Guaranteed unbiased
+        face_[i] = uni_face(rng);
+
+        std::uniform_int_distribution<int> uni_direction(0, 1); // Guaranteed unbiased
+        direction_[i] = uni_direction(rng);
+        if (direction_[i] == 0) {
+          direction_[i] = -1;
+        }
+
+        // set 
+        for (int t = 0; t < 1500; t++) {
+          transition_data_->ctrl[face_[i]] = direction_[i] * 1.57 * t / 1500;
+          mj_step(transition_model_, transition_data_);
+          mju_copy(data->qpos + 11, transition_data_->qpos, 86);
+        }
+      }
+
+      // set face goal index 
+      goal_index_ = num_scramble_ - 1;
+
+      // set to wait
+      mode = 0;
+    }
+
+    if (mode == 3) { // solve
+      // set goal 
+      mju_copy(goal_, goal_cache_.data() + 6 * goal_index_, 6);
+
+      // check error
+      double error[6];
+      mju_sub(error, data->qpos + 11, goal_, 6);
+
+      if (mju_norm(error, 6) < 0.1) {
+        if (goal_index_ == 0) {
+          // return to wait
+          printf("solved!");
+          mode = 0;
+        } else {
+          goal_index_--;
+        }
+      }
+    }
+  }
+
   // // find cube and floor
   // int cube = mj_name2id(model, mjOBJ_GEOM, "cube");
   // int floor = mj_name2id(model, mjOBJ_GEOM, "floor");
@@ -114,5 +184,13 @@ void Hand::Transition(const mjModel* model, mjData* data) {
   //   mj_forward(model, data);
   // }
 }
+
+// #include <random>
+
+// std::random_device rd;     // Only used once to initialise (seed) engine
+// std::mt19937 rng(rd());    // Random-number engine used (Mersenne-Twister in this case)
+// std::uniform_int_distribution<int> uni(min,max); // Guaranteed unbiased
+
+// auto random_integer = uni(rng);
 
 }  // namespace mjpc

@@ -9,9 +9,10 @@
   <statistic meansize="0.0087" extent="0.1"/>
   <default>
     <geom mass="0.00253704"/>
-    <motor ctrlrange="-0.05 0.05"/>
+    <!-- <motor ctrlrange="-0.05 0.05"/> -->
+    <position ctrlrange="-10 10"/>
     <default class="cubelet">
-      <joint type="ball" armature="0.00005" damping="0.00005" frictionloss="0.00005"/>
+      <joint type="ball" armature="0.001" damping="0.001" frictionloss="0.001"/>
       <geom type="mesh" condim="1" mesh="cubelet"/>
     </default>
     <default class="core">
@@ -78,8 +79,7 @@
   </asset>
   <worldbody>
     <light pos="0 0 1"/>
-    <body name="core" pos="0.325 0.0 0.075" childclass="cubelet">
-      <freejoint/>
+    <body name="core" childclass="cubelet">
       <geom class="core"/>
       <body name="pX">
         <joint name="pX" type="hinge" axis="1 0 0"/>
@@ -187,12 +187,12 @@
       </body>
     </body>
   </worldbody>
-
-  <sensor>
-    <framepos name="trace0" objtype="body" objname="core"/>
-    <framepos name="cube_position" objtype="body" objname="core"/>
-    <framequat name="cube_orientation" objtype="body" objname="core"/>
-    <framelinvel name="cube_linear_velocity" objtype="body" objname="core"/>
-    <frameangvel name="cube_angular_velocity" objtype="body" objname="core"/>
-  </sensor>
+  <actuator>
+    <position name="red" joint="pX"/>
+    <position name="orange" joint="nX"/>
+    <position name="blue" joint="pY"/>
+    <position name="green" joint="nY"/>
+    <position name="white" joint="pZ"/>
+    <position name="yellow" joint="nZ"/>
+  </actuator>
 </mujoco>

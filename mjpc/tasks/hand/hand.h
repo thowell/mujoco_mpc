@@ -18,10 +18,23 @@
 #include <string>
 #include <mujoco/mujoco.h>
 #include "mjpc/task.h"
+#include "mjpc/utilities.h"
 
 namespace mjpc {
 class Hand : public Task {
  public:
+  Hand() { 
+    std::string path = GetModelPath("hand/transition_model.xml");
+
+    // load transition model
+    constexpr int kErrorLength = 1024;
+    char load_error[kErrorLength] = "";
+    transition_model_ = mj_loadXML(path.c_str(), nullptr, load_error,
+                        kErrorLength);
+    transition_data_ = mj_makeData(transition_model_);
+    mju_zero(goal_, 6);
+    printf("Hand loaded.\n"); 
+  }
   std::string Name() const override;
   std::string XmlPath() const override;
   // ---------- Residuals for in-hand manipulation task ---------
@@ -34,11 +47,19 @@ class Hand : public Task {
   // ------------------------------------------------------------
   void Residual(const mjModel* model, const mjData* data,
                 double* residual) const override;
-// ----- Transition for in-hand manipulation task -----
-//   If cube is within tolerance or floor ->
-//   reset cube into hand.
-// -----------------------------------------------
+  // ----- Transition for in-hand manipulation task -----
+  //   If cube is within tolerance or floor ->
+  //   reset cube into hand.
+  // -----------------------------------------------
   void Transition(const mjModel* model, mjData* data) override;
+  mjModel* transition_model_;
+  mjData* transition_data_;
+  int num_scramble_ = 10;
+  std::vector<int> face_;
+  std::vector<int> direction_;
+  double goal_[6];
+  std::vector<double> goal_cache_;
+  int goal_index_;
 };
 }  // namespace mjpc
 
