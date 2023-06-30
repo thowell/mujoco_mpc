@@ -400,8 +400,8 @@ class Estimator {
   int max_line_search_ = 10;                // maximum number of line search iterations
   int max_smoother_iterations_ = 10;        // maximum number of smoothing iterations
   double gradient_tolerance_ = 1.0e-5;      // small gradient tolerance
-  bool verbose_optimize_ = false;           // flag for printing optimize status
-  bool verbose_cost_ = false;               // flag for printing cost
+  bool verbose_optimize_ = true;           // flag for printing optimize status
+  bool verbose_cost_ = true;               // flag for printing cost
   bool verbose_prior_ = false;              // flag for printing prior weight update status
   bool band_covariance_ = true;             // approximate covariance for prior
   double step_scaling_ = 0.5;               // step size scaling

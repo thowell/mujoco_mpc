@@ -1769,6 +1769,8 @@ void Estimator::PriorWeightUpdate(ThreadPool& pool) {
 
 // optimize trajectory estimate
 void Estimator::Optimize(ThreadPool& pool) {
+  printf("Hello, world\n");
+  fflush(stdout);
   // start timer
   auto start_optimize = std::chrono::steady_clock::now();
 
