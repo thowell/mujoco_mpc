@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Startup code for `BatchEstimator` server.
+// Startup code for `Batch` server.
 
 #include <cstdint>
 #include <memory>
@@ -27,7 +27,7 @@
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
 #include <grpcpp/server_context.h>
-#include "grpc/batch_estimator_service.h"
+#include "grpc/batch_service.h"
 
 ABSL_FLAG(int32_t, mjpc_port, 10000, "port to listen on");
 
@@ -42,7 +42,7 @@ int main(int argc, char** argv) {
   grpc::ServerBuilder builder;
   builder.AddListeningPort(server_address, server_credentials);
 
-  batch_estimator_grpc::BatchEstimatorService service;
+  batch_grpc::BatchService service;
   builder.SetMaxReceiveMessageSize(40 * 1024 * 1024);
   builder.RegisterService(&service);
 

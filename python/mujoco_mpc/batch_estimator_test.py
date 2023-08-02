@@ -15,13 +15,13 @@
 
 from absl.testing import absltest
 import mujoco
-from mujoco_mpc import batch_estimator as batch_estimator_lib
+from mujoco_mpc import batch as batch_lib
 import numpy as np
 
 import pathlib
 
 
-class BatchEstimatorTest(absltest.TestCase):
+class BatchTest(absltest.TestCase):
 
   def test_initialized(self):
     # load model
@@ -33,11 +33,11 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # initialize
     configuration_length = 5
-    batch_estimator = batch_estimator_lib.BatchEstimator(
+    batch = batch_lib.Batch(
         model=model, configuration_length=configuration_length, send_as="mjb"
     )
 
-    batch_estimator.data(0)["configuration"]
+    batch.data(0)["configuration"]
 
   def test_data(self):
     # load model
@@ -49,7 +49,7 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # initialize
     configuration_length = 5
-    batch_estimator = batch_estimator_lib.BatchEstimator(
+    batch = batch_lib.Batch(
         model=model, configuration_length=configuration_length
     )
 
@@ -60,7 +60,7 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # set
     configuration = np.random.rand(model.nq)
-    data = batch_estimator.data(index, configuration=configuration)
+    data = batch.data(index, configuration=configuration)
 
     # test that input and output match
     self.assertTrue(np.linalg.norm(configuration - data["configuration"]) < 1.0e-5)
@@ -69,7 +69,7 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # set
     velocity = np.random.rand(model.nv)
-    data = batch_estimator.data(index, velocity=velocity)
+    data = batch.data(index, velocity=velocity)
 
     # test that input and output match
     self.assertLess(np.linalg.norm(velocity - data["velocity"]), 1.0e-5)
@@ -78,7 +78,7 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # set
     acceleration = np.random.rand(model.nv)
-    data = batch_estimator.data(index, acceleration=acceleration)
+    data = batch.data(index, acceleration=acceleration)
 
     # test that input and output match
     self.assertLess(np.linalg.norm(acceleration - data["acceleration"]), 1.0e-5)
@@ -87,7 +87,7 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # set
     time = np.random.rand(1)
-    data = batch_estimator.data(index, time=time)
+    data = batch.data(index, time=time)
 
     # test that input and output match
     self.assertLess(np.linalg.norm(time - data["time"]), 1.0e-5)
@@ -96,7 +96,7 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # set
     ctrl = np.random.rand(model.nu)
-    data = batch_estimator.data(index, ctrl=ctrl)
+    data = batch.data(index, ctrl=ctrl)
 
     # test that input and output match
     self.assertLess(np.linalg.norm(ctrl - data["ctrl"]), 1.0e-5)
@@ -105,7 +105,7 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # set
     configuration_previous = np.random.rand(model.nq)
-    data = batch_estimator.data(index, configuration_previous=configuration_previous)
+    data = batch.data(index, configuration_previous=configuration_previous)
 
     # test that input and output match
     self.assertLess(
@@ -116,7 +116,7 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # set
     sensor_measurement = np.random.rand(model.nsensordata)
-    data = batch_estimator.data(index, sensor_measurement=sensor_measurement)
+    data = batch.data(index, sensor_measurement=sensor_measurement)
 
     # test that input and output match
     self.assertTrue(
@@ -127,7 +127,7 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # set
     sensor_prediction = np.random.rand(model.nsensordata)
-    data = batch_estimator.data(index, sensor_prediction=sensor_prediction)
+    data = batch.data(index, sensor_prediction=sensor_prediction)
 
     # test that input and output match
     self.assertTrue(
@@ -138,7 +138,7 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # set
     sensor_mask = np.array([1, 0, 1, 0])
-    data = batch_estimator.data(index, sensor_mask=sensor_mask)
+    data = batch.data(index, sensor_mask=sensor_mask)
 
     # test that input and output match
     self.assertTrue(
@@ -149,7 +149,7 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # set
     force_measurement = np.random.rand(model.nv)
-    data = batch_estimator.data(index, force_measurement=force_measurement)
+    data = batch.data(index, force_measurement=force_measurement)
 
     # test that input and output match
     self.assertTrue(
@@ -160,7 +160,7 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # set
     force_prediction = np.random.rand(model.nv)
-    data = batch_estimator.data(index, force_prediction=force_prediction)
+    data = batch.data(index, force_prediction=force_prediction)
 
     # test that input and output match
     self.assertTrue(
@@ -177,132 +177,132 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # initialize
     configuration_length = 15
-    batch_estimator = batch_estimator_lib.BatchEstimator(
+    batch = batch_lib.Batch(
         model=model, configuration_length=configuration_length
     )
 
     # initial configuration length
-    settings = batch_estimator.settings()
+    settings = batch.settings()
     self.assertTrue(configuration_length == settings["configuration_length"])
 
     # get/set configuration length
     in_configuration_length = 7
-    settings = batch_estimator.settings(configuration_length=in_configuration_length)
+    settings = batch.settings(configuration_length=in_configuration_length)
     self.assertTrue(in_configuration_length == settings["configuration_length"])
 
     # get/set prior flag
     in_prior_flag = False
-    settings = batch_estimator.settings(prior_flag=in_prior_flag)
+    settings = batch.settings(prior_flag=in_prior_flag)
     self.assertTrue(in_prior_flag == settings["prior_flag"])
 
     # get/set sensor flag
     in_sensor_flag = False
-    settings = batch_estimator.settings(sensor_flag=in_sensor_flag)
+    settings = batch.settings(sensor_flag=in_sensor_flag)
     self.assertTrue(in_sensor_flag == settings["sensor_flag"])
 
     # get/set force flag
     in_force_flag = False
-    settings = batch_estimator.settings(force_flag=in_force_flag)
+    settings = batch.settings(force_flag=in_force_flag)
     self.assertTrue(in_force_flag == settings["force_flag"])
 
     # get/set search iterations
     in_search_iterations = 25
-    settings = batch_estimator.settings(max_search_iterations=in_search_iterations)
+    settings = batch.settings(max_search_iterations=in_search_iterations)
     self.assertTrue(in_search_iterations == settings["max_search_iterations"])
 
     # get/set smoother iterations
     in_smoother_iterations = 25
-    settings = batch_estimator.settings(max_smoother_iterations=in_smoother_iterations)
+    settings = batch.settings(max_smoother_iterations=in_smoother_iterations)
     self.assertTrue(in_smoother_iterations == settings["max_smoother_iterations"])
 
     # get/set gradient tolerance 
     gradient_tolerance = 1.23456
-    settings = batch_estimator.settings(gradient_tolerance=gradient_tolerance)
+    settings = batch.settings(gradient_tolerance=gradient_tolerance)
     self.assertTrue(np.abs(gradient_tolerance - settings["gradient_tolerance"]) < 1.0e-6)
 
     # get/set verbose iteration
     verbose_iteration = True 
-    settings = batch_estimator.settings(verbose_iteration=verbose_iteration)
+    settings = batch.settings(verbose_iteration=verbose_iteration)
     self.assertTrue(verbose_iteration == settings["verbose_iteration"])
 
     # get/set verbose optimize
     verbose_optimize = True 
-    settings = batch_estimator.settings(verbose_optimize=verbose_optimize)
+    settings = batch.settings(verbose_optimize=verbose_optimize)
     self.assertTrue(verbose_optimize == settings["verbose_optimize"])
 
     # get/set verbose cost
     verbose_cost = True 
-    settings = batch_estimator.settings(verbose_cost=verbose_cost)
+    settings = batch.settings(verbose_cost=verbose_cost)
     self.assertTrue(verbose_cost == settings["verbose_cost"])
 
     # get/set verbose prior
     verbose_prior = True 
-    settings = batch_estimator.settings(verbose_prior=verbose_prior)
+    settings = batch.settings(verbose_prior=verbose_prior)
     self.assertTrue(verbose_prior == settings["verbose_prior"])
 
     # get/set band prior
     band_prior = False 
-    settings = batch_estimator.settings(band_prior=band_prior)
+    settings = batch.settings(band_prior=band_prior)
     self.assertTrue(band_prior == settings["band_prior"])
 
     # get/set search type
     in_search_type = 0
-    settings = batch_estimator.settings(search_type=in_search_type)
+    settings = batch.settings(search_type=in_search_type)
     self.assertTrue(in_search_type == settings["search_type"])
 
     # get/set step scaling 
     in_step_scaling = 2.5 
-    settings = batch_estimator.settings(step_scaling=in_step_scaling)
+    settings = batch.settings(step_scaling=in_step_scaling)
     self.assertTrue(np.abs(in_step_scaling - settings["step_scaling"]) < 1.0e-4)
 
     # get/set regularization initial 
     in_regularization_initial = 3.0e1
-    settings = batch_estimator.settings(regularization_initial=in_regularization_initial)
+    settings = batch.settings(regularization_initial=in_regularization_initial)
     self.assertTrue(np.abs(in_regularization_initial - settings["regularization_initial"]) < 1.0e-4)
 
     # get/set regularization scaling 
     in_regularization_scaling = 7.1
-    settings = batch_estimator.settings(regularization_scaling=in_regularization_scaling)
+    settings = batch.settings(regularization_scaling=in_regularization_scaling)
     self.assertTrue(np.abs(in_regularization_scaling - settings["regularization_scaling"]) < 1.0e-4)
 
     # get/set band copy 
     in_band_copy = False 
-    settings = batch_estimator.settings(band_copy=in_band_copy) 
+    settings = batch.settings(band_copy=in_band_copy) 
     self.assertTrue(in_band_copy == settings["band_copy"])
 
     # get/set search direction tolerance
     search_direction_tolerance = 3.3 
-    settings = batch_estimator.settings(search_direction_tolerance=search_direction_tolerance)
+    settings = batch.settings(search_direction_tolerance=search_direction_tolerance)
     self.assertTrue(np.abs(search_direction_tolerance - settings["search_direction_tolerance"]) < 1.0e-5)
    
     # get/set cost tolerance 
     cost_tolerance = 1.0e-3 
-    settings = batch_estimator.settings(cost_tolerance=cost_tolerance)
+    settings = batch.settings(cost_tolerance=cost_tolerance)
     self.assertTrue(np.abs(cost_tolerance - settings["cost_tolerance"]) < 1.0e-5)
 
     # get/set assemble prior Jacobian 
     assemble_prior_jacobian = True
-    settings = batch_estimator.settings(assemble_prior_jacobian=assemble_prior_jacobian)
+    settings = batch.settings(assemble_prior_jacobian=assemble_prior_jacobian)
     self.assertTrue(assemble_prior_jacobian == settings["assemble_prior_jacobian"])
 
     # get/set assemble sensor Jacobian 
     assemble_sensor_jacobian = True
-    settings = batch_estimator.settings(assemble_sensor_jacobian=assemble_sensor_jacobian)
+    settings = batch.settings(assemble_sensor_jacobian=assemble_sensor_jacobian)
     self.assertTrue(assemble_sensor_jacobian == settings["assemble_sensor_jacobian"])
 
     # get/set assemble force Jacobian 
     assemble_force_jacobian = True
-    settings = batch_estimator.settings(assemble_force_jacobian=assemble_force_jacobian)
+    settings = batch.settings(assemble_force_jacobian=assemble_force_jacobian)
     self.assertTrue(assemble_force_jacobian == settings["assemble_force_jacobian"])
 
     # get/set assemble sensor norm Hessian
     assemble_sensor_norm_hessian = True
-    settings = batch_estimator.settings(assemble_sensor_norm_hessian=assemble_sensor_norm_hessian)
+    settings = batch.settings(assemble_sensor_norm_hessian=assemble_sensor_norm_hessian)
     self.assertTrue(assemble_sensor_norm_hessian == settings["assemble_sensor_norm_hessian"])
 
     # get/set assemble force norm Hessian
     assemble_force_norm_hessian = True
-    settings = batch_estimator.settings(assemble_force_norm_hessian=assemble_force_norm_hessian)
+    settings = batch.settings(assemble_force_norm_hessian=assemble_force_norm_hessian)
     self.assertTrue(assemble_force_norm_hessian == settings["assemble_force_norm_hessian"])
 
   def test_costs(self):
@@ -315,14 +315,14 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # initialize
     configuration_length = 5
-    batch_estimator = batch_estimator_lib.BatchEstimator(
+    batch = batch_lib.Batch(
         model=model, configuration_length=configuration_length
     )
 
     # TODO(taylor): better tests
 
     # cost
-    cost = batch_estimator.cost(derivatives=True, internals=True)
+    cost = batch.cost(derivatives=True, internals=True)
 
     self.assertTrue(np.abs(cost["total"] - 0.0) < 1.0e-5)
 
@@ -377,18 +377,18 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # initialize
     configuration_length = 5
-    batch_estimator = batch_estimator_lib.BatchEstimator(
+    batch = batch_lib.Batch(
         model=model, configuration_length=configuration_length
     )
 
     ## process
     in_process = np.random.rand(model.nv)
-    noise = batch_estimator.noise(process=in_process)
+    noise = batch.noise(process=in_process)
     self.assertTrue(np.linalg.norm(in_process - noise["process"]) < 1.0e-5)
 
     ## sensor
     in_sensor = np.random.rand(model.nsensor)
-    noise = batch_estimator.noise(sensor=in_sensor)
+    noise = batch.noise(sensor=in_sensor)
     self.assertTrue(np.linalg.norm(in_sensor - noise["sensor"]) < 1.0e-5)
 
   def test_shift(self):
@@ -401,21 +401,21 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # initialize
     configuration_length = 5
-    batch_estimator = batch_estimator_lib.BatchEstimator(
+    batch = batch_lib.Batch(
         model=model, configuration_length=configuration_length
     )
 
     # no shift
-    head = batch_estimator.shift(0)
+    head = batch.shift(0)
     self.assertTrue(head == 0)
 
     # shift
     shift = 1
-    head = batch_estimator.shift(shift)
+    head = batch.shift(shift)
     self.assertTrue(head == 1)
 
     shift = 2
-    head = batch_estimator.shift(shift)
+    head = batch.shift(shift)
     self.assertTrue(head == 3)
 
   def test_reset(self):
@@ -428,7 +428,7 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # initialize
     configuration_length = 5
-    batch_estimator = batch_estimator_lib.BatchEstimator(
+    batch = batch_lib.Batch(
         model=model, configuration_length=configuration_length
     )
 
@@ -436,7 +436,7 @@ class BatchEstimatorTest(absltest.TestCase):
     index = 1
     configuration = np.random.rand(model.nq)
     sensor_measurement = np.random.rand(model.nsensordata)
-    data = batch_estimator.data(
+    data = batch.data(
         index, configuration=configuration, sensor_measurement=sensor_measurement
     )
 
@@ -445,10 +445,10 @@ class BatchEstimatorTest(absltest.TestCase):
     self.assertTrue(np.linalg.norm(data["sensor_measurement"]) > 0.0)
 
     # reset
-    batch_estimator.reset()
+    batch.reset()
 
     # get data
-    data = batch_estimator.data(index)
+    data = batch.data(index)
 
     # check that elements are reset to zero
     self.assertTrue(np.linalg.norm(data["configuration"]) < 1.0e-5)
@@ -464,14 +464,14 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # initialize
     configuration_length = 5
-    batch_estimator = batch_estimator_lib.BatchEstimator(
+    batch = batch_lib.Batch(
         model=model, configuration_length=configuration_length
     )
 
     # TODO(taylor): setup
 
     # optimize
-    # batch_estimator.optimize()
+    # batch.optimize()
 
   def test_status(self):
     # load model
@@ -483,12 +483,12 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # initialize
     configuration_length = 5
-    batch_estimator = batch_estimator_lib.BatchEstimator(
+    batch = batch_lib.Batch(
         model=model, configuration_length=configuration_length
     )
 
     # TODO(taylor): setup
-    status = batch_estimator.status()
+    status = batch.status()
 
     # search iterations
     self.assertTrue(status["search_iterations"] == 0)
@@ -500,7 +500,7 @@ class BatchEstimatorTest(absltest.TestCase):
     self.assertTrue(np.abs(status["step_size"] - 1.0) < 1.0e-5)
 
     # regularization
-    self.assertTrue(np.abs(status["regularization"] - batch_estimator.settings()["regularization_initial"]) < 1.0e-6)
+    self.assertTrue(np.abs(status["regularization"] - batch.settings()["regularization_initial"]) < 1.0e-6)
 
     # gradient norm
     self.assertTrue(np.abs(status["gradient_norm"]) < 1.0e-5)
@@ -524,7 +524,7 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # initialize
     configuration_length = 5
-    batch_estimator = batch_estimator_lib.BatchEstimator(
+    batch = batch_lib.Batch(
         model=model, configuration_length=configuration_length
     )
 
@@ -532,7 +532,7 @@ class BatchEstimatorTest(absltest.TestCase):
     dim = configuration_length * model.nv
 
     # get uninitialized (zero) matrix
-    prior0 = batch_estimator.prior_weights()
+    prior0 = batch.prior_weights()
 
     # test
     self.assertTrue(prior0.shape == (dim, dim))
@@ -540,7 +540,7 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # random
     in_weights = np.random.rand(dim, dim)
-    out_prior = batch_estimator.prior_weights(weights=in_weights)
+    out_prior = batch.prior_weights(weights=in_weights)
 
     # test
     self.assertTrue(np.linalg.norm(in_weights - out_prior) < 1.0e-4)
@@ -555,12 +555,12 @@ class BatchEstimatorTest(absltest.TestCase):
 
     # initialize
     configuration_length = 5
-    batch_estimator = batch_estimator_lib.BatchEstimator(
+    batch = batch_lib.Batch(
         model=model, configuration_length=configuration_length
     )
 
     # get norm data
-    data = batch_estimator.norm()
+    data = batch.norm()
 
     # test norm types
     self.assertTrue((data["sensor_type"] == np.zeros(model.nsensor)).all())
@@ -571,7 +571,7 @@ class BatchEstimatorTest(absltest.TestCase):
     # set norm data
     sensor_type = np.array([1, 2, 3, 4])
     sensor_parameters = np.random.rand(3 * model.nsensor)
-    data = batch_estimator.norm(
+    data = batch.norm(
         sensor_type=sensor_type,
         sensor_parameters=sensor_parameters,
     )

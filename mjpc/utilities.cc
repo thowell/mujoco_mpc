@@ -1535,6 +1535,46 @@ void PrincipalEigenVector4(double* res, const double* mat,
   res[3] = scl * gamma;
 }
 
+// condition matrix: res = mat11 - mat10 * mat00 \ mat10^T; return rank of
+// mat00
+// TODO(taylor): thread
+void ConditionMatrix(double* res, const double* mat, double* mat00,
+                     double* mat10, double* mat11, double* tmp0, double* tmp1,
+                     int n, int n0, int n1, double* bandfactor, int nband) {
+  // unpack mat
+  BlockFromMatrix(mat00, mat, n0, n0, n, n, 0, 0);
+  BlockFromMatrix(mat10, mat, n1, n0, n, n, n0, 0);
+  BlockFromMatrix(mat11, mat, n1, n1, n, n, n0, n0);
+
+  // factorize mat00, solve mat00 \ mat10^T
+  if (nband > 0 && bandfactor) {
+    mju_dense2Band(bandfactor, mat00, n0, nband, 0);
+
+    // factorize mat00
+    mju_cholFactorBand(bandfactor, n0, nband, 0, 0.0, 0.0);
+
+    // tmp0 = mat00 \ mat01 = (mat00^-1 mat01)^T
+    for (int i = 0; i < n1; i++) {
+      mju_cholSolveBand(tmp0 + n0 * i, bandfactor, mat10 + n0 * i, n0, nband,
+                        0);
+    }
+  } else {
+    // factorize mat00
+    mju_cholFactor(mat00, n0, 0.0);
+
+    // tmp0 = mat00 \ mat01 = (mat00^-1 mat01)^T
+    for (int i = 0; i < n1; i++) {
+      mju_cholSolve(tmp0 + n0 * i, mat00, mat10 + n0 * i, n0);
+    }
+  }
+
+  // tmp1 = mat10 * (mat00 \ mat01)
+  mju_mulMatMatT(tmp1, tmp0, mat10, n1, n0, n1);
+
+  // res = mat11 - mat10 * (mat00 \ mat01)
+  mju_sub(res, mat11, tmp1, n1 * n1);
+}
+
 // compute skew symmetric matrix
 void SkewSymmetricMatrix(double* mat, const double* x) {
   mat[0] = 0.0;

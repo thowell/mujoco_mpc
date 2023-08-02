@@ -23,7 +23,7 @@ import numpy as np
 import pathlib
 
 import mujoco
-from mujoco_mpc import estimator as estimator_lib
+from mujoco_mpc import batch as batch_lib
 
 # %matplotlib inline
 np.set_printoptions(precision=5, suppress=True, linewidth=100)
@@ -37,7 +37,7 @@ data = mujoco.MjData(model)
 renderer = mujoco.Renderer(model)
 # %%
 configuration_length = 32
-estimator = estimator_lib.Estimator(
+batch = batch_lib.Estimator(
     model=model,
     configuration_length=configuration_length
 )
