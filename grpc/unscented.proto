@@ -47,9 +47,8 @@ message InitRequest {
 message InitResponse {}
 
 message Settings {
-  optional double epsilon = 1;
-  optional bool flg_centered = 2;
-  optional bool auto_timestep = 3;
+  optional double alpha = 1;
+  optional double beta = 2;
 }
 
 message SettingsRequest {

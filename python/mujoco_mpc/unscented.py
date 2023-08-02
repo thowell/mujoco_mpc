@@ -82,7 +82,7 @@ class Unscented:
     credentials = grpc.local_channel_credentials(grpc.LocalConnectionType.LOCAL_TCP)
     self.channel = grpc.secure_channel(f"localhost:{self.port}", credentials)
     grpc.channel_ready_future(self.channel).result(timeout=10)
-    self.stub = unscented_pb2_grpc.KALMANStub(self.channel)
+    self.stub = unscented_pb2_grpc.UnscentedStub(self.channel)
 
     # initialize
     self.init(
@@ -148,15 +148,13 @@ class Unscented:
 
   def settings(
       self,
-      epsilon: Optional[float] = None,
-      flg_centered: Optional[bool] = None,
-      auto_timestep: Optional[bool] = None,
-  ) -> dict[str, int | bool]:
+      alpha: Optional[float] = None,
+      beta: Optional[float] = None,
+  ) -> dict[str, float]:
     # assemble settings
     inputs = unscented_pb2.Settings(
-        epsilon=epsilon,
-        flg_centered=flg_centered,
-        auto_timestep=auto_timestep,
+        alpha=alpha,
+        beta=beta,
     )
 
     # settings request
@@ -169,9 +167,8 @@ class Unscented:
 
     # return all settings
     return {
-        "epsilon": settings.epsilon,
-        "flg_centered": settings.flg_centered,
-        "auto_timestep": settings.auto_timestep,
+        "alpha": settings.alpha,
+        "beta": settings.beta,
     }
 
   def update(

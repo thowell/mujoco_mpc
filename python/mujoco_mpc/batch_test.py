@@ -22,23 +22,6 @@ import pathlib
 
 
 class BatchTest(absltest.TestCase):
-
-  def test_initialized(self):
-    # load model
-    model_path = (
-        pathlib.Path(__file__).parent.parent.parent
-        / "mjpc/test/testdata/estimator/quadruped/task.xml"
-    )
-    model = mujoco.MjModel.from_xml_path(str(model_path))
-
-    # initialize
-    configuration_length = 5
-    batch = batch_lib.Batch(
-        model=model, configuration_length=configuration_length, send_as="mjb"
-    )
-
-    batch.data(0)["configuration"]
-
   def test_data(self):
     # load model
     model_path = (

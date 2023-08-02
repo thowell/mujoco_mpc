@@ -51,7 +51,6 @@ message InitResponse {}
 message Settings {
   optional double epsilon = 1;
   optional bool flg_centered = 2;
-  optional bool auto_timestep = 3;
 }
 
 message SettingsRequest {

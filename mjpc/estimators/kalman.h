@@ -130,7 +130,6 @@ class Kalman : public Estimator {
   struct Settings {
     double epsilon = 1.0e-6;
     bool flg_centered = false;
-    bool auto_timestep = false;
   } settings;
 
  private:

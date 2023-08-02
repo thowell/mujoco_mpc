@@ -146,22 +146,16 @@ grpc::Status UnscentedService::Settings(
   unscented::Settings* output = response->mutable_settings();
 
   // epsilon
-  if (input.has_epsilon()) {
-    unscented_.settings.epsilon = input.epsilon();
+  if (input.has_alpha()) {
+    unscented_.settings.alpha = input.alpha();
   }
-  output->set_epsilon(unscented_.settings.epsilon);
+  output->set_alpha(unscented_.settings.alpha);
 
-  // flg_centered
-  if (input.has_flg_centered()) {
-    unscented_.settings.flg_centered = input.flg_centered();
+  // beta
+  if (input.has_beta()) {
+    unscented_.settings.beta = input.beta();
   }
-  output->set_flg_centered(unscented_.settings.flg_centered);
-
-  // auto_timestep
-  if (input.has_auto_timestep()) {
-    unscented_.settings.auto_timestep = input.auto_timestep();
-  }
-  output->set_auto_timestep(unscented_.settings.auto_timestep);
+  output->set_beta(unscented_.settings.beta);
 
   return grpc::Status::OK;
 }

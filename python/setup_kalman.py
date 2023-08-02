@@ -90,7 +90,7 @@ class GenerateProtoGrpcCommand(setuptools.Command):
     self.spawn(["touch", str(kalman_proto_destination_path.parent / "__init__.py")])
 
 
-class CopyKALMANServerBinaryCommand(setuptools.Command):
+class CopyKalmanServerBinaryCommand(setuptools.Command):
   """Specialized setup command to copy `kalman_server` next to `kalman.py`.
 
   Assumes that the C++ gRPC `kalman_server` binary has been manually built and
@@ -287,7 +287,7 @@ setuptools.setup(
         "build_py": BuildPyCommand,
         "build_ext": BuildCMakeExtension,
         "generate_proto_grpc": GenerateProtoGrpcCommand,
-        "copy_kalman_server_binary": CopyKALMANServerBinaryCommand,
+        "copy_kalman_server_binary": CopyKalmanServerBinaryCommand,
         "copy_task_assets": CopyTaskAssetsCommand,
     },
     package_data={

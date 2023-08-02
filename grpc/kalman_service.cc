@@ -160,12 +160,6 @@ grpc::Status KalmanService::Settings(grpc::ServerContext* context,
   }
   output->set_flg_centered(kalman_.settings.flg_centered);
 
-  // auto_timestep 
-  if (input.has_auto_timestep()) {
-    kalman_.settings.auto_timestep = input.auto_timestep();
-  }
-  output->set_auto_timestep(kalman_.settings.auto_timestep);
-
   return grpc::Status::OK;
 }
 

@@ -21,7 +21,7 @@ import numpy as np
 import pathlib
 
 
-class KALMANTest(absltest.TestCase):
+class KalmanTest(absltest.TestCase):
 
   def test_settings(self):
     # load model
@@ -37,15 +37,13 @@ class KALMANTest(absltest.TestCase):
     # settings
     epsilon = 2.0
     flg_centered = True
-    auto_timestep = True
     settings = kalman.settings(
-        epsilon=epsilon, flg_centered=flg_centered, auto_timestep=auto_timestep
+        epsilon=epsilon, flg_centered=flg_centered
     )
 
     # test
     self.assertLess(np.abs(settings["epsilon"] - epsilon), 1.0e-5)
     self.assertTrue(settings["flg_centered"] == flg_centered)
-    self.assertTrue(settings["auto_timestep"] == auto_timestep)
 
   def test_updates(self):
     # load model

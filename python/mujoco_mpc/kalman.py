@@ -82,7 +82,7 @@ class Kalman:
     credentials = grpc.local_channel_credentials(grpc.LocalConnectionType.LOCAL_TCP)
     self.channel = grpc.secure_channel(f"localhost:{self.port}", credentials)
     grpc.channel_ready_future(self.channel).result(timeout=10)
-    self.stub = kalman_pb2_grpc.KALMANStub(self.channel)
+    self.stub = kalman_pb2_grpc.KalmanStub(self.channel)
 
     # initialize
     self.init(
@@ -150,13 +150,11 @@ class Kalman:
       self,
       epsilon: Optional[float] = None,
       flg_centered: Optional[bool] = None,
-      auto_timestep: Optional[bool] = None,
   ) -> dict[str, int | bool]:
     # assemble settings
     inputs = kalman_pb2.Settings(
         epsilon=epsilon,
         flg_centered=flg_centered,
-        auto_timestep=auto_timestep,
     )
 
     # settings request
@@ -171,7 +169,6 @@ class Kalman:
     return {
         "epsilon": settings.epsilon,
         "flg_centered": settings.flg_centered,
-        "auto_timestep": settings.auto_timestep,
     }
 
   def update_measurement(

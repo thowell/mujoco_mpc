@@ -90,7 +90,7 @@ class GenerateProtoGrpcCommand(setuptools.Command):
     self.spawn(["touch", str(unscented_proto_destination_path.parent / "__init__.py")])
 
 
-class CopyKALMANServerBinaryCommand(setuptools.Command):
+class CopyUnscentedServerBinaryCommand(setuptools.Command):
   """Specialized setup command to copy `unscented_server` next to `unscented.py`.
 
   Assumes that the C++ gRPC `unscented_server` binary has been manually built and
@@ -287,7 +287,7 @@ setuptools.setup(
         "build_py": BuildPyCommand,
         "build_ext": BuildCMakeExtension,
         "generate_proto_grpc": GenerateProtoGrpcCommand,
-        "copy_unscented_server_binary": CopyKALMANServerBinaryCommand,
+        "copy_unscented_server_binary": CopyUnscentedServerBinaryCommand,
         "copy_task_assets": CopyTaskAssetsCommand,
     },
     package_data={

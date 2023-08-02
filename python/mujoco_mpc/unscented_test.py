@@ -21,7 +21,7 @@ import numpy as np
 import pathlib
 
 
-class KALMANTest(absltest.TestCase):
+class UnscentedTest(absltest.TestCase):
 
   def test_settings(self):
     # load model
@@ -35,17 +35,16 @@ class KALMANTest(absltest.TestCase):
     unscented = unscented_lib.Unscented(model=model)
 
     # settings
-    epsilon = 2.0
-    flg_centered = True
-    auto_timestep = True
+    alpha = 7.0
+    beta = 1.4
+  
     settings = unscented.settings(
-        epsilon=epsilon, flg_centered=flg_centered, auto_timestep=auto_timestep
+        alpha=alpha, beta=beta
     )
 
     # test
-    self.assertLess(np.abs(settings["epsilon"] - epsilon), 1.0e-5)
-    self.assertTrue(settings["flg_centered"] == flg_centered)
-    self.assertTrue(settings["auto_timestep"] == auto_timestep)
+    self.assertLess(np.abs(settings["alpha"] - alpha), 1.0e-5)
+    self.assertLess(np.abs(settings["beta"] - beta), 1.0e-5)
 
   def test_update(self):
     # load model

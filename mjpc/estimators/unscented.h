@@ -146,10 +146,6 @@ class Unscented : public Estimator {
     double beta = 2.0; 
   } settings;
 
-  // sensor start
- 
-  
-
  private:
   // dimensions
   int nstate_;
