@@ -131,6 +131,8 @@ TEST(Batch, Box3Drot) {
 
   // initialize batch
   Batch batch(1);
+  batch.settings.time_scaling_force = false;
+  batch.settings.time_scaling_sensor = false;
   batch.Initialize(model);
   batch.Reset();
 

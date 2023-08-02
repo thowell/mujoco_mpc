@@ -15,7 +15,7 @@
 
 from absl.testing import absltest
 import mujoco
-from mujoco_mpc import kalman as kalman_lib
+from mujoco_mpc import unscented as unscented_lib
 import numpy as np
 
 import pathlib
@@ -32,13 +32,13 @@ class KALMANTest(absltest.TestCase):
     model = mujoco.MjModel.from_xml_path(str(model_path))
 
     # initialize
-    kalman = kalman_lib.Kalman(model=model)
+    unscented = unscented_lib.Unscented(model=model)
 
     # settings
     epsilon = 2.0
     flg_centered = True
     auto_timestep = True
-    settings = kalman.settings(
+    settings = unscented.settings(
         epsilon=epsilon, flg_centered=flg_centered, auto_timestep=auto_timestep
     )
 
@@ -47,7 +47,7 @@ class KALMANTest(absltest.TestCase):
     self.assertTrue(settings["flg_centered"] == flg_centered)
     self.assertTrue(settings["auto_timestep"] == auto_timestep)
 
-  def test_updates(self):
+  def test_update(self):
     # load model
     model_path = (
         pathlib.Path(__file__).parent.parent.parent
@@ -56,11 +56,11 @@ class KALMANTest(absltest.TestCase):
     model = mujoco.MjModel.from_xml_path(str(model_path))
 
     # initialize
-    kalman = kalman_lib.Kalman(model=model)
+    unscented = unscented_lib.Unscented(model=model)
 
     # state
     state = np.random.normal(scale=1.0, size=(model.nq + model.nv))
-    state_response = kalman.state(state=state)
+    state_response = unscented.state(state=state)
 
     # test state
     self.assertLess(np.linalg.norm(state_response - state), 1.0e-5)
@@ -69,7 +69,7 @@ class KALMANTest(absltest.TestCase):
     nvelocity = 2 * model.nv
     F = np.random.normal(scale=1.0, size=(nvelocity**2)).reshape(nvelocity, nvelocity)
     covariance = F.T @ F
-    covariance_response = kalman.covariance(covariance=covariance)
+    covariance_response = unscented.covariance(covariance=covariance)
 
     # test covariance
     self.assertLess(np.linalg.norm((covariance_response - covariance).ravel()), 1.0e-5)
@@ -78,7 +78,7 @@ class KALMANTest(absltest.TestCase):
     # noise
     process = np.random.normal(scale=1.0e-3, size=nvelocity)
     sensor = np.random.normal(scale=1.0e-3, size=model.nsensordata)
-    noise = kalman.noise(process=process, sensor=sensor)
+    noise = unscented.noise(process=process, sensor=sensor)
 
     # test noise
     self.assertLess(np.linalg.norm(noise["process"] - process), 1.0e-5)
@@ -87,16 +87,12 @@ class KALMANTest(absltest.TestCase):
     # measurement update
     ctrl = np.random.normal(scale=1.0, size=model.nu)
     sensor = np.random.normal(scale=1.0, size=model.nsensordata)
-    kalman.update_measurement(ctrl=ctrl, sensor=sensor)
-
-    # # prediction update
-    kalman.update_prediction()
+    unscented.update(ctrl=ctrl, sensor=sensor)
 
     # timers
-    timer = kalman.timers()
+    timer = unscented.timers()
 
-    self.assertTrue(timer["measurement"] > 0.0)
-    self.assertTrue(timer["prediction"] > 0.0)
+    self.assertTrue(timer["update"] > 0.0)
 
 if __name__ == "__main__":
   absltest.main()

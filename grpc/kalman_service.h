@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// An implementation of the `KALMAN` gRPC service.
+// An implementation of the `Kalman` gRPC service.
 
 #ifndef GRPC_KALMAN_SERVICE_H
 #define GRPC_KALMAN_SERVICE_H
@@ -32,10 +32,10 @@
 
 namespace kalman_grpc {
 
-class KALMANService final : public kalman::KALMAN::Service {
+class KalmanService final : public kalman::Kalman::Service {
  public:
-  explicit KALMANService() : thread_pool_(1) {}
-  ~KALMANService();
+  explicit KalmanService() : thread_pool_(1) {}
+  ~KalmanService();
 
   grpc::Status Init(grpc::ServerContext* context,
                     const kalman::InitRequest* request,

@@ -13,7 +13,7 @@
 # limitations under the License.
 # ==============================================================================
 
-"""Python interface for interface with Kalman."""
+"""Python interface for interface with Unscented."""
 
 import atexit
 import os
@@ -30,8 +30,8 @@ import numpy as np
 from numpy import typing as npt
 
 # INTERNAL IMPORT
-from mujoco_mpc.proto import kalman_pb2
-from mujoco_mpc.proto import kalman_pb2_grpc
+from mujoco_mpc.proto import unscented_pb2
+from mujoco_mpc.proto import unscented_pb2_grpc
 
 
 def find_free_port() -> int:
@@ -49,8 +49,8 @@ def find_free_port() -> int:
     return s.getsockname()[1]
 
 
-class Kalman:
-  """`Kalman` class to interface with MuJoCo MPC kalman.
+class Unscented:
+  """`Unscented` class to interface with MuJoCo MPC unscented.
 
   Attributes:
     port:
@@ -68,7 +68,7 @@ class Kalman:
   ):
     # server
     if server_binary_path is None:
-      binary_name = "kalman_server"
+      binary_name = "unscented_server"
       server_binary_path = pathlib.Path(__file__).parent / "mjpc" / binary_name
     self._colab_logging = colab_logging
     self.port = find_free_port()
@@ -82,7 +82,7 @@ class Kalman:
     credentials = grpc.local_channel_credentials(grpc.LocalConnectionType.LOCAL_TCP)
     self.channel = grpc.secure_channel(f"localhost:{self.port}", credentials)
     grpc.channel_ready_future(self.channel).result(timeout=10)
-    self.stub = kalman_pb2_grpc.KALMANStub(self.channel)
+    self.stub = unscented_pb2_grpc.KALMANStub(self.channel)
 
     # initialize
     self.init(
@@ -125,14 +125,14 @@ class Kalman:
 
     if model is not None:
       if send_as == "mjb":
-        model_message = kalman_pb2.MjModel(mjb=model_to_mjb(model))
+        model_message = unscented_pb2.MjModel(mjb=model_to_mjb(model))
       else:
-        model_message = kalman_pb2.MjModel(xml=model_to_xml(model))
+        model_message = unscented_pb2.MjModel(xml=model_to_xml(model))
     else:
       model_message = None
 
     # initialize request
-    init_request = kalman_pb2.InitRequest(
+    init_request = unscented_pb2.InitRequest(
         model=model_message,
     )
 
@@ -141,7 +141,7 @@ class Kalman:
 
   def reset(self):
     # reset request
-    request = kalman_pb2.ResetRequest()
+    request = unscented_pb2.ResetRequest()
 
     # reset response
     self._wait(self.stub.Reset.future(request))
@@ -153,14 +153,14 @@ class Kalman:
       auto_timestep: Optional[bool] = None,
   ) -> dict[str, int | bool]:
     # assemble settings
-    inputs = kalman_pb2.Settings(
+    inputs = unscented_pb2.Settings(
         epsilon=epsilon,
         flg_centered=flg_centered,
         auto_timestep=auto_timestep,
     )
 
     # settings request
-    request = kalman_pb2.SettingsRequest(
+    request = unscented_pb2.SettingsRequest(
         settings=inputs,
     )
 
@@ -174,44 +174,36 @@ class Kalman:
         "auto_timestep": settings.auto_timestep,
     }
 
-  def update_measurement(
+  def update(
       self, ctrl: Optional[npt.ArrayLike] = [], sensor: Optional[npt.ArrayLike] = []
   ):
     # request
-    request = kalman_pb2.UpdateMeasurementRequest(
+    request = unscented_pb2.UpdateRequest(
         ctrl=ctrl,
         sensor=sensor,
     )
 
     # response
-    self._wait(self.stub.UpdateMeasurement.future(request))
-
-  def update_prediction(self):
-    # request
-    request = kalman_pb2.UpdatePredictionRequest()
-
-    # response
-    self._wait(self.stub.UpdatePrediction.future(request))
+    self._wait(self.stub.Update.future(request))
 
   def timers(self) -> dict[str, float]:
     # request
-    request = kalman_pb2.TimersRequest()
+    request = unscented_pb2.TimersRequest()
 
     # response
     response = self._wait(self.stub.Timers.future(request))
 
     # timers
     return {
-        "measurement": response.measurement,
-        "prediction": response.prediction,
+        "update": response.update,
     }
 
   def state(self, state: Optional[npt.ArrayLike] = []) -> np.ndarray:
     # input
-    input = kalman_pb2.State(state=state)
+    input = unscented_pb2.State(state=state)
 
     # request
-    request = kalman_pb2.StateRequest(
+    request = unscented_pb2.StateRequest(
         state=input,
     )
 
@@ -223,12 +215,12 @@ class Kalman:
 
   def covariance(self, covariance: Optional[npt.ArrayLike] = None) -> np.ndarray:
     # input
-    inputs = kalman_pb2.Covariance(
+    inputs = unscented_pb2.Covariance(
         covariance=covariance.flatten() if covariance is not None else None,
     )
 
     # request
-    request = kalman_pb2.CovarianceRequest(
+    request = unscented_pb2.CovarianceRequest(
         covariance=inputs,
     )
 
@@ -242,13 +234,13 @@ class Kalman:
       self, process: Optional[npt.ArrayLike] = [], sensor: Optional[npt.ArrayLike] = []
   ) -> dict[str, np.ndarray]:
     # inputs
-    inputs = kalman_pb2.Noise(
+    inputs = unscented_pb2.Noise(
         process=process,
         sensor=sensor,
     )
 
     # request
-    request = kalman_pb2.NoiseRequest(
+    request = unscented_pb2.NoiseRequest(
         noise=inputs,
     )
 

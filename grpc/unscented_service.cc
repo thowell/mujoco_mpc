@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "grpc/kalman_service.h"
+#include "grpc/unscented_service.h"
 
 #include <absl/log/check.h>
 #include <absl/status/status.h>
@@ -27,29 +27,27 @@
 #include <string_view>
 #include <vector>
 
-#include "grpc/kalman.pb.h"
-#include "mjpc/estimators/kalman.h"
+#include "grpc/unscented.pb.h"
+#include "mjpc/estimators/unscented.h"
 
-namespace kalman_grpc {
+namespace unscented_grpc {
 
-using ::kalman::CovarianceRequest;
-using ::kalman::CovarianceResponse;
-using ::kalman::InitRequest;
-using ::kalman::InitResponse;
-using ::kalman::NoiseRequest;
-using ::kalman::NoiseResponse;
-using ::kalman::ResetRequest;
-using ::kalman::ResetResponse;
-using ::kalman::SettingsRequest;
-using ::kalman::SettingsResponse;
-using ::kalman::StateRequest;
-using ::kalman::StateResponse;
-using ::kalman::TimersRequest;
-using ::kalman::TimersResponse;
-using ::kalman::UpdateMeasurementRequest;
-using ::kalman::UpdateMeasurementResponse;
-using ::kalman::UpdatePredictionRequest;
-using ::kalman::UpdatePredictionResponse;
+using ::unscented::CovarianceRequest;
+using ::unscented::CovarianceResponse;
+using ::unscented::InitRequest;
+using ::unscented::InitResponse;
+using ::unscented::NoiseRequest;
+using ::unscented::NoiseResponse;
+using ::unscented::ResetRequest;
+using ::unscented::ResetResponse;
+using ::unscented::SettingsRequest;
+using ::unscented::SettingsResponse;
+using ::unscented::StateRequest;
+using ::unscented::StateResponse;
+using ::unscented::TimersRequest;
+using ::unscented::TimersResponse;
+using ::unscented::UpdateRequest;
+using ::unscented::UpdateResponse;
 
 // TODO(taylor): make CheckSize utility function
 namespace {
@@ -73,12 +71,11 @@ absl::Status CheckSize(std::string_view name, int model_size, int vector_size) {
     }                                                         \
   }
 
-KalmanService::~KalmanService() {}
+UnscentedService::~UnscentedService() {}
 
-grpc::Status KalmanService::Init(grpc::ServerContext* context,
-                              const kalman::InitRequest* request,
-                              kalman::InitResponse* response) {
-
+grpc::Status UnscentedService::Init(grpc::ServerContext* context,
+                                    const unscented::InitRequest* request,
+                                    unscented::InitResponse* response) {
   // ----- initialize with model ----- //
   mjpc::UniqueMjModel tmp_model = {nullptr, mj_deleteModel};
 
@@ -114,123 +111,109 @@ grpc::Status KalmanService::Init(grpc::ServerContext* context,
   }
 
   // move
-  kalman_model_override_ = std::move(tmp_model);
-  mjModel* model = kalman_model_override_.get();
+  unscented_model_override_ = std::move(tmp_model);
+  mjModel* model = unscented_model_override_.get();
 
-  // initialize kalman
-  kalman_.Initialize(model);
-  kalman_.Reset();
+  // initialize unscented
+  unscented_.Initialize(model);
+  unscented_.Reset();
 
   return grpc::Status::OK;
 }
 
-grpc::Status KalmanService::Reset(grpc::ServerContext* context,
-                               const kalman::ResetRequest* request,
-                               kalman::ResetResponse* response) {
+grpc::Status UnscentedService::Reset(grpc::ServerContext* context,
+                                     const unscented::ResetRequest* request,
+                                     unscented::ResetResponse* response) {
   if (!Initialized()) {
     return {grpc::StatusCode::FAILED_PRECONDITION, "Init not called."};
   }
 
   // reset
-  kalman_.Reset();
+  unscented_.Reset();
 
   return grpc::Status::OK;
 }
 
-grpc::Status KalmanService::Settings(grpc::ServerContext* context,
-                                  const kalman::SettingsRequest* request,
-                                  kalman::SettingsResponse* response) {
+grpc::Status UnscentedService::Settings(
+    grpc::ServerContext* context, const unscented::SettingsRequest* request,
+    unscented::SettingsResponse* response) {
   if (!Initialized()) {
     return {grpc::StatusCode::FAILED_PRECONDITION, "Init not called."};
   }
 
   // settings
-  kalman::Settings input = request->settings();
-  kalman::Settings* output = response->mutable_settings();
+  unscented::Settings input = request->settings();
+  unscented::Settings* output = response->mutable_settings();
 
-  // epsilon 
+  // epsilon
   if (input.has_epsilon()) {
-    kalman_.settings.epsilon = input.epsilon();
+    unscented_.settings.epsilon = input.epsilon();
   }
-  output->set_epsilon(kalman_.settings.epsilon);
+  output->set_epsilon(unscented_.settings.epsilon);
 
-  // flg_centered 
+  // flg_centered
   if (input.has_flg_centered()) {
-    kalman_.settings.flg_centered = input.flg_centered();
+    unscented_.settings.flg_centered = input.flg_centered();
   }
-  output->set_flg_centered(kalman_.settings.flg_centered);
+  output->set_flg_centered(unscented_.settings.flg_centered);
 
-  // auto_timestep 
+  // auto_timestep
   if (input.has_auto_timestep()) {
-    kalman_.settings.auto_timestep = input.auto_timestep();
+    unscented_.settings.auto_timestep = input.auto_timestep();
   }
-  output->set_auto_timestep(kalman_.settings.auto_timestep);
+  output->set_auto_timestep(unscented_.settings.auto_timestep);
 
   return grpc::Status::OK;
 }
 
-grpc::Status KalmanService::UpdateMeasurement(
-    grpc::ServerContext* context, const kalman::UpdateMeasurementRequest* request,
-    kalman::UpdateMeasurementResponse* response) {
+grpc::Status UnscentedService::Update(
+    grpc::ServerContext* context,
+    const unscented::UpdateRequest* request,
+    unscented::UpdateResponse* response) {
   if (!Initialized()) {
     return {grpc::StatusCode::FAILED_PRECONDITION, "Init not called."};
   }
 
-  // measurement update
-  kalman_.UpdateMeasurement(request->ctrl().data(), request->sensor().data());
+  // update
+  unscented_.Update(request->ctrl().data(),
+                               request->sensor().data());
 
   return grpc::Status::OK;
 }
 
-grpc::Status KalmanService::UpdatePrediction(
-    grpc::ServerContext* context, const kalman::UpdatePredictionRequest* request,
-    kalman::UpdatePredictionResponse* response) {
+grpc::Status UnscentedService::Timers(grpc::ServerContext* context,
+                                      const unscented::TimersRequest* request,
+                                      unscented::TimersResponse* response) {
   if (!Initialized()) {
     return {grpc::StatusCode::FAILED_PRECONDITION, "Init not called."};
   }
 
-  // prediction update 
-  kalman_.UpdatePrediction();
+  // measurement
+  response->set_update(unscented_.TimerUpdate());
 
   return grpc::Status::OK;
 }
 
-grpc::Status KalmanService::Timers(grpc::ServerContext* context,
-                                const kalman::TimersRequest* request,
-                                kalman::TimersResponse* response) {
-  if (!Initialized()) {
-    return {grpc::StatusCode::FAILED_PRECONDITION, "Init not called."};
-  }
-
-  // measurement 
-  response->set_measurement(kalman_.TimerMeasurement());
-
-  // prediction
-  response->set_prediction(kalman_.TimerPrediction());
-
-  return grpc::Status::OK;
-}
-
-grpc::Status KalmanService::State(grpc::ServerContext* context,
-                               const kalman::StateRequest* request,
-                               kalman::StateResponse* response) {
+grpc::Status UnscentedService::State(grpc::ServerContext* context,
+                                     const unscented::StateRequest* request,
+                                     unscented::StateResponse* response) {
   if (!Initialized()) {
     return {grpc::StatusCode::FAILED_PRECONDITION, "Init not called."};
   }
 
   // unpack input/output
-  kalman::State input = request->state();
-  kalman::State* output = response->mutable_state();
+  unscented::State input = request->state();
+  unscented::State* output = response->mutable_state();
 
   // set state
-  int nstate = kalman_.model->nq + kalman_.model->nv;
+  int nstate = unscented_.model->nq + unscented_.model->nv;
   if (input.state_size() > 0) {
     CHECK_SIZE("state", nstate, input.state_size());
-    mju_copy(kalman_.state.data(), input.state().data(), nstate);
+    mju_copy(unscented_.state.data(), input.state().data(), nstate);
   }
 
   // get state
-  double* state = kalman_.state.data();
+  double* state = unscented_.state.data();
   for (int i = 0; i < nstate; i++) {
     output->add_state(state[i]);
   }
@@ -238,32 +221,33 @@ grpc::Status KalmanService::State(grpc::ServerContext* context,
   return grpc::Status::OK;
 }
 
-grpc::Status KalmanService::Covariance(grpc::ServerContext* context,
-                                    const kalman::CovarianceRequest* request,
-                                    kalman::CovarianceResponse* response) {
+grpc::Status UnscentedService::Covariance(
+    grpc::ServerContext* context, const unscented::CovarianceRequest* request,
+    unscented::CovarianceResponse* response) {
   if (!Initialized()) {
     return {grpc::StatusCode::FAILED_PRECONDITION, "Init not called."};
   }
 
   // unpack input/output
-  kalman::Covariance input = request->covariance();
-  kalman::Covariance* output = response->mutable_covariance();
+  unscented::Covariance input = request->covariance();
+  unscented::Covariance* output = response->mutable_covariance();
 
   // dimensions
-  int nvelocity = 2 * kalman_.model->nv;
+  int nvelocity = 2 * unscented_.model->nv;
   int ncovariance = nvelocity * nvelocity;
 
-  // set dimension 
+  // set dimension
   output->set_dimension(nvelocity);
 
   // set covariance
   if (input.covariance_size() > 0) {
     CHECK_SIZE("covariance", ncovariance, input.covariance_size());
-    mju_copy(kalman_.covariance.data(), input.covariance().data(), ncovariance);
+    mju_copy(unscented_.covariance.data(), input.covariance().data(),
+             ncovariance);
   }
 
   // get covariance
-  double* covariance = kalman_.covariance.data();
+  double* covariance = unscented_.covariance.data();
   for (int i = 0; i < ncovariance; i++) {
     output->add_covariance(covariance[i]);
   }
@@ -271,29 +255,29 @@ grpc::Status KalmanService::Covariance(grpc::ServerContext* context,
   return grpc::Status::OK;
 }
 
-grpc::Status KalmanService::Noise(grpc::ServerContext* context,
-                               const kalman::NoiseRequest* request,
-                               kalman::NoiseResponse* response) {
+grpc::Status UnscentedService::Noise(grpc::ServerContext* context,
+                                     const unscented::NoiseRequest* request,
+                                     unscented::NoiseResponse* response) {
   if (!Initialized()) {
     return {grpc::StatusCode::FAILED_PRECONDITION, "Init not called."};
   }
 
   // unpack input/output
-  kalman::Noise input = request->noise();
-  kalman::Noise* output = response->mutable_noise();
+  unscented::Noise input = request->noise();
+  unscented::Noise* output = response->mutable_noise();
 
   // dimensions
-  int nprocess = 2 * kalman_.model->nv;
-  int nsensor = kalman_.model->nsensordata;
+  int nprocess = 2 * unscented_.model->nv;
+  int nsensor = unscented_.model->nsensordata;
 
   // set process noise
   if (input.process_size() > 0) {
     CHECK_SIZE("process noise", nprocess, input.process_size());
-    mju_copy(kalman_.noise_process.data(), input.process().data(), nprocess);
+    mju_copy(unscented_.noise_process.data(), input.process().data(), nprocess);
   }
 
   // get process noise
-  double* process = kalman_.noise_process.data();
+  double* process = unscented_.noise_process.data();
   for (int i = 0; i < nprocess; i++) {
     output->add_process(process[i]);
   }
@@ -301,11 +285,11 @@ grpc::Status KalmanService::Noise(grpc::ServerContext* context,
   // set sensor noise
   if (input.sensor_size() > 0) {
     CHECK_SIZE("sensor noise", nsensor, input.sensor_size());
-    mju_copy(kalman_.noise_sensor.data(), input.sensor().data(), nsensor);
+    mju_copy(unscented_.noise_sensor.data(), input.sensor().data(), nsensor);
   }
 
   // get sensor noise
-  double* sensor = kalman_.noise_sensor.data();
+  double* sensor = unscented_.noise_sensor.data();
   for (int i = 0; i < nsensor; i++) {
     output->add_sensor(sensor[i]);
   }
@@ -315,4 +299,4 @@ grpc::Status KalmanService::Noise(grpc::ServerContext* context,
 
 #undef CHECK_SIZE
 
-}  // namespace kalman_grpc
+}  // namespace unscented_grpc

@@ -14,26 +14,24 @@
 
 syntax = "proto3";
 
-package kalman;
+package unscented;
 
-service Kalman {
-  // Initialize Kalman
+service Unscented {
+  // Initialize Unscented
   rpc Init(InitRequest) returns (InitResponse);
-  // Reset Kalman
+  // Reset Unscented
   rpc Reset(ResetRequest) returns (ResetResponse);
-  // Kalman settings
+  // Unscented settings
   rpc Settings(SettingsRequest) returns (SettingsResponse);
-  // Kalman measurement update 
-  rpc UpdateMeasurement(UpdateMeasurementRequest) returns (UpdateMeasurementResponse);
-  // Kalman prediction update 
-  rpc UpdatePrediction(UpdatePredictionRequest) returns (UpdatePredictionResponse);
-  // Kalman timers 
+  // Unscented update 
+  rpc Update(UpdateRequest) returns (UpdateResponse);
+  // Unscented timers 
   rpc Timers(TimersRequest) returns (TimersResponse);
-  // Kalman state 
+  // Unscented state 
   rpc State(StateRequest) returns (StateResponse);
-  // Kalman covariance 
+  // Unscented covariance 
   rpc Covariance(CovarianceRequest) returns (CovarianceResponse);
-  // Kalman noise 
+  // Unscented noise 
   rpc Noise(NoiseRequest) returns (NoiseResponse);
 }
 
@@ -66,22 +64,17 @@ message ResetRequest {}
 
 message ResetResponse {}
 
-message UpdateMeasurementRequest {
+message UpdateRequest {
   repeated double ctrl = 1 [packed = true];
   repeated double sensor = 2 [packed = true];
 } 
 
-message UpdateMeasurementResponse {} 
-
-message UpdatePredictionRequest {} 
-
-message UpdatePredictionResponse {}
+message UpdateResponse {} 
 
 message TimersRequest {}
 
 message TimersResponse {
-  double measurement = 1;
-  double prediction = 2;
+  double update = 1;
 }
 
 message State {
