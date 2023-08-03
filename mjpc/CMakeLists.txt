@@ -106,6 +106,8 @@ add_library(
   estimators/buffer.h
   estimators/estimator.cc
   estimators/estimator.h
+  estimators/kalman.cc
+  estimators/kalman.h
   estimators/trajectory.h
   app.cc
   app.h
