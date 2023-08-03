@@ -369,6 +369,17 @@ void ZeroBlockInMatrix(double* mat, int rm, int cm, int rb, int cb, int ri,
 // square dense to block band matrix
 void DenseToBlockBand(double* res, int dim, int dblock, int nblock);
 
+// determinant of 3x3 matrix 
+double Determinant3(const double* mat);
+
+// inverse of 3x3 matrix 
+void Inverse3(double* res, const double* mat);
+
+// principal eigenvector of 4x4 matrix
+// QUEST: "Three-Axis Attitude Determination from Vector Observations"
+void PrincipalEigenVector4(double* res, const double* mat,
+                           double eigenvalue_init = 12.0);
+
 }  // namespace mjpc
 
 #endif  // MJPC_UTILITIES_H_

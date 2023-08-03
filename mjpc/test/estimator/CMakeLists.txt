@@ -32,3 +32,6 @@ target_link_libraries(estimator_trajectory_test gmock)
 
 test(estimator_utilities_test)
 target_link_libraries(estimator_utilities_test load gmock)
+
+test(unscented_test)
+target_link_libraries(unscented_test load gmock)

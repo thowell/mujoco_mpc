@@ -106,6 +106,8 @@ add_library(
   estimators/buffer.h
   estimators/estimator.cc
   estimators/estimator.h
+  estimators/unscented.cc
+  estimators/unscented.h
   estimators/trajectory.h
   app.cc
   app.h
