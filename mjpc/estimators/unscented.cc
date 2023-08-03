@@ -469,6 +469,7 @@ void Unscented::Update(const double* ctrl, const double* sensor) {
 
   // check failure
   if (rank < nsensordata_) {
+    // TODO(taylor): remove and return status
     mju_error("covariance sensor factorization failure (%i / %i)\n", rank,
               nsensordata_);
   }
