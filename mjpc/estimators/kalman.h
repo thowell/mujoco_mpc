@@ -25,6 +25,10 @@
 
 namespace mjpc {
 
+// maximum terms
+inline constexpr int kMaxProcessNoise = 1028;
+inline constexpr int kMaxSensorNoise = 1028;
+
 // https://stanford.edu/class/ee363/lectures/kf.pdf
 class Kalman {
  public:

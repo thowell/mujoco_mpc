@@ -369,6 +369,9 @@ void ZeroBlockInMatrix(double* mat, int rm, int cm, int rb, int cb, int ri,
 // square dense to block band matrix
 void DenseToBlockBand(double* res, int dim, int dblock, int nblock);
 
+// trace of square matrix 
+double Trace(const double* mat, int n);
+
 }  // namespace mjpc
 
 #endif  // MJPC_UTILITIES_H_
