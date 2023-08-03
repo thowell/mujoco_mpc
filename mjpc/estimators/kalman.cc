@@ -32,7 +32,6 @@ void Kalman::Initialize(const mjModel* model) {
   this->model = mj_copyModel(nullptr, model);
 
   // data
-  if (this->data_) mj_deleteData(this->data_);
   data_ = mj_makeData(model);
 
   // timestep

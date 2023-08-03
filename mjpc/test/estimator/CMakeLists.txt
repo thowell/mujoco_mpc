@@ -34,4 +34,4 @@ test(estimator_utilities_test)
 target_link_libraries(estimator_utilities_test load gmock)
 
 test(kalman_test)
-target_link_libraries(kalman_test load gmock)
+target_link_libraries(kalman_test load simulation gmock)
