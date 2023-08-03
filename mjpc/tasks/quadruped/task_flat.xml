@@ -31,10 +31,10 @@
     <numeric name="residual_Heading" data="0 -3.14 3.14" />
 
     <!-- estimator -->
-    <!-- <numeric name="estimator" data="0" /> -->
+    <numeric name="estimator" data="0" />
     <numeric name="estimator_sensor_start" data="9" />
-    <numeric name="estimator_number_sensor" data="34" />
-    <numeric name="estimator_timestep" data="0.005" />
+    <numeric name="estimator_number_sensor" data="17" />
+    <numeric name="estimator_timestep" data="0.0075" />
   </custom>
 
   <visual>
@@ -125,7 +125,7 @@
     <jointpos name="pos_RL_thigh_joint" joint="RL_thigh_joint" />
     <jointpos name="pos_RL_calf_joint" joint="RL_calf_joint" />
 
-    <framelinvel name="vtorso_pos" objtype="site" objname="torso" />
+    <!-- <framelinvel name="vtorso_pos" objtype="site" objname="torso" />
     <framelinvel name="vFR_pos" objtype="site" objname="FR" />
     <framelinvel name="vFL_pos" objtype="site" objname="FL" />
     <framelinvel name="vRR_pos" objtype="site" objname="RR" />
@@ -141,7 +141,7 @@
     <jointvel name="vpos_RR_calf_joint" joint="RR_calf_joint" />
     <jointvel name="vpos_RL_hip_joint" joint="RL_hip_joint" />
     <jointvel name="vpos_RL_thigh_joint" joint="RL_thigh_joint" />
-    <jointvel name="vpos_RL_calf_joint" joint="RL_calf_joint" />
+    <jointvel name="vpos_RL_calf_joint" joint="RL_calf_joint" /> -->
 
     <!-- trace -->
     <framepos      name="trace0" objtype="site" objname="head"/>

@@ -15,7 +15,7 @@
     <numeric name="residual_Speed" data="0.5 -3.0 3.0" />
 
     <!-- estimator -->
-    <!-- <numeric name="estimator" data="0" /> -->
+    <numeric name="estimator" data="0" />
     <numeric name="estimator_sensor_start" data="8" />
     <numeric name="estimator_number_sensor" data="26" />
     <numeric name="estimator_timestep" data="0.0075" />
