@@ -259,6 +259,7 @@ void Unscented::SigmaPoints() {
 
   // check failure
   if (rank < ndstate_) {
+    // TODO(taylor): remove and return status
     mju_error("covariance factorization failure: (%i / %i)\n", rank, ndstate_);
   }
 

@@ -197,6 +197,7 @@ void Kalman::UpdateMeasurement(const double* ctrl, const double* sensor) {
   // factorize: C * P * C' + R
   int rank = mju_cholFactor(tmp1_.data(), nsensordata_, 0.0);
   if (rank < nsensordata_) {
+    // TODO(taylor): remove and return status
     mju_error("measurement update rank: (%i / %i)\n", rank, nsensordata_);
   }
 
