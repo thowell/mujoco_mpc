@@ -106,6 +106,8 @@ message Settings {
   optional bool assemble_force_jacobian = 24; 
   optional bool assemble_sensor_norm_hessian = 25; 
   optional bool assemble_force_norm_hessian = 26;
+  optional bool filter = 27;
+  optional bool recursive_prior_update = 28;
 }
 
 message SettingsRequest {

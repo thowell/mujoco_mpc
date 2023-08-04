@@ -498,6 +498,18 @@ grpc::Status BatchService::Settings(
   }
   output->set_assemble_force_norm_hessian(batch_.settings.assemble_force_norm_hessian);
 
+  // filter mode 
+  if (input.has_filter()) {
+    batch_.settings.filter = input.filter();
+  }
+  output->set_filter(batch_.settings.filter);
+
+  // recursive prior update 
+  if (input.has_recursive_prior_update()) {
+    batch_.settings.recursive_prior_update = input.recursive_prior_update();
+  }
+  output->set_recursive_prior_update(batch_.settings.recursive_prior_update);
+
   return grpc::Status::OK;
 }
 

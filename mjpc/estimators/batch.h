@@ -288,6 +288,7 @@ class Batch : public Estimator {
     bool assemble_sensor_norm_hessian = false;    // assemble dense sensor norm Hessian 
     bool assemble_force_norm_hessian = false;     // assemble dense force norm Hessian
     bool filter = false;                          // filter mode
+    bool recursive_prior_update = false;          // recursively update prior matrix
   } settings;
   
   // finite-difference settings
@@ -398,6 +399,8 @@ class Batch : public Estimator {
   double cost_initial_;
   double cost_previous_;
 
+  // TODO(taylor): underscore
+
   // cost gradient
   std::vector<double> cost_gradient;          // nv * max_history_
 
@@ -507,6 +510,14 @@ class Batch : public Estimator {
   std::vector<double> prior_matrix_factor_;    // (nv * max_history_) * (nv * max_history_)
   std::vector<double> scratch0_covariance_;    // (nv * max_history_) * (nv * max_history_)
   std::vector<double> scratch1_covariance_;    // (nv * max_history_) * (nv * max_history_)
+
+  // conditioned matrix 
+  std::vector<double> mat00_;
+  std::vector<double> mat10_;
+  std::vector<double> mat11_;
+  std::vector<double> condmat_;
+  std::vector<double> scratch0_condmat_;
+  std::vector<double> scratch1_condmat_;
 
   // status (internal)
   int cost_count_;                          // number of cost evaluations

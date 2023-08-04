@@ -252,6 +252,14 @@ void Batch::Initialize(const mjModel* model) {
   scratch0_covariance_.resize((nv * max_history_) * (nv * max_history_));
   scratch1_covariance_.resize((nv * max_history_) * (nv * max_history_));
 
+  // conditioned matrix 
+  mat00_.resize((nv * max_history_) * (nv * max_history_));
+  mat10_.resize((nv * max_history_) * (nv * max_history_));
+  mat11_.resize((nv * max_history_) * (nv * max_history_));
+  condmat_.resize((nv * max_history_) * (nv * max_history_));
+  scratch0_condmat_.resize((nv * max_history_) * (nv * max_history_));
+  scratch1_condmat_.resize((nv * max_history_) * (nv * max_history_));
+
   // regularization
   regularization_ = settings.regularization_initial;
 
@@ -456,6 +464,14 @@ void Batch::Reset() {
   std::fill(scratch0_covariance_.begin(), scratch0_covariance_.end(), 0.0);
   std::fill(scratch1_covariance_.begin(), scratch1_covariance_.end(), 0.0);
 
+  // conditioned matrix 
+  std::fill(mat00_.begin(), mat00_.end(), 0.0);
+  std::fill(mat10_.begin(), mat10_.end(), 0.0);
+  std::fill(mat11_.begin(), mat11_.end(), 0.0);
+  std::fill(condmat_.begin(), condmat_.end(), 0.0);
+  std::fill(scratch0_condmat_.begin(), scratch0_condmat_.end(), 0.0);
+  std::fill(scratch1_condmat_.begin(), scratch1_condmat_.end(), 0.0);
+
   // timer
   std::fill(timer_.prior_step.begin(), timer_.prior_step.end(), 0.0);
   std::fill(timer_.sensor_step.begin(), timer_.sensor_step.end(), 0.0);
@@ -611,7 +627,23 @@ void Batch::Update(const double* ctrl, const double* sensor) {
   time = d->time;
 
   // update prior weights
-  // TODO(taylor)
+  if (settings.recursive_prior_update) {
+    // dimension
+    int nvar = nv * configuration_length_;
+
+    // compute conditioned matrix
+    double* condmat = condmat_.data();
+    ConditionMatrix(condmat, cost_hessian.data(), mat00_.data(), mat10_.data(),
+                    mat11_.data(), scratch0_condmat_.data(),
+                    scratch1_condmat_.data(), nvar, nv, 2 * nv);
+
+    // zero prior weights
+    double* weights = weight_prior.data();
+    mju_zero(weights, nvar * nvar);
+
+    // set conditioned matrix in prior weights
+    SetBlockInMatrix(weights, condmat, 1.0, nvar, nvar, 2 * nv, 2 * nv, 0, 0);
+  }
 
   // shift trajectories
   Shift(1);
