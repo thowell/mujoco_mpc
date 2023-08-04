@@ -488,9 +488,11 @@ void Batch::Reset() {
 
   // -- initialize -- //
   if (settings.filter) {
-    settings.gradient_tolerance = 1.0e-8;
+    settings.gradient_tolerance = 1.0e-5;
     settings.max_smoother_iterations = 1;
     settings.max_search_iterations = 10;
+    settings.recursive_prior_update = true;
+    scale_prior = 1.0e-1;
 
     // timestep
     double timestep = model->opt.timestep;
