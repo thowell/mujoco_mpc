@@ -1,9 +1,8 @@
 <h1>
   <a href="#"><img alt="MuJoCo MPC" src="docs/assets/banner.png" width="100%"></a>
 </h1>
-
+[![Paper](http://img.shields.io/badge/arXiv-2212.00541-B31B1B.svg)](https://arxiv.org/abs/2212.00541)
 <p>
-  [![Paper](http://img.shields.io/badge/arXiv-2212.00541-B31B1B.svg)](https://arxiv.org/abs/2212.00541)
   <a href="https://github.com/deepmind/mujoco_mpc/actions/workflows/build.yml?query=branch%3Amain" alt="GitHub Actions">
     <img src="https://img.shields.io/github/actions/workflow/status/deepmind/mujoco_mpc/build.yml?branch=main">
   </a>
