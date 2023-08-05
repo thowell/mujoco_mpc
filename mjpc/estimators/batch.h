@@ -63,8 +63,9 @@ class Batch : public Estimator {
   Batch() = default;
   Batch(int mode) {
     settings.filter = mode;
+    max_history_ = 10;
   }
-  Batch(const mjModel* model, int length=3, int max_history_=0) {
+  Batch(const mjModel* model, int length=3, int max_history_=10) {
     // set max history length
     this->max_history_ = (max_history_ == 0 ? length : max_history_);
 
@@ -296,6 +297,9 @@ class Batch : public Estimator {
     double tolerance = 1.0e-7;
     bool flg_actuation = 1;
   } finite_difference;
+
+  // filter mode status 
+  int current_time_index;
 
  private:
   // convert sequence of configurations to velocities, accelerations

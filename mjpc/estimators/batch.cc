@@ -81,6 +81,11 @@ void Batch::Initialize(const mjModel* model) {
   configuration_length_ =
       GetNumberOrDefault(3, model, "batch_configuration_length");
 
+  // check configuration length
+  if (configuration_length_ > max_history_) {
+    mju_error("configuration_length > max_history: increase max history\n");
+  }
+
   // -- trajectories -- //
   configuration.Initialize(nq, configuration_length_);
   velocity.Initialize(nv, configuration_length_);
@@ -322,6 +327,9 @@ void Batch::Reset() {
       GetNumberOrDefault(1.0e-4, model, "estimator_sensor_noise_scale");
   std::fill(noise_sensor.begin(), noise_sensor.end(), noise_sensor_scl);
 
+  // scale prior 
+  scale_prior = GetNumberOrDefault(1.0e-1, model, "batch_scale_prior");
+
   // trajectories
   configuration.Reset();
   velocity.Reset();
@@ -486,13 +494,16 @@ void Batch::Reset() {
   cost_count_ = 0;
   solve_status_ = kUnsolved;
 
-  // -- initialize -- //
+  // -- initialize filter -- //
   if (settings.filter) {
-    settings.gradient_tolerance = 1.0e-5;
+    // filter mode status
+    current_time_index = 1;
+
+    // filter settings
+    settings.gradient_tolerance = 1.0e-6;
     settings.max_smoother_iterations = 1;
     settings.max_search_iterations = 10;
     settings.recursive_prior_update = true;
-    scale_prior = 1.0e-1;
 
     // timestep
     double timestep = model->opt.timestep;
@@ -542,6 +553,7 @@ void Batch::Reset() {
       // need stage 
       int sensor_stage = model->sensor_needstage[index];
 
+      // position sensor
       if (sensor_stage == mjSTAGE_POS) {
         // address 
         int sensor_adr = model->sensor_adr[index];
@@ -568,16 +580,11 @@ void Batch::Update(const double* ctrl, const double* sensor) {
   // start timer
   auto start = std::chrono::steady_clock::now();
 
-  // check configuration length 
-  if (configuration_length_ != 3) {
-    mju_error("batch filter only supports configuration length = 3\n");
-  }
-
   // dimensions
   int nq = model->nq, nv = model->nv, na = model->na, nu = model->nu;
 
   // current time index
-  int t = 1;
+  int t = current_time_index;
 
   // configurations
   double* q0 = configuration.Get(t - 1);
@@ -592,8 +599,6 @@ void Batch::Update(const double* ctrl, const double* sensor) {
   mju_copy(d->qpos, q1, model->nq);
   mj_differentiatePos(model, d->qvel, model->opt.timestep, q0, q1);
 
-  // TODO(taylor): set time
-
   // set ctrl
   mju_copy(d->ctrl, ctrl, nu);
 
@@ -601,6 +606,7 @@ void Batch::Update(const double* ctrl, const double* sensor) {
   mj_step(model, d);
 
   // -- set batch data -- //
+
   // set next qpos
   configuration.Set(d->qpos, t + 1);
   configuration_previous.Set(d->qpos, t + 1);
@@ -617,7 +623,14 @@ void Batch::Update(const double* ctrl, const double* sensor) {
   // set force measurement
   force_measurement.Set(d->qfrc_actuator, t);
 
-  // measurement update
+  // -- measurement update -- //
+
+  // cache configuration length 
+  int configuration_length_cache = configuration_length_;
+
+  // set reduced configuration length for optimization 
+  configuration_length_ = current_time_index + 2;
+
   // TODO(taylor): preallocate pool
   ThreadPool pool(1);
   Optimize(pool);
@@ -629,7 +642,8 @@ void Batch::Update(const double* ctrl, const double* sensor) {
   time = d->time;
 
   // update prior weights
-  if (settings.recursive_prior_update) {
+  if (settings.recursive_prior_update &&
+      configuration_length_ == configuration_length_cache) {
     // dimension
     int nvar = nv * configuration_length_;
 
@@ -637,18 +651,28 @@ void Batch::Update(const double* ctrl, const double* sensor) {
     double* condmat = condmat_.data();
     ConditionMatrix(condmat, cost_hessian.data(), mat00_.data(), mat10_.data(),
                     mat11_.data(), scratch0_condmat_.data(),
-                    scratch1_condmat_.data(), nvar, nv, 2 * nv);
+                    scratch1_condmat_.data(), nvar, nv, nv * (configuration_length_ - 1));
 
     // zero prior weights
     double* weights = weight_prior.data();
     mju_zero(weights, nvar * nvar);
 
     // set conditioned matrix in prior weights
-    SetBlockInMatrix(weights, condmat, 1.0, nvar, nvar, 2 * nv, 2 * nv, 0, 0);
+    SetBlockInMatrix(weights, condmat, 1.0, nvar, nvar,
+                     nv * (configuration_length_ - 1),
+                     nv * (configuration_length_ - 1), 0, 0);
   }
 
-  // shift trajectories
-  Shift(1);
+  // restore configuration length 
+  configuration_length_ = configuration_length_cache;
+
+  // check estimation horizon
+  if (current_time_index < configuration_length_ - 2) {
+    current_time_index++;
+  } else {
+    // shift trajectories once estimation horizon is filled
+    Shift(1);
+  }
 
   // stop timer
   timer_.update = 1.0e-3 * GetDuration(start);
@@ -2383,6 +2407,13 @@ void Batch::SearchDirection() {
   // search direction norm
   search_direction_norm_ = InfinityNorm(direction, ntotal);
 
+  // set regularization 
+  if (regularization_ > 0.0) {
+    for (int i = 0; i < ntotal; i++) {
+      hessian[i * ntotal + i] += regularization_;
+    }
+  }
+
   // end timer
   timer_.search_direction += GetDuration(search_direction_start);
 }
@@ -2576,6 +2607,7 @@ void Batch::GUI(mjUI& ui, double* process_noise, double* sensor_noise,
       {mjITEM_SLIDERNUM, "Timestep", 2, &timestep, "1.0e-3 0.1"},
       {mjITEM_SELECT, "Integrator", 2, &integrator,
        "Euler\nRK4\nImplicit\nFastImplicit"},
+      // {mjITEM_SLIDERINT, "Horizon",}
       {mjITEM_END}};
 
   // add estimator

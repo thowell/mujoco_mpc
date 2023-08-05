@@ -22,6 +22,9 @@ set(CMAKE_POLICY_DEFAULT_CMP0072 NEW)
 # This line has to appear before 'PROJECT' in order to be able to disable incremental linking
 set(MSVC_INCREMENTAL_DEFAULT ON)
 
+# turn on/off find or fetch
+set(FETCHCONTENT_FULLY_DISCONNECTED ON)
+
 project(
   mujoco_mpc
   VERSION 0.1.0
