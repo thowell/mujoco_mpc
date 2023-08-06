@@ -810,6 +810,18 @@ void Unscented::GUI(mjUI& ui, EstimatorGUIData& data) {
   mjui_add(&ui, defSensorNoise);
 }
 
+// set GUI data
+void Unscented::SetGUIData(EstimatorGUIData& data) {
+  mju_copy(noise_process.data(),
+           data.process_noise.data(),
+           DimensionProcess());
+  mju_copy(noise_sensor.data(),
+           data.sensor_noise.data(),
+           DimensionSensor());
+  model->opt.timestep = data.timestep;
+  model->opt.integrator = data.integrator;
+};
+
 // estimator-specific plots
 void Unscented::Plots(mjvFigure* fig_planner, mjvFigure* fig_timer,
                       int planner_shift, int timer_shift, int planning,

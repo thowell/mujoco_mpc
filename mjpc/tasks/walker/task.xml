@@ -21,7 +21,7 @@
     <numeric name="estimator_number_sensor" data="18" />
     <numeric name="estimator_timestep" data="0.005" />
     <numeric name="batch_configuration_length" data="7" />
-    <numeric name="batch_scale_prior" data="1.0e-6" />
+    <numeric name="batch_scale_prior" data="1.0e-8" />
   </custom>
 
   <sensor>

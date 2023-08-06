@@ -80,6 +80,9 @@ class Estimator {
   // estimator-specific GUI elements
   virtual void GUI(mjUI& ui, EstimatorGUIData& data) = 0;
 
+  // set GUI data 
+  virtual void SetGUIData(EstimatorGUIData& data) = 0;
+
   // estimator-specific plots
   virtual void Plots(mjvFigure* fig_planner, mjvFigure* fig_timer,
                      int planner_shift, int timer_shift, int planning,
@@ -227,6 +230,9 @@ class GroundTruth : public Estimator {
 
   // estimator-specific GUI elements
   void GUI(mjUI& ui, EstimatorGUIData& data) override {};
+
+  // set GUI data 
+  void SetGUIData(EstimatorGUIData& data) override {};
 
   // estimator-specific plots
   void Plots(mjvFigure* fig_planner, mjvFigure* fig_timer, int planner_shift,

@@ -154,12 +154,7 @@ void EstimatorLoop(mj::Simulate& sim) {
         auto start = std::chrono::steady_clock::now();
 
         // set values from GUI
-        mju_copy(estimator->ProcessNoise(), sim.agent->estimator_gui_data.process_noise.data(),
-                 estimator->DimensionProcess());
-        mju_copy(estimator->SensorNoise(), sim.agent->estimator_gui_data.sensor_noise.data(),
-                 estimator->DimensionSensor());
-        estimator->Model()->opt.timestep = sim.agent->estimator_gui_data.timestep;
-        estimator->Model()->opt.integrator = sim.agent->estimator_gui_data.integrator;
+        estimator->SetGUIData(sim.agent->estimator_gui_data);
 
         // get simulation state
         {
@@ -167,12 +162,9 @@ void EstimatorLoop(mj::Simulate& sim) {
           mju_copy(sim.agent->ctrl.data(), d->ctrl, m->nu);
           mju_copy(sim.agent->sensor.data(), d->sensordata, m->nsensordata);
           sim.agent->time = d->time;
+          estimator->Data()->time = sim.agent->time;
+          mju_copy(estimator->Data()->userdata, d->userdata, m->nuserdata);
         }
-
-        // set time
-        // TODO(taylor): time sync w/ physics loop
-        estimator->Data()->time = sim.agent->time;
-        mju_copy(estimator->Data()->userdata, d->userdata, m->nuserdata);
 
         // update
         estimator->Update(sim.agent->ctrl.data(), sim.agent->sensor.data());

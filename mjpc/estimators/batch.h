@@ -151,6 +151,9 @@ class Batch : public Estimator {
   // estimator-specific GUI elements
   void GUI(mjUI& ui, EstimatorGUIData& data) override;
 
+  // set GUI data 
+  void SetGUIData(EstimatorGUIData& data) override;
+
   // estimator-specific plots
   void Plots(mjvFigure* fig_planner, mjvFigure* fig_timer, int planner_shift,
              int timer_shift, int planning, int* shift) override;
@@ -369,6 +372,9 @@ class Batch : public Estimator {
 
   // initialize filter mode 
   void InitializeFilter();
+
+  // shift head and resize trajectories
+  void ShiftResizeTrajectory(int new_head, int new_length);
   
   // reset timers
   void ResetTimers();
@@ -582,6 +588,20 @@ class Batch : public Estimator {
 
   // max history
   int max_history_ = 3;
+
+  // trajectory cache
+  EstimatorTrajectory<double> configuration_cache_;           // nq x T
+  EstimatorTrajectory<double> configuration_previous_cache_;  // nq x T
+  EstimatorTrajectory<double> velocity_cache_;                // nv x T
+  EstimatorTrajectory<double> acceleration_cache_;            // nv x T
+  EstimatorTrajectory<double> act_cache_;                     // na x T
+  EstimatorTrajectory<double> times_cache_;                   //  1 x T
+  EstimatorTrajectory<double> ctrl_cache_;                    // nu x T
+  EstimatorTrajectory<double> sensor_measurement_cache_;      // ns x T
+  EstimatorTrajectory<double> sensor_prediction_cache_;       // ns x T
+  EstimatorTrajectory<int> sensor_mask_cache_;                // num_sensor x T
+  EstimatorTrajectory<double> force_measurement_cache_;       // nv x T
+  EstimatorTrajectory<double> force_prediction_cache_;        // nv x T
 };
 
 // estimator status string
