@@ -31,7 +31,8 @@
 namespace mjpc {
 
 // defaults
-const int MIN_HISTORY = 3;      // minimum configuration trajectory length
+inline constexpr int kMinBatchHistory = 3;      // minimum configuration trajectory length
+inline constexpr int kMaxFilterHistory = 32;    // maximum batch filter estimation horizon
 
 // batch estimator status 
 enum BatchStatus : int {
@@ -64,7 +65,7 @@ class Batch : public Estimator {
   Batch() = default;
   Batch(int mode) {
     settings.filter = mode;
-    max_history_ = 10;
+    max_history_ = kMaxFilterHistory;
   }
   Batch(const mjModel* model, int length=3, int max_history_=10) {
     // set max history length

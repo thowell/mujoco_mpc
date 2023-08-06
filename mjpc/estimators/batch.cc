@@ -322,7 +322,7 @@ void Batch::Reset(const mjData* data) {
   mjData* d = data_[0].get();
 
   if (data) {
-    // copy input data 
+    // copy input data
     mj_copyData(d, model, data);
   } else {
     // set home keyframe
@@ -607,6 +607,9 @@ void Batch::Update(const double* ctrl, const double* sensor) {
 
   // set reduced configuration length for optimization
   configuration_length_ = current_time_index + 2;
+  if (configuration_length_ != configuration_length_cache) {
+    ShiftResizeTrajectory(0, configuration_length_);
+  }
 
   // TODO(taylor): preallocate pool
   ThreadPool pool(1);
@@ -656,9 +659,9 @@ void Batch::Update(const double* ctrl, const double* sensor) {
       nvar_new += nv;
     }
 
-    // check same size 
+    // check same size
     if (nvar != nvar_new) {
-      // get previous weights 
+      // get previous weights
       double* previous_weights = scratch0_condmat_.data();
       mju_copy(previous_weights, weights, nvar * nvar);
 
@@ -675,6 +678,9 @@ void Batch::Update(const double* ctrl, const double* sensor) {
   }
 
   // restore configuration length
+  if (configuration_length_ != configuration_length_cache) {
+    ShiftResizeTrajectory(0, configuration_length_cache);
+  }
   configuration_length_ = configuration_length_cache;
 
   // check estimation horizon
@@ -697,7 +703,7 @@ void Batch::SetConfigurationLength(int length) {
   }
 
   // set configuration length
-  configuration_length_ = std::max(length, MIN_HISTORY);
+  configuration_length_ = std::max(length, kMinBatchHistory);
 
   // update trajectory lengths
   configuration.SetLength(configuration_length_);
@@ -2055,9 +2061,6 @@ void Batch::ShiftResizeTrajectory(int new_head, int new_length) {
   sensor_measurement_cache_.Reset();
   sensor_prediction_cache_.Reset();
   sensor_mask_cache_.Reset();
-  for (int i = 0; i < nsensor_ * max_history_; i++) {
-    sensor_mask_cache_.Data()[i] = 1;  // sensor on
-  }
   force_measurement_cache_.Reset();
   force_prediction_cache_.Reset();
 
@@ -2093,13 +2096,15 @@ void Batch::ShiftResizeTrajectory(int new_head, int new_length) {
     force_prediction_cache_.Set(force_prediction.Get(i), i);
   }
 
-  // set configuration length 
+  // set configuration length
   SetConfigurationLength(new_length);
 
-  // set trajectory data 
-  for (int i = 0; i < std::min(length, new_length); i++) {
+  // set trajectory data
+  int length_copy = std::min(length, new_length);
+  for (int i = 0; i < length_copy; i++) {
     configuration.Set(configuration_cache_.Get(new_head + i), i);
-    configuration_previous.Set(configuration_previous_cache_.Get(new_head + i), i);
+    configuration_previous.Set(configuration_previous_cache_.Get(new_head + i),
+                               i);
     velocity.Set(velocity_cache_.Get(new_head + i), i);
     acceleration.Set(acceleration_cache_.Get(new_head + i), i);
     act.Set(act_cache_.Get(new_head + i), i);
@@ -2777,8 +2782,11 @@ void Batch::GUI(mjUI& ui, EstimatorGUIData& data) {
       {mjITEM_SLIDERNUM, "Timestep", 2, &data.timestep, "1.0e-3 0.1"},
       {mjITEM_SELECT, "Integrator", 2, &data.integrator,
        "Euler\nRK4\nImplicit\nFastImplicit"},
-      {mjITEM_SLIDERINT, "Horizon", 2, &data.horizon, "3 10"},
+      {mjITEM_SLIDERINT, "Horizon", 2, &data.horizon, "3 3"},
       {mjITEM_END}};
+
+  // set number of trajectory slider limits
+  mju::sprintf_arr(defEstimator[4].other, "%i %i", kMinBatchHistory, kMaxFilterHistory);
 
   // add estimator
   mjui_add(&ui, defEstimator);
@@ -2938,20 +2946,16 @@ void Batch::GUI(mjUI& ui, EstimatorGUIData& data) {
 
 // set GUI data
 void Batch::SetGUIData(EstimatorGUIData& data) {
-  mju_copy(noise_process.data(),
-           data.process_noise.data(),
-           DimensionProcess());
-  mju_copy(noise_sensor.data(),
-           data.sensor_noise.data(),
-           DimensionSensor());
+  mju_copy(noise_process.data(), data.process_noise.data(), DimensionProcess());
+  mju_copy(noise_sensor.data(), data.sensor_noise.data(), DimensionSensor());
   model->opt.timestep = data.timestep;
   model->opt.integrator = data.integrator;
 
-  // store estimation horizon 
+  // store estimation horizon
   int horizon = data.horizon;
 
   // changing horizon cases
-  if (horizon > configuration_length_) { // increase horizon
+  if (horizon > configuration_length_) {  // increase horizon
     // -- prior weights resize -- //
     int nvar = model->nv * configuration_length_;
     int nvar_new = model->nv * horizon;
@@ -2976,15 +2980,18 @@ void Batch::SetGUIData(EstimatorGUIData& data) {
 
     // update configuration length
     configuration_length_ = horizon;
-  } else if (horizon < configuration_length_) { // decrease horizon
+
+    printf("increase horizon\n");
+  } else if (horizon < configuration_length_) {  // decrease horizon
     // -- prior weights resize -- //
     int nvar = model->nv * configuration_length_;
     int nvar_new = model->nv * horizon;
-    
+
     // get previous weights
     double* weights = weight_prior.data();
     double* previous_weights = scratch0_condmat_.data();
-    BlockFromMatrix(previous_weights, weights, nvar_new, nvar_new, nvar, nvar, 0, 0);
+    BlockFromMatrix(previous_weights, weights, nvar_new, nvar_new, nvar, nvar,
+                    0, 0);
 
     // set previous in new weights (dimension may have increased)
     mju_zero(weights, nvar * nvar);
@@ -2999,6 +3006,8 @@ void Batch::SetGUIData(EstimatorGUIData& data) {
     // update configuration length and current time index
     configuration_length_ = horizon;
     current_time_index -= horizon_diff;
+    
+    printf("decrease horizon\n");
   }
 };
 
