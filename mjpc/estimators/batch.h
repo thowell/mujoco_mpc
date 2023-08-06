@@ -367,6 +367,9 @@ class Batch : public Estimator {
                            const EstimatorTrajectory<double>& configuration,
                            const double* search_direction, double step_size);
 
+  // initialize filter mode 
+  void InitializeFilter();
+  
   // reset timers
   void ResetTimers();
 

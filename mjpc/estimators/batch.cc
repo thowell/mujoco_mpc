@@ -494,85 +494,8 @@ void Batch::Reset() {
   cost_count_ = 0;
   solve_status_ = kUnsolved;
 
-  // -- initialize filter -- //
-  if (settings.filter) {
-    // filter mode status
-    current_time_index = 1;
-
-    // filter settings
-    settings.gradient_tolerance = 1.0e-6;
-    settings.max_smoother_iterations = 1;
-    settings.max_search_iterations = 10;
-    settings.recursive_prior_update = true;
-
-    // timestep
-    double timestep = model->opt.timestep;
-
-    // set q1
-    configuration.Set(state.data(), 1);
-    configuration_previous.Set(configuration.Get(1), 1);
-
-    // set q0
-    double* q0 = configuration.Get(0);
-    mju_copy(q0, state.data(), nq);
-    mj_integratePos(model, q0, state.data() + nq, -1.0 * timestep);
-    configuration_previous.Set(configuration.Get(0), 0);
-
-    // set times
-    double current_time = -1.0 * timestep;
-    times.Set(&current_time, 0);
-    for (int i = 1; i < configuration_length_; i++) {
-      // increment time
-      current_time += timestep;
-
-      // set
-      times.Set(&current_time, i);
-    }
-
-    // -- set initial position-based measurements -- //
-
-    // data 
-    mjData* data = data_[0].get();
-
-    // set q0 
-    mju_copy(data->qpos, q0, model->nq);
-
-    // evaluate position
-    mj_fwdPosition(model, data);
-    mj_sensorPos(model, data);
-
-    // y0 
-    double* y0 = sensor_measurement.Get(0);
-    mju_zero(y0, nsensordata_);
-
-    // loop over sensors
-    for (int i = 0; i < nsensor_; i++) {
-      // measurement sensor index 
-      int index = sensor_start_ + i;
-
-      // need stage 
-      int sensor_stage = model->sensor_needstage[index];
-
-      // position sensor
-      if (sensor_stage == mjSTAGE_POS) {
-        // address 
-        int sensor_adr = model->sensor_adr[index];
-
-        // dimension 
-        int sensor_dim = model->sensor_dim[index];
-
-        // set sensor
-        mju_copy(y0 + sensor_adr - sensor_start_index_,
-                 data->sensordata + sensor_adr, sensor_dim);
-      }
-    }
-
-    // prior weight (skip act)
-    for (int i = 0; i < ndstate_ - na; i++) {
-      weight_prior[nv * configuration_length_ * i + i] =
-          1.0 / covariance[ndstate_ * i + i];
-    }
-  }
+  // initialize filter
+  if (settings.filter) InitializeFilter();
 }
 
 // update
@@ -641,26 +564,47 @@ void Batch::Update(const double* ctrl, const double* sensor) {
   mju_copy(state.data() + nq + nv, act.Get(t + 1), na);
   time = d->time;
 
-  // update prior weights
+  // -- update prior weights -- //
+
+  // dimension
+  int nvar = nv * configuration_length_;
+
+  // prior weights
+  double* weights = weight_prior.data();
+  mju_zero(weights, nvar * nvar);
+
+  // recursive update
   if (settings.recursive_prior_update &&
       configuration_length_ == configuration_length_cache) {
-    // dimension
-    int nvar = nv * configuration_length_;
+    
+    // condition dimension 
+    int ncondition = nv * (configuration_length_ - 1);
 
     // compute conditioned matrix
     double* condmat = condmat_.data();
     ConditionMatrix(condmat, cost_hessian.data(), mat00_.data(), mat10_.data(),
                     mat11_.data(), scratch0_condmat_.data(),
-                    scratch1_condmat_.data(), nvar, nv, nv * (configuration_length_ - 1));
-
-    // zero prior weights
-    double* weights = weight_prior.data();
-    mju_zero(weights, nvar * nvar);
+                    scratch1_condmat_.data(), nvar, nv, ncondition);
 
     // set conditioned matrix in prior weights
-    SetBlockInMatrix(weights, condmat, 1.0, nvar, nvar,
-                     nv * (configuration_length_ - 1),
-                     nv * (configuration_length_ - 1), 0, 0);
+    SetBlockInMatrix(weights, condmat, 1.0, nvar, nvar, ncondition, ncondition,
+                     0, 0);
+
+    // set bottom right to scale_prior * I 
+    for (int i = ncondition; i < nvar; i++) {
+      weights[nvar * i + i] = scale_prior;
+    }
+  } else {
+    // dimension 
+    int nvar_new = nvar;
+    if (current_time_index < configuration_length_ - 2) {
+      nvar_new += nv;
+    }
+
+    // scale_prior * I
+    for (int i = 0; i < nvar_new; i++) {
+      weights[nvar_new * i + i] = scale_prior;
+    }
   }
 
   // restore configuration length 
@@ -1941,6 +1885,89 @@ void Batch::VelocityAccelerationDerivatives() {
 
   // stop timer
   timer_.velacc_derivatives += GetDuration(start);
+}
+
+// initialize filter mode
+void Batch::InitializeFilter() {
+  // dimensions 
+  int nq = model->nq, nv = model->nv;
+
+  // filter mode status
+  current_time_index = 1;
+
+  // filter settings
+  settings.gradient_tolerance = 1.0e-6;
+  settings.max_smoother_iterations = 1;
+  settings.max_search_iterations = 10;
+  settings.recursive_prior_update = true;
+
+  // timestep
+  double timestep = model->opt.timestep;
+
+  // set q1
+  configuration.Set(state.data(), 1);
+  configuration_previous.Set(configuration.Get(1), 1);
+
+  // set q0
+  double* q0 = configuration.Get(0);
+  mju_copy(q0, state.data(), nq);
+  mj_integratePos(model, q0, state.data() + nq, -1.0 * timestep);
+  configuration_previous.Set(configuration.Get(0), 0);
+
+  // set times
+  double current_time = -1.0 * timestep;
+  times.Set(&current_time, 0);
+  for (int i = 1; i < configuration_length_; i++) {
+    // increment time
+    current_time += timestep;
+
+    // set
+    times.Set(&current_time, i);
+  }
+
+  // -- set initial position-based measurements -- //
+
+  // data
+  mjData* data = data_[0].get();
+
+  // set q0
+  mju_copy(data->qpos, q0, model->nq);
+
+  // evaluate position
+  mj_fwdPosition(model, data);
+  mj_sensorPos(model, data);
+
+  // y0
+  double* y0 = sensor_measurement.Get(0);
+  mju_zero(y0, nsensordata_);
+
+  // loop over sensors
+  for (int i = 0; i < nsensor_; i++) {
+    // measurement sensor index
+    int index = sensor_start_ + i;
+
+    // need stage
+    int sensor_stage = model->sensor_needstage[index];
+
+    // position sensor
+    if (sensor_stage == mjSTAGE_POS) {
+      // address
+      int sensor_adr = model->sensor_adr[index];
+
+      // dimension
+      int sensor_dim = model->sensor_dim[index];
+
+      // set sensor
+      mju_copy(y0 + sensor_adr - sensor_start_index_,
+               data->sensordata + sensor_adr, sensor_dim);
+    }
+  }
+
+  // prior weight
+  int nvar = nv * configuration_length_;
+  for (int i = 0; i < nvar; i++) {
+    weight_prior[nvar * i + i] = scale_prior;
+  }
 }
 
 // compute total cost
