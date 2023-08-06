@@ -21,7 +21,8 @@
 #include <vector>
 
 #include "mjpc/estimators/buffer.h"
-#include "mjpc/estimators/include.h"
+#include "mjpc/estimators/estimator.h"
+#include "mjpc/estimators/gui.h"
 #include "mjpc/estimators/trajectory.h"
 #include "mjpc/norm.h"
 #include "mjpc/threadpool.h"
@@ -148,8 +149,7 @@ class Batch : public Estimator {
   };
 
   // estimator-specific GUI elements
-  void GUI(mjUI& ui, double* process_noise, double* sensor_noise,
-           double& timestep, int& integrator) override;
+  void GUI(mjUI& ui, EstimatorGUIData& data) override;
 
   // estimator-specific plots
   void Plots(mjvFigure* fig_planner, mjvFigure* fig_timer, int planner_shift,

@@ -18,6 +18,8 @@
 
 #include "mjpc/array_safety.h"
 #include "mjpc/estimators/buffer.h"
+#include "mjpc/estimators/estimator.h"
+#include "mjpc/estimators/gui.h"
 #include "mjpc/norm.h"
 #include "mjpc/threadpool.h"
 #include "mjpc/utilities.h"
@@ -153,7 +155,8 @@ void Batch::Initialize(const mjModel* model) {
   block_force_velocity_.Initialize(nv * nv, configuration_length_);
   block_force_acceleration_.Initialize(nv * nv, configuration_length_);
 
-  block_force_previous_configuration_.Initialize(nv * nv, configuration_length_);
+  block_force_previous_configuration_.Initialize(nv * nv,
+                                                 configuration_length_);
   block_force_current_configuration_.Initialize(nv * nv, configuration_length_);
   block_force_next_configuration_.Initialize(nv * nv, configuration_length_);
   block_force_configurations_.Initialize(nv * 3 * nv, configuration_length_);
@@ -257,7 +260,7 @@ void Batch::Initialize(const mjModel* model) {
   scratch0_covariance_.resize((nv * max_history_) * (nv * max_history_));
   scratch1_covariance_.resize((nv * max_history_) * (nv * max_history_));
 
-  // conditioned matrix 
+  // conditioned matrix
   mat00_.resize((nv * max_history_) * (nv * max_history_));
   mat10_.resize((nv * max_history_) * (nv * max_history_));
   mat11_.resize((nv * max_history_) * (nv * max_history_));
@@ -327,7 +330,7 @@ void Batch::Reset() {
       GetNumberOrDefault(1.0e-4, model, "estimator_sensor_noise_scale");
   std::fill(noise_sensor.begin(), noise_sensor.end(), noise_sensor_scl);
 
-  // scale prior 
+  // scale prior
   scale_prior = GetNumberOrDefault(1.0e-1, model, "batch_scale_prior");
 
   // trajectories
@@ -348,7 +351,7 @@ void Batch::Reset() {
   // sensor mask
   sensor_mask.Reset();
   for (int i = 0; i < nsensor_ * configuration_length_; i++) {
-    sensor_mask.Data()[i] = 1; // sensor on
+    sensor_mask.Data()[i] = 1;  // sensor on
   }
 
   // force
@@ -472,7 +475,7 @@ void Batch::Reset() {
   std::fill(scratch0_covariance_.begin(), scratch0_covariance_.end(), 0.0);
   std::fill(scratch1_covariance_.begin(), scratch1_covariance_.end(), 0.0);
 
-  // conditioned matrix 
+  // conditioned matrix
   std::fill(mat00_.begin(), mat00_.end(), 0.0);
   std::fill(mat10_.begin(), mat10_.end(), 0.0);
   std::fill(mat11_.begin(), mat11_.end(), 0.0);
@@ -548,10 +551,10 @@ void Batch::Update(const double* ctrl, const double* sensor) {
 
   // -- measurement update -- //
 
-  // cache configuration length 
+  // cache configuration length
   int configuration_length_cache = configuration_length_;
 
-  // set reduced configuration length for optimization 
+  // set reduced configuration length for optimization
   configuration_length_ = current_time_index + 2;
 
   // TODO(taylor): preallocate pool
@@ -576,8 +579,7 @@ void Batch::Update(const double* ctrl, const double* sensor) {
   // recursive update
   if (settings.recursive_prior_update &&
       configuration_length_ == configuration_length_cache) {
-    
-    // condition dimension 
+    // condition dimension
     int ncondition = nv * (configuration_length_ - 1);
 
     // compute conditioned matrix
@@ -590,12 +592,12 @@ void Batch::Update(const double* ctrl, const double* sensor) {
     SetBlockInMatrix(weights, condmat, 1.0, nvar, nvar, ncondition, ncondition,
                      0, 0);
 
-    // set bottom right to scale_prior * I 
+    // set bottom right to scale_prior * I
     for (int i = ncondition; i < nvar; i++) {
       weights[nvar * i + i] = scale_prior;
     }
   } else {
-    // dimension 
+    // dimension
     int nvar_new = nvar;
     if (current_time_index < configuration_length_ - 2) {
       nvar_new += nv;
@@ -607,7 +609,7 @@ void Batch::Update(const double* ctrl, const double* sensor) {
     }
   }
 
-  // restore configuration length 
+  // restore configuration length
   configuration_length_ = configuration_length_cache;
 
   // check estimation horizon
@@ -1029,7 +1031,7 @@ double Batch::CostSensor(double* gradient, double* hessian) {
   if (gradient) mju_zero(gradient, nvar);
   if (hessian) mju_zero(hessian, nvar * nvar);
 
-  // time scaling 
+  // time scaling
   double time_scale = 1.0;
   double time_scale2 = 1.0;
   if (settings.time_scaling_sensor) {
@@ -1050,15 +1052,15 @@ double Batch::CostSensor(double* gradient, double* hessian) {
 
     // unpack block
     double* block;
-    int block_columns; 
-    if (t == 0) { // only position sensors
+    int block_columns;
+    if (t == 0) {  // only position sensors
       block = block_sensor_configuration_.Get(t) + sensor_start_index_ * nv;
       block_columns = nv;
-    } else { // position, velocity, acceleration sensors
+    } else {  // position, velocity, acceleration sensors
       block = block_sensor_configurations_.Get(t);
       block_columns = 3 * nv;
     }
-    
+
     // shift
     int shift_sensor = 0;
 
@@ -1067,10 +1069,10 @@ double Batch::CostSensor(double* gradient, double* hessian) {
       // start cost timer
       auto start_cost = std::chrono::steady_clock::now();
 
-      // sensor stage 
+      // sensor stage
       int sensor_stage = model->sensor_needstage[sensor_start_ + i];
-      
-      // time scaling weight 
+
+      // time scaling weight
       double time_weight = 1.0;
       if (sensor_stage == mjSTAGE_VEL) {
         time_weight = time_scale;
@@ -1088,7 +1090,8 @@ double Batch::CostSensor(double* gradient, double* hessian) {
       double* rti = rt + shift_sensor;
 
       // weight
-      double weight = time_weight / noise_sensor[i] / nsi / (configuration_length_ - 1);
+      double weight =
+          time_weight / noise_sensor[i] / nsi / (configuration_length_ - 1);
 
       // parameters
       double* pi = norm_parameters_sensor.data() + MAX_NORM_PARAMETERS * i;
@@ -1138,8 +1141,8 @@ double Batch::CostSensor(double* gradient, double* hessian) {
                        block_columns);
 
         // add
-        mju_addToScl(gradient + nv * std::max(0, t - 1), scratch0_sensor_.data(), weight,
-                     block_columns);
+        mju_addToScl(gradient + nv * std::max(0, t - 1),
+                     scratch0_sensor_.data(), weight, block_columns);
       }
 
       // Hessian (Gauss-Newton): drdq' * d2ndr2 * drdq
@@ -1156,8 +1159,9 @@ double Batch::CostSensor(double* gradient, double* hessian) {
         mju_mulMatTMat(tmp1, blocki, tmp0, nsi, block_columns, block_columns);
 
         // add
-        AddBlockInMatrix(hessian, tmp1, weight, nvar, nvar, block_columns, block_columns,
-                         nv * std::max(0, t - 1), nv * std::max(0, t - 1));
+        AddBlockInMatrix(hessian, tmp1, weight, nvar, nvar, block_columns,
+                         block_columns, nv * std::max(0, t - 1),
+                         nv * std::max(0, t - 1));
       }
 
       // shift by individual sensor dimension
@@ -1194,7 +1198,7 @@ double Batch::CostForce(double* gradient, double* hessian) {
   if (gradient) mju_zero(gradient, nvar);
   if (hessian) mju_zero(hessian, nvar * nvar);
 
-  // time scaling 
+  // time scaling
   double time_scale2 = 1.0;
   if (settings.time_scaling_force) {
     time_scale2 = model->opt.timestep * model->opt.timestep;
@@ -1223,7 +1227,8 @@ double Batch::CostForce(double* gradient, double* hessian) {
     // quadratic cost
     for (int i = 0; i < nv; i++) {
       // weight
-      double weight = time_scale2 / noise_process[i] / nv / (configuration_length_ - 2);
+      double weight =
+          time_scale2 / noise_process[i] / nv / (configuration_length_ - 2);
 
       // gradient
       norm_gradient[i] = weight * rt[i];
@@ -1257,7 +1262,8 @@ double Batch::CostForce(double* gradient, double* hessian) {
       mju_mulMatTVec(scratch0_force_.data(), block, norm_gradient, nv, 3 * nv);
 
       // add
-      mju_addToScl(gradient + (t - 1) * nv, scratch0_force_.data(), 1.0, 3 * nv);
+      mju_addToScl(gradient + (t - 1) * nv, scratch0_force_.data(), 1.0,
+                   3 * nv);
     }
 
     // Hessian (Gauss-Newton): drdq' * d2ndr2 * drdq
@@ -1271,8 +1277,8 @@ double Batch::CostForce(double* gradient, double* hessian) {
       mju_mulMatTMat(tmp1, block, tmp0, nv, 3 * nv, 3 * nv);
 
       // add
-      AddBlockInMatrix(hessian, tmp1, 1.0, nvar, nvar, 3 * nv, 3 * nv, nv * (t - 1),
-                       nv * (t - 1));
+      AddBlockInMatrix(hessian, tmp1, 1.0, nvar, nvar, 3 * nv, 3 * nv,
+                       nv * (t - 1), nv * (t - 1));
     }
   }
 
@@ -1297,7 +1303,7 @@ void Batch::ResidualSensor() {
     // sensor difference
     mju_sub(rt, yt_model, yt_sensor, nsensordata_);
 
-    // zero out non-position sensors at first time step 
+    // zero out non-position sensors at first time step
     if (t == 0) {
       // loop over position sensors
       for (int i = 0; i < nsensor_; i++) {
@@ -1420,7 +1426,8 @@ void Batch::BlockSensor(int index) {
   if (settings.assemble_sensor_jacobian) {
     // set block
     SetBlockInMatrix(jacobian_sensor_.data(), dsdq012, 1.0, nsen, nvar,
-                     nsensordata_, 3 * nv, index * nsensordata_, (index - 1) * nv);
+                     nsensordata_, 3 * nv, index * nsensordata_,
+                     (index - 1) * nv);
   }
 }
 
@@ -1583,18 +1590,18 @@ void Batch::InverseDynamicsPrediction(ThreadPool& pool) {
 
   // first time step
   pool.Schedule([&batch = *this, nq, nv, nu]() {
-    // time index 
+    // time index
     int t = 0;
 
     // data
     mjData* d = batch.data_[t].get();
 
-    // terms 
+    // terms
     double* q0 = batch.configuration.Get(t);
     double* y0 = batch.sensor_prediction.Get(t);
     mju_zero(y0, batch.nsensordata_);
 
-    // set data 
+    // set data
     mju_copy(d->qpos, q0, nq);
     mju_zero(d->qvel, nv);
     mju_zero(d->ctrl, nu);
@@ -1604,17 +1611,17 @@ void Batch::InverseDynamicsPrediction(ThreadPool& pool) {
     mj_fwdPosition(batch.model, d);
     mj_sensorPos(batch.model, d);
 
-    // loop over position sensors 
+    // loop over position sensors
     for (int i = 0; i < batch.nsensor_; i++) {
       // sensor stage
       int sensor_stage = batch.model->sensor_needstage[batch.sensor_start_ + i];
 
-      // check for position 
+      // check for position
       if (sensor_stage == mjSTAGE_POS) {
-        // dimension 
+        // dimension
         int sensor_dim = batch.model->sensor_dim[batch.sensor_start_ + i];
 
-        // address 
+        // address
         int sensor_adr = batch.model->sensor_adr[batch.sensor_start_ + i];
 
         // copy sensor data
@@ -1681,17 +1688,17 @@ void Batch::InverseDynamicsDerivatives(ThreadPool& pool) {
 
   // first time step
   pool.Schedule([&batch = *this, nq, nv, nu]() {
-    // time index 
+    // time index
     int t = 0;
 
     // data
     mjData* d = batch.data_[t].get();
 
-    // terms 
+    // terms
     double* q0 = batch.configuration.Get(t);
     double* dsdq = batch.block_sensor_configuration_.Get(t);
 
-    // set data 
+    // set data
     mju_copy(d->qpos, q0, nq);
     mju_zero(d->qvel, nv);
     mju_zero(d->ctrl, nu);
@@ -1889,7 +1896,7 @@ void Batch::VelocityAccelerationDerivatives() {
 
 // initialize filter mode
 void Batch::InitializeFilter() {
-  // dimensions 
+  // dimensions
   int nq = model->nq, nv = model->nv;
 
   // filter mode status
@@ -2383,7 +2390,8 @@ void Batch::SearchDirection() {
       }
 
       // copy
-      mju_copy(hessian_band_factor, hessian_band, ntotal * ntotal); // TODO(taylor): band copy
+      mju_copy(hessian_band_factor, hessian_band,
+               ntotal * ntotal);  // TODO(taylor): band copy
 
       // factorize
       min_diag = mju_cholFactorBand(hessian_band_factor, ntotal, nband, ndense,
@@ -2434,7 +2442,7 @@ void Batch::SearchDirection() {
   // search direction norm
   search_direction_norm_ = InfinityNorm(direction, ntotal);
 
-  // set regularization 
+  // set regularization
   if (regularization_ > 0.0) {
     for (int i = 0; i < ntotal; i++) {
       hessian[i * ntotal + i] += regularization_;
@@ -2624,17 +2632,16 @@ std::string StatusString(int code) {
 }
 
 // estimator-specific GUI elements
-void Batch::GUI(mjUI& ui, double* process_noise, double* sensor_noise,
-                double& timestep, int& integrator) {
+void Batch::GUI(mjUI& ui, EstimatorGUIData& data) {
   // ----- estimator ------ //
   mjuiDef defEstimator[] = {
       {mjITEM_SECTION, "Estimator Settings", 1, nullptr,
        "AP"},  // needs new section to satisfy mjMAXUIITEM
       {mjITEM_BUTTON, "Reset", 2, nullptr, ""},
-      {mjITEM_SLIDERNUM, "Timestep", 2, &timestep, "1.0e-3 0.1"},
-      {mjITEM_SELECT, "Integrator", 2, &integrator,
+      {mjITEM_SLIDERNUM, "Timestep", 2, &data.timestep, "1.0e-3 0.1"},
+      {mjITEM_SELECT, "Integrator", 2, &data.integrator,
        "Euler\nRK4\nImplicit\nFastImplicit"},
-      // {mjITEM_SLIDERINT, "Horizon",}
+      {mjITEM_SLIDERINT, "Horizon", 2, &data.horizon, "3 10"},
       {mjITEM_END}};
 
   // add estimator
@@ -2652,8 +2659,8 @@ void Batch::GUI(mjUI& ui, double* process_noise, double* sensor_noise,
   // add UI elements
   for (int i = 0; i < nv; i++) {
     // element
-    defProcessNoise[process_noise_shift] = {mjITEM_SLIDERNUM, "", 2,
-                                            process_noise + i, "1.0e-8 0.01"};
+    defProcessNoise[process_noise_shift] = {
+        mjITEM_SLIDERNUM, "", 2, data.process_noise.data() + i, "1.0e-8 0.01"};
 
     // set name
     mju::strcpy_arr(defProcessNoise[process_noise_shift].name, "");
@@ -2771,9 +2778,9 @@ void Batch::GUI(mjUI& ui, double* process_noise, double* sensor_noise,
                             model->name_sensoradr[sensor_start_ + i]);
 
     // element
-    defSensorNoise[sensor_noise_shift] = {mjITEM_SLIDERNUM, "", 2,
-                                          sensor_noise + sensor_noise_shift - 1,
-                                          "1.0e-8 0.01"};
+    defSensorNoise[sensor_noise_shift] = {
+        mjITEM_SLIDERNUM, "", 2,
+        data.sensor_noise.data() + sensor_noise_shift - 1, "1.0e-8 0.01"};
 
     // sensor name
     sensor_str = name_sensor;
@@ -2809,7 +2816,8 @@ void Batch::Plots(mjvFigure* fig_planner, mjvFigure* fig_timer,
   //                      mju_log10(trace), 100, planner_shift + 0, 0, 1, -100);
 
   // // legend
-  // mju::strcpy_arr(fig_planner->linename[planner_shift + 0], "Covariance Trace");
+  // mju::strcpy_arr(fig_planner->linename[planner_shift + 0], "Covariance
+  // Trace");
 
   // Batch timers
   double timer_bounds[2] = {0.0, 1.0};

@@ -154,12 +154,12 @@ void EstimatorLoop(mj::Simulate& sim) {
         auto start = std::chrono::steady_clock::now();
 
         // set values from GUI
-        mju_copy(estimator->ProcessNoise(), sim.agent->process_noise.data(),
+        mju_copy(estimator->ProcessNoise(), sim.agent->estimator_gui_data.process_noise.data(),
                  estimator->DimensionProcess());
-        mju_copy(estimator->SensorNoise(), sim.agent->sensor_noise.data(),
+        mju_copy(estimator->SensorNoise(), sim.agent->estimator_gui_data.sensor_noise.data(),
                  estimator->DimensionSensor());
-        estimator->Model()->opt.timestep = sim.agent->timestep;
-        estimator->Model()->opt.integrator = sim.agent->integrator;
+        estimator->Model()->opt.timestep = sim.agent->estimator_gui_data.timestep;
+        estimator->Model()->opt.integrator = sim.agent->estimator_gui_data.integrator;
 
         // get simulation state
         {
@@ -178,7 +178,7 @@ void EstimatorLoop(mj::Simulate& sim) {
         estimator->Update(sim.agent->ctrl.data(), sim.agent->sensor.data());
 
         // copy state
-        mju_copy(sim.agent->state.data(), estimator->State(),
+        mju_copy(sim.agent->estimator_state.data(), estimator->State(),
                  m->nq + m->nv + m->na);
         sim.agent->time = estimator->Data()->time;
 
@@ -367,9 +367,9 @@ void PhysicsLoop(mj::Simulate& sim) {
       // set state
       if (active_estimator > 0) {
         // from estimator
-        state->SetPosition(m, sim.agent->state.data());
-        state->SetVelocity(m, sim.agent->state.data() + m->nq);
-        state->SetAct(m, sim.agent->state.data() + m->nq + m->nv);
+        state->SetPosition(m, sim.agent->estimator_state.data());
+        state->SetVelocity(m, sim.agent->estimator_state.data() + m->nq);
+        state->SetAct(m, sim.agent->estimator_state.data() + m->nq + m->nv);
         state->SetTime(m, sim.agent->time);
         state->SetMocap(m, d->mocap_pos, d->mocap_quat);
         state->SetUserData(m, d->userdata);

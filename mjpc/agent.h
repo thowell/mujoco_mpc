@@ -176,14 +176,11 @@ class Agent {
   // estimator 
   std::vector<double> sensor;
   std::vector<double> ctrl;
-  std::vector<double> state;
+  std::vector<double> estimator_state;
   double time = 0.0;
-  double timestep;
-  int integrator;
-  std::vector<double> process_noise;
-  std::vector<double> sensor_noise;
   int previous_estimator;
   bool reset_estimator = true;
+  EstimatorGUIData estimator_gui_data;
 
  private:
   // model

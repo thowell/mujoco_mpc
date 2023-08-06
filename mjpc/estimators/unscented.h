@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "mjpc/estimators/estimator.h"
+#include "mjpc/estimators/gui.h"
 #include "mjpc/utilities.h"
 
 namespace mjpc {
@@ -38,7 +39,7 @@ class Unscented : public Estimator {
     Reset();
   }
 
-  // destructor 
+  // destructor
   ~Unscented() {
     if (data_) mj_deleteData(data_);
     if (model) mj_deleteModel(model);
@@ -50,43 +51,43 @@ class Unscented : public Estimator {
   // reset memory
   void Reset() override;
 
-  // compute sigma points 
+  // compute sigma points
   void SigmaPoints();
 
-  // evaluate sigma points 
+  // evaluate sigma points
   void EvaluateSigmaPoints();
 
-  // compute sigma point differences 
+  // compute sigma point differences
   void SigmaPointDifferences();
 
-  // compute sigma covariances 
+  // compute sigma covariances
   void SigmaCovariances();
 
   // update
   void Update(const double* ctrl, const double* sensor) override;
 
-  // quaternion means 
+  // quaternion means
   void QuaternionMeans();
 
-  // get state 
+  // get state
   double* State() override { return state.data(); };
 
-  // get covariance 
+  // get covariance
   double* Covariance() override { return covariance.data(); };
 
-  // get time 
+  // get time
   double& Time() override { return time; };
 
-  // get model 
+  // get model
   mjModel* Model() override { return model; };
 
-  // get data 
+  // get data
   mjData* Data() override { return data_; };
 
-  // get process noise 
+  // get process noise
   double* ProcessNoise() override { return noise_process.data(); };
 
-  // get sensor noise 
+  // get sensor noise
   double* SensorNoise() override { return noise_sensor.data(); };
 
   // dimension process
@@ -109,8 +110,7 @@ class Unscented : public Estimator {
   double TimerUpdate() const { return timer_update_; };
 
   // estimator-specific GUI elements
-  void GUI(mjUI& ui, double* process_noise, double* sensor_noise,
-           double& timestep, int& integrator) override;
+  void GUI(mjUI& ui, EstimatorGUIData& data) override;
 
   // estimator-specific plots
   void Plots(mjvFigure* fig_planner, mjvFigure* fig_timer, int planner_shift,
@@ -132,10 +132,10 @@ class Unscented : public Estimator {
   // sensor noise (nsensordata_)
   std::vector<double> noise_sensor;
 
-  // sigma step 
+  // sigma step
   double sigma_step;
 
-  // weights 
+  // weights
   double weight_mean0;
   double weight_covariance0;
   double weight_sigma;
@@ -143,7 +143,7 @@ class Unscented : public Estimator {
   // settings
   struct Settings {
     double alpha = 1.0;
-    double beta = 2.0; 
+    double beta = 2.0;
   } settings;
 
  private:
@@ -203,13 +203,13 @@ class Unscented : public Estimator {
   // covariance state state (ndstate_ x ndstate_)
   std::vector<double> covariance_state_state_;
 
-  // sensor difference outer product 
+  // sensor difference outer product
   std::vector<double> sensor_difference_outer_product_;
 
-  // state sensor difference outer product 
+  // state sensor difference outer product
   std::vector<double> state_sensor_difference_outer_product_;
 
-  // state state difference outer product 
+  // state state difference outer product
   std::vector<double> state_state_difference_outer_product_;
 
   // covariance sensor factor (nsensordata_ x nsensordata_)

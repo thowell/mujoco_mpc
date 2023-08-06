@@ -20,6 +20,7 @@
 #include <mutex>
 #include <vector>
 
+#include "mjpc/estimators/gui.h"
 #include "mjpc/utilities.h"
 
 namespace mjpc {
@@ -77,8 +78,7 @@ class Estimator {
   virtual void SetCovariance(const double* covariance) = 0;
 
   // estimator-specific GUI elements
-  virtual void GUI(mjUI& ui, double* process_noise, double* sensor_noise,
-                   double& timestep, int& integrator) = 0;
+  virtual void GUI(mjUI& ui, EstimatorGUIData& data) = 0;
 
   // estimator-specific plots
   virtual void Plots(mjvFigure* fig_planner, mjvFigure* fig_timer,
@@ -219,8 +219,7 @@ class GroundTruth : public Estimator {
   };
 
   // estimator-specific GUI elements
-  void GUI(mjUI& ui, double* process_noise, double* sensor_noise,
-           double& timestep, int& integrator) override {};
+  void GUI(mjUI& ui, EstimatorGUIData& data) override {};
 
   // estimator-specific plots
   void Plots(mjvFigure* fig_planner, mjvFigure* fig_timer, int planner_shift,

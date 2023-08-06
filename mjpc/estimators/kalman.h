@@ -21,6 +21,7 @@
 #include <vector>
 
 #include "mjpc/estimators/estimator.h"
+#include "mjpc/estimators/gui.h"
 #include "mjpc/utilities.h"
 
 namespace mjpc {
@@ -35,7 +36,7 @@ class Kalman : public Estimator {
     Reset();
   }
 
-  // destructor 
+  // destructor
   ~Kalman() {
     if (data_) mj_deleteData(data_);
     if (model) mj_deleteModel(model);
@@ -53,31 +54,31 @@ class Kalman : public Estimator {
   // update time
   void UpdatePrediction();
 
-  // update 
+  // update
   void Update(const double* ctrl, const double* sensor) override {
     UpdateMeasurement(ctrl, sensor);
     UpdatePrediction();
   }
 
-  // get state 
+  // get state
   double* State() override { return state.data(); };
 
-  // get covariance 
+  // get covariance
   double* Covariance() override { return covariance.data(); };
 
-  // get time 
+  // get time
   double& Time() override { return time; };
 
-  // get model 
+  // get model
   mjModel* Model() override { return model; };
 
-  // get data 
+  // get data
   mjData* Data() override { return data_; };
 
-  // get process noise 
+  // get process noise
   double* ProcessNoise() override { return noise_process.data(); };
 
-  // get sensor noise 
+  // get sensor noise
   double* SensorNoise() override { return noise_sensor.data(); };
 
   // dimension process
@@ -103,8 +104,7 @@ class Kalman : public Estimator {
   double TimerPrediction() const { return timer_prediction_; };
 
   // estimator-specific GUI elements
-  void GUI(mjUI& ui, double* process_noise, double* sensor_noise,
-           double& timestep, int& integrator) override;
+  void GUI(mjUI& ui, EstimatorGUIData& data) override;
 
   // estimator-specific plots
   void Plots(mjvFigure* fig_planner, mjvFigure* fig_timer, int planner_shift,
@@ -135,7 +135,7 @@ class Kalman : public Estimator {
  private:
   // dimensions
   int nstate_;
-  int ndstate_;  
+  int ndstate_;
   int nsensordata_;
   int nsensor_;
 

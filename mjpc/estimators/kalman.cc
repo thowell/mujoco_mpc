@@ -20,6 +20,8 @@
 #include <vector>
 
 #include "mjpc/array_safety.h"
+#include "mjpc/estimators/estimator.h"
+#include "mjpc/estimators/gui.h"
 #include "mjpc/utilities.h"
 
 namespace mjpc {
@@ -289,14 +291,14 @@ void Kalman::UpdatePrediction() {
 }
 
 // estimator-specific GUI elements
-void Kalman::GUI(mjUI& ui, double* process_noise, double* sensor_noise, double& timestep, int& integrator) {
+void Kalman::GUI(mjUI& ui, EstimatorGUIData& data) {
  
   // ----- estimator ------ // 
   mjuiDef defEstimator[] = {
     {mjITEM_SECTION, "Estimator Settings", 1, nullptr, "AP"}, // needs new section to satisfy mjMAXUIITEM
     {mjITEM_BUTTON, "Reset", 2, nullptr, ""},
-    {mjITEM_SLIDERNUM, "Timestep", 2, &timestep, "1.0e-3 0.1"},
-    {mjITEM_SELECT, "Integrator", 2, &integrator, "Euler\nRK4\nImplicit\nFastImplicit"},
+    {mjITEM_SLIDERNUM, "Timestep", 2, &data.timestep, "1.0e-3 0.1"},
+    {mjITEM_SELECT, "Integrator", 2, &data.integrator, "Euler\nRK4\nImplicit\nFastImplicit"},
     {mjITEM_END}
   };
 
@@ -316,7 +318,7 @@ void Kalman::GUI(mjUI& ui, double* process_noise, double* sensor_noise, double& 
   for (int i = 0; i < DimensionProcess(); i++) {
     // element
     defProcessNoise[process_noise_shift] = {mjITEM_SLIDERNUM, "", 2,
-                                            process_noise + i, "1.0e-8 0.01"};
+                                            data.process_noise.data() + i, "1.0e-8 0.01"};
 
     // set name
     mju::strcpy_arr(defProcessNoise[process_noise_shift].name, "");
@@ -485,7 +487,7 @@ void Kalman::GUI(mjUI& ui, double* process_noise, double* sensor_noise, double& 
     for (int j = 0; j < dim_sensor; j++) {
       // element
       defSensorNoise[sensor_noise_shift] = {
-          mjITEM_SLIDERNUM, "", 2, sensor_noise + sensor_noise_shift - 1,
+          mjITEM_SLIDERNUM, "", 2, data.sensor_noise.data() + sensor_noise_shift - 1,
           "1.0e-8 0.01"};
 
       // sensor name

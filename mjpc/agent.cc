@@ -122,14 +122,19 @@ void Agent::Initialize(const mjModel* model) {
   // initialize estimator data
   ctrl.resize(model->nu);
   sensor.resize(model->nsensordata);
-  state.resize(model->nq + model->nv + model->na);
-  timestep = estimator->Model()->opt.timestep;
-  integrator = estimator->Model()->opt.integrator;
-  process_noise.resize(estimator->DimensionProcess());
-  sensor_noise.resize(estimator->DimensionSensor());
-  mju_copy(process_noise.data(), estimator->ProcessNoise(),
+  estimator_state.resize(model->nq + model->nv + model->na);
+
+  // initialize estimator GUI data
+  estimator_gui_data.Initialize(estimator->Model(),
+                                estimator->DimensionProcess(),
+                                estimator->DimensionSensor());
+
+  // set initial process noise
+  mju_copy(estimator_gui_data.process_noise.data(), estimator->ProcessNoise(),
            estimator->DimensionProcess());
-  mju_copy(sensor_noise.data(), estimator->SensorNoise(),
+
+  // set initial sensor noise
+  mju_copy(estimator_gui_data.sensor_noise.data(), estimator->SensorNoise(),
            estimator->DimensionSensor());
 
   // status
@@ -689,8 +694,7 @@ void Agent::GUI(mjUI& ui) {
 
   // estimator
   if (ActiveEstimatorIndex() > 0) {
-    ActiveEstimator().GUI(ui, process_noise.data(), sensor_noise.data(),
-                          timestep, integrator);
+    ActiveEstimator().GUI(ui, estimator_gui_data);
   }
 }
 
