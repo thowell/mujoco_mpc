@@ -292,16 +292,21 @@ void Batch::Initialize(const mjModel* model) {
 }
 
 // reset memory
-void Batch::Reset() {
+void Batch::Reset(const mjData* data) {
   // dimension
   int nq = model->nq, nv = model->nv, na = model->na;
 
   // data
   mjData* d = data_[0].get();
 
-  // set home keyframe
-  int home_id = mj_name2id(model, mjOBJ_KEY, "home");
-  if (home_id >= 0) mj_resetDataKeyframe(model, d, home_id);
+  if (data) {
+    // copy input data 
+    mj_copyData(d, model, data);
+  } else {
+    // set home keyframe
+    int home_id = mj_name2id(model, mjOBJ_KEY, "home");
+    if (home_id >= 0) mj_resetDataKeyframe(model, d, home_id);
+  }
 
   // forward evaluation
   mj_forward(model, d);
@@ -310,8 +315,7 @@ void Batch::Reset() {
   mju_copy(state.data(), d->qpos, nq);
   mju_copy(state.data() + nq, d->qvel, nv);
   mju_copy(state.data() + nq + nv, d->act, na);
-  d->time = 0.0;
-  time = 0.0;
+  time = d->time;
 
   // covariance
   mju_eye(covariance.data(), ndstate_);
@@ -1922,7 +1926,7 @@ void Batch::InitializeFilter() {
   configuration_previous.Set(configuration.Get(0), 0);
 
   // set times
-  double current_time = -1.0 * timestep;
+  double current_time = time - timestep;
   times.Set(&current_time, 0);
   for (int i = 1; i < configuration_length_; i++) {
     // increment time

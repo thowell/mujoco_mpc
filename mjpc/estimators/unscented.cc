@@ -150,21 +150,28 @@ void Unscented::Initialize(const mjModel* model) {
 }
 
 // reset memory
-void Unscented::Reset() {
+void Unscented::Reset(const mjData* data) {
   // dimension
   int nq = model->nq, nv = model->nv, na = model->na;
 
-  // set home keyframe
-  int home_id = mj_name2id(model, mjOBJ_KEY, "home");
-  if (home_id >= 0) mj_resetDataKeyframe(model, data_, home_id);
+  if (data) {
+    // state
+    mju_copy(state.data(), data->qpos, nq);
+    mju_copy(state.data() + nq, data->qvel, nv);
+    mju_copy(state.data() + nq + nv, data->act, na);
+    time = data->time;
+  } else {
+    // set home keyframe
+    int home_id = mj_name2id(model, mjOBJ_KEY, "home");
+    if (home_id >= 0) mj_resetDataKeyframe(model, data_, home_id);
 
-  // state
-  mju_copy(state.data(), data_->qpos, nq);
-  mju_copy(state.data() + nq, data_->qvel, nv);
-  mju_copy(state.data() + nq + nv, data_->act, na);
-  data_->time = 0.0;
-  time = 0.0;
-
+    // state
+    mju_copy(state.data(), data_->qpos, nq);
+    mju_copy(state.data() + nq, data_->qvel, nv);
+    mju_copy(state.data() + nq + nv, data_->act, na);
+    time = data_->time;
+  }
+  
   // covariance
   mju_eye(covariance.data(), ndstate_);
   double covariance_scl =

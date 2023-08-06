@@ -46,7 +46,7 @@ class Kalman : public Estimator {
   void Initialize(const mjModel* model) override;
 
   // reset memory
-  void Reset() override;
+  void Reset(const mjData* data = nullptr) override;
 
   // update measurement
   void UpdateMeasurement(const double* ctrl, const double* sensor);

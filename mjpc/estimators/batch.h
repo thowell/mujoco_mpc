@@ -89,7 +89,7 @@ class Batch : public Estimator {
   void Initialize(const mjModel* model) override;
 
   // reset memory
-  void Reset() override;
+  void Reset(const mjData* data = nullptr) override;
 
   // update
   void Update(const double* ctrl, const double* sensor) override;

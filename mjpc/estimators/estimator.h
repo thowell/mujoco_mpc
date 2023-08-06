@@ -39,7 +39,7 @@ class Estimator {
   virtual void Initialize(const mjModel* model) = 0;
 
   // reset memory
-  virtual void Reset() = 0;
+  virtual void Reset(const mjData* data = nullptr) = 0;
 
   // update 
   virtual void Update(const double* ctrl, const double* sensor) = 0;
@@ -144,22 +144,29 @@ class GroundTruth : public Estimator {
     noise_sensor.resize(nsensordata_); // over allocate
   }
 
-  // reset 
-  void Reset() override {
-    // dimensions 
+  // reset
+  void Reset(const mjData* data = nullptr) override {
+    // dimensions
     int nq = model->nq, nv = model->nv, na = model->na;
     int ndstate = 2 * nv + na;
 
-    // set home keyframe
-    int home_id = mj_name2id(model, mjOBJ_KEY, "home");
-    if (home_id >= 0) mj_resetDataKeyframe(model, data_, home_id);
+    if (data) {
+      mju_copy(state.data(), data->qpos, nq);
+      mju_copy(state.data() + nq, data->qvel, nv);
+      mju_copy(state.data() + nq + nv, data->act, na);
+      time = data->time;
+    } else { // model default
+      // set home keyframe
+      int home_id = mj_name2id(model, mjOBJ_KEY, "home");
+      if (home_id >= 0) mj_resetDataKeyframe(model, data_, home_id);
 
-    // state
-    mju_copy(state.data(), data_->qpos, nq);
-    mju_copy(state.data() + nq, data_->qvel, nv);
-    mju_copy(state.data() + nq + nv, data_->act, na);
-    time = 0.0;
-
+      // state
+      mju_copy(state.data(), data_->qpos, nq);
+      mju_copy(state.data() + nq, data_->qvel, nv);
+      mju_copy(state.data() + nq + nv, data_->act, na);
+      time = data_->time;
+    }
+    
     // covariance
     mju_eye(covariance.data(), ndstate);
     double covariance_scl =

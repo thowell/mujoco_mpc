@@ -778,6 +778,20 @@ void Agent::AgentEvent(mjuiItem* it, mjData* data,
   }
 }
 
+// agent-based GUI event
+void Agent::EstimatorEvent(mjuiItem* it, mjData* data,
+                           std::atomic<int>& uiloadrequest, int& run) {
+  switch (it->itemid) {
+    case 0:  // reset estimator
+      if (model_) {
+        this->ActiveEstimator().Reset(data);
+        this->PlotInitialize();
+        this->PlotReset();
+      }
+      break;
+  }
+}
+
 // initialize plots
 void Agent::PlotInitialize() {
   // set figures to default

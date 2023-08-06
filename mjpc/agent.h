@@ -96,6 +96,10 @@ class Agent {
   void AgentEvent(mjuiItem* it, mjData* data, std::atomic<int>& uiloadrequest,
                   int& run);
 
+  // estimator-based GUI event
+  void EstimatorEvent(mjuiItem* it, mjData* data,
+                      std::atomic<int>& uiloadrequest, int& run);
+
   // initialize plots
   void PlotInitialize();
 

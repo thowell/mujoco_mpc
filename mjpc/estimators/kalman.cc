@@ -97,21 +97,28 @@ void Kalman::Initialize(const mjModel* model) {
 }
 
 // reset memory
-void Kalman::Reset() {
+void Kalman::Reset(const mjData* data) {
   // dimension
   int nq = model->nq, nv = model->nv, na = model->na;
 
-  // set home keyframe
-  int home_id = mj_name2id(model, mjOBJ_KEY, "home");
-  if (home_id >= 0) mj_resetDataKeyframe(model, data_, home_id);
+  if (data) {
+    // state
+    mju_copy(state.data(), data->qpos, nq);
+    mju_copy(state.data() + nq, data->qvel, nv);
+    mju_copy(state.data() + nq + nv, data->act, na);
+    time = data->time; 
+  } else {
+    // set home keyframe
+    int home_id = mj_name2id(model, mjOBJ_KEY, "home");
+    if (home_id >= 0) mj_resetDataKeyframe(model, data_, home_id);
 
-  // state
-  mju_copy(state.data(), data_->qpos, nq);
-  mju_copy(state.data() + nq, data_->qvel, nv);
-  mju_copy(state.data() + nq + nv, data_->act, na);
-  data_->time = 0.0;
-  time = 0.0;
-
+    // state
+    mju_copy(state.data(), data_->qpos, nq);
+    mju_copy(state.data() + nq, data_->qvel, nv);
+    mju_copy(state.data() + nq + nv, data_->act, na);
+    time = data_->time; 
+  }
+  
   // covariance
   mju_eye(covariance.data(), ndstate_);
   double covariance_scl =
@@ -293,14 +300,15 @@ void Kalman::UpdatePrediction() {
 // estimator-specific GUI elements
 void Kalman::GUI(mjUI& ui, EstimatorGUIData& data) {
  
-  // ----- estimator ------ // 
+  // ----- estimator ------ //
   mjuiDef defEstimator[] = {
-    {mjITEM_SECTION, "Estimator Settings", 1, nullptr, "AP"}, // needs new section to satisfy mjMAXUIITEM
-    {mjITEM_BUTTON, "Reset", 2, nullptr, ""},
-    {mjITEM_SLIDERNUM, "Timestep", 2, &data.timestep, "1.0e-3 0.1"},
-    {mjITEM_SELECT, "Integrator", 2, &data.integrator, "Euler\nRK4\nImplicit\nFastImplicit"},
-    {mjITEM_END}
-  };
+      {mjITEM_SECTION, "Estimator Settings", 1, nullptr,
+       "AP"},  // needs new section to satisfy mjMAXUIITEM
+      {mjITEM_BUTTON, "Reset", 2, nullptr, ""},
+      {mjITEM_SLIDERNUM, "Timestep", 2, &data.timestep, "1.0e-3 0.1"},
+      {mjITEM_SELECT, "Integrator", 2, &data.integrator,
+       "Euler\nRK4\nImplicit\nFastImplicit"},
+      {mjITEM_END}};
 
   // add estimator 
   mjui_add(&ui, defEstimator);

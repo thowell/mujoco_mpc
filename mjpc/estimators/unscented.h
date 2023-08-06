@@ -49,7 +49,7 @@ class Unscented : public Estimator {
   void Initialize(const mjModel* model) override;
 
   // reset memory
-  void Reset() override;
+  void Reset(const mjData* data = nullptr) override;
 
   // compute sigma points
   void SigmaPoints();
