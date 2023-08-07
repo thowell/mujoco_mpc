@@ -761,6 +761,9 @@ void Agent::AgentEvent(mjuiItem* it, mjData* data,
 
         // copy covariance
         ActiveEstimator().SetCovariance(PreviousEstimator().Covariance());
+        
+        // reset estimator 
+        // ActiveEstimator().Reset(data);
 
         // reset agent
         reset_estimator = false;    // skip estimator reset

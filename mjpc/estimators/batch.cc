@@ -2785,7 +2785,7 @@ void Batch::GUI(mjUI& ui, EstimatorGUIData& data) {
       {mjITEM_SLIDERINT, "Horizon", 2, &data.horizon, "3 3"},
       {mjITEM_END}};
 
-  // set number of trajectory slider limits
+  // set estimation horizon limits
   mju::sprintf_arr(defEstimator[4].other, "%i %i", kMinBatchHistory, kMaxFilterHistory);
 
   // add estimator
