@@ -453,6 +453,9 @@ void Unscented::Update(const double* ctrl, const double* sensor) {
   // start timer
   auto start = std::chrono::steady_clock::now();
 
+  // time cache 
+  double time_cache = data_->time;
+
   // dimensions
   int nq = model->nq, nv = model->nv, na = model->na;
 
@@ -531,6 +534,9 @@ void Unscented::Update(const double* ctrl, const double* sensor) {
 
   // symmetrize
   mju_symmetrize(covariance.data(), covariance.data(), ndstate_);
+
+  // update time 
+  time = time_cache + model->opt.timestep;
 
   // stop timer (ms)
   timer_update_ = 1.0e-3 * GetDuration(start);

@@ -148,7 +148,7 @@ void EstimatorLoop(mj::Simulate& sim) {
       int active_estimator = sim.agent->ActiveEstimatorIndex();
       mjpc::Estimator* estimator = &sim.agent->ActiveEstimator();
 
-      // if (active_estimator == 1 || active_estimator == 2) {
+      // estimator update
       if (active_estimator > 0) {
         // start timer
         auto start = std::chrono::steady_clock::now();
@@ -159,10 +159,20 @@ void EstimatorLoop(mj::Simulate& sim) {
         // get simulation state
         {
           const std::lock_guard<std::mutex> lock(sim.mtx);
+          // copy simulation ctrl
           mju_copy(sim.agent->ctrl.data(), d->ctrl, m->nu);
+
+          // copy simulation sensor
           mju_copy(sim.agent->sensor.data(), d->sensordata, m->nsensordata);
-          sim.agent->time = d->time;
-          estimator->Data()->time = sim.agent->time;
+
+          // copy simulation time
+          estimator->Data()->time = d->time;
+
+          // copy simulation mocap
+          mju_copy(estimator->Data()->mocap_pos, d->mocap_pos, 3 * m->nmocap);
+          mju_copy(estimator->Data()->mocap_quat, d->mocap_quat, 4 * m->nmocap);
+
+          // copy simulation userdata
           mju_copy(estimator->Data()->userdata, d->userdata, m->nuserdata);
         }
 
@@ -172,7 +182,7 @@ void EstimatorLoop(mj::Simulate& sim) {
         // copy state
         mju_copy(sim.agent->estimator_state.data(), estimator->State(),
                  m->nq + m->nv + m->na);
-        sim.agent->time = estimator->Data()->time;
+        sim.agent->time = estimator->Time();
 
         // wait (ms)
         while (1.0e-3 * mjpc::GetDuration(start) <

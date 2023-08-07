@@ -560,15 +560,15 @@ void Batch::Update(const double* ctrl, const double* sensor) {
   // dimensions
   int nq = model->nq, nv = model->nv, na = model->na, nu = model->nu;
 
+  // data
+  mjData* d = data_[0].get();
+
   // current time index
   int t = current_time_index;
 
   // configurations
   double* q0 = configuration.Get(t - 1);
   double* q1 = configuration.Get(t);
-
-  // data
-  mjData* d = data_[0].get();
 
   // -- next qpos -- //
 
@@ -619,7 +619,7 @@ void Batch::Update(const double* ctrl, const double* sensor) {
   mju_copy(state.data(), configuration.Get(t + 1), nq);
   mju_copy(state.data() + nq, velocity.Get(t + 1), nv);
   mju_copy(state.data() + nq + nv, act.Get(t + 1), na);
-  time = d->time;
+  time = times.Get(t + 1)[0];
 
   // -- update prior weights -- //
 
@@ -2980,8 +2980,6 @@ void Batch::SetGUIData(EstimatorGUIData& data) {
 
     // update configuration length
     configuration_length_ = horizon;
-
-    printf("increase horizon\n");
   } else if (horizon < configuration_length_) {  // decrease horizon
     // -- prior weights resize -- //
     int nvar = model->nv * configuration_length_;
@@ -3006,8 +3004,6 @@ void Batch::SetGUIData(EstimatorGUIData& data) {
     // update configuration length and current time index
     configuration_length_ = horizon;
     current_time_index -= horizon_diff;
-    
-    printf("decrease horizon\n");
   }
 };
 
