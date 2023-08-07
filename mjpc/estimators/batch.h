@@ -143,6 +143,22 @@ class Batch : public Estimator {
     mj_integratePos(model, q0, state + nq, -1.0 * model->opt.timestep);
   };
 
+  // set time 
+  void SetTime(double time) override {
+    // copy 
+    double time_copy = time;
+
+    // t1
+    times.Set(&time_copy, 1);
+
+    // t0 
+    time_copy -= model->opt.timestep;
+    times.Set(&time_copy, 0);
+
+    // reset current time index 
+    current_time_index = 1;
+  }
+
   // set covariance
   void SetCovariance(const double* covariance) override {
     mju_copy(this->covariance.data(), covariance, ndstate_ * ndstate_);

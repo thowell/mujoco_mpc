@@ -6,7 +6,7 @@
 
   <custom>
     <!-- agent -->
-    <numeric name="agent_planner" data="0" />
+    <numeric name="agent_planner" data="2" />
     <numeric name="agent_horizon" data="2.0" />
     <numeric name="agent_timestep" data="0.01" />
     <numeric name="sampling_sample_width" data="0.01" />
@@ -18,8 +18,10 @@
     <!-- estimator -->
     <numeric name="estimator" data="0" />
     <numeric name="estimator_sensor_start" data="3" />
-    <numeric name="estimator_number_sensor" data="4" />
-    <numeric name="estimator_timestep" data="0.005" />
+    <numeric name="estimator_number_sensor" data="2" />
+    <numeric name="estimator_timestep" data="0.0025" />
+    <numeric name="batch_configuration_length" data="7" />
+    <numeric name="batch_scale_prior" data="1.0e-8" />
   </custom>
 
   <sensor>
@@ -31,9 +33,8 @@
     <!-- estimator -->
     <jointpos name="shoulder" joint="shoulder"/>
     <jointpos name="elbow" joint="elbow"/>
-
-    <jointvel name="vshoulder" joint="shoulder"/>
-    <jointvel name="velbow" joint="elbow"/>
+    <!-- <framepos name="tip_pos" objtype="site" objname="tip" />
+    <framelinvel name="tip_vel" objtype="site" objname="tip"/> -->
 
     <!-- trace -->
     <framepos name="trace0" objtype="site" objname="tip"/>
@@ -45,6 +46,6 @@
 
   <keyframe>
   <!-- Start from bottom position. -->
-  <key name="home" qpos="3.142 0"/>
+  <!-- <key name="home" qpos="3.142 0"/> -->
   </keyframe>
 </mujoco>

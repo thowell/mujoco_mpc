@@ -42,16 +42,6 @@
     <jointpos name="left_knee" joint="left_knee" />
     <jointpos name="left_ankle" joint="left_ankle" />
 
-    <!-- <jointvel name="vrootz" joint="rootz" />
-    <jointvel name="vrootx" joint="rootx" />
-    <jointvel name="vrooty" joint="rooty" />
-    <jointvel name="vright_hip" joint="right_hip" />
-    <jointvel name="vright_knee" joint="right_knee" />
-    <jointvel name="vright_ankle" joint="right_ankle" />
-    <jointvel name="vleft_hip" joint="left_hip" />
-    <jointvel name="vleft_knee" joint="left_knee" />
-    <jointvel name="vleft_ankle" joint="left_ankle" /> -->
-
     <!-- trace -->
     <framepos      name="trace0" objtype="site" objname="torso_site"/>
 

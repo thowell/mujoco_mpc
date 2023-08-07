@@ -74,6 +74,9 @@ class Estimator {
   // set state
   virtual void SetState(const double* state) = 0;
 
+  // set time 
+  virtual void SetTime(double time) = 0;
+
   // set covariance
   virtual void SetCovariance(const double* covariance) = 0;
 
@@ -222,6 +225,11 @@ class GroundTruth : public Estimator {
   void SetState(const double* state) override {
     mju_copy(this->state.data(), state, ndstate_);
   };
+
+  // set time 
+  void SetTime(double time) override {
+    this->time = time;
+  }
 
   // set covariance
   void SetCovariance(const double* covariance) override {
