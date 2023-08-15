@@ -1680,4 +1680,24 @@ void Slerp(double* res, const double* quat0, const double* quat1, double t,
   }
 }
 
+// set symmetric block matrix in band matrix
+void SetBlockInBand(double* band, const double* block, int ntotal, int nband,
+                    int nblock, int shift) {
+  // loop over block rows
+  for (int i = 0; i < nblock; i++) {
+    // width of block lower triangle row
+    int width = i + 1;
+
+    // number of leading zeros in band row
+    int row_shift = nband - width;
+
+    // row segments
+    double* band_row = band + (shift + i) * nband + row_shift;
+    const double* block_row = block + i * nblock;
+
+    // copy block row segment into band row
+    mju_addTo(band_row, block_row, width);
+  }
+}
+
 }  // namespace mjpc

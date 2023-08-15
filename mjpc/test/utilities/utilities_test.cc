@@ -722,10 +722,6 @@ TEST(QuaternionInterpolation, Slerp) {
   double quat0[4] = {1.0, 0.0, 0.0, 0.0};
   double quat1[4] = {0.7071, 0.0, 0.7071, 0.0};
   mju_normalize4(quat1);
-  // printf("quat0 = \n");
-  // mju_printMat(quat0, 1, 4);
-  // printf("quat1 = \n");
-  // mju_printMat(quat1, 1, 4);
 
   // -- slerp: t = 0 -- //
   double t = 0.0;
@@ -733,9 +729,6 @@ TEST(QuaternionInterpolation, Slerp) {
   double jac00[9];
   double jac01[9];
   Slerp(slerp0, quat0, quat1, t, jac00, jac01);
-
-  // printf("slerp0 = \n");
-  // mju_printMat(slerp0, 1, 4);
 
   // test
   double error[4];
@@ -749,9 +742,6 @@ TEST(QuaternionInterpolation, Slerp) {
   double jac11[9];
   Slerp(slerp1, quat0, quat1, t, jac10, jac11);
 
-  // printf("slerp1 = \n");
-  // mju_printMat(slerp1, 1, 4);
-
   // test
   mju_sub(error, slerp1, quat1, 4);
   EXPECT_NEAR(mju_norm(error, 4), 0.0, 1.0e-4);
@@ -762,9 +752,6 @@ TEST(QuaternionInterpolation, Slerp) {
   double jac050[9];
   double jac051[9];
   Slerp(slerp05, quat0, quat1, t, jac050, jac051);
-
-  // printf("slerp05 = \n");
-  // mju_printMat(slerp05, 1, 4);
 
   // test
   double slerp05_solution[4] = {0.92387953, 0.0, 0.38268343, 0.0};
@@ -826,18 +813,6 @@ TEST(QuaternionInterpolation, Slerp) {
   mju_sub(error_jac, jac051, jac1fd, 9);
   EXPECT_NEAR(mju_norm(error_jac, 9) / 9, 0.0, 1.0e-3);
 
-  // printf("jac0fd = \n");
-  // mju_printMat(jac0fd, 3, 3);
-
-  // printf("jac050 = \n");
-  // mju_printMat(jac050, 3, 3);
-
-  // printf("jac1fd = \n");
-  // mju_printMat(jac1fd, 3, 3);
-
-  // printf("jac051 = \n");
-  // mju_printMat(jac051, 3, 3);
-
   // -- t = 0.0 -- //
   t = 0.0;
 
@@ -880,18 +855,6 @@ TEST(QuaternionInterpolation, Slerp) {
   mju_sub(error_jac, jac01, jac1fd, 9);
   EXPECT_NEAR(mju_norm(error_jac, 9) / 9, 0.0, 1.0e-3);
 
-  // printf("jac0fd = \n");
-  // mju_printMat(jac0fd, 3, 3);
-
-  // printf("jac00 = \n");
-  // mju_printMat(jac00, 3, 3);
-
-  // printf("jac1fd = \n");
-  // mju_printMat(jac1fd, 3, 3);
-
-  // printf("jac01 = \n");
-  // mju_printMat(jac01, 3, 3);
-
   // -- t = 1.0 -- //
   t = 1.0;
 
@@ -933,18 +896,76 @@ TEST(QuaternionInterpolation, Slerp) {
 
   mju_sub(error_jac, jac11, jac1fd, 9);
   EXPECT_NEAR(mju_norm(error_jac, 9) / 9, 0.0, 1.0e-3);
+}
 
-  // printf("jac0fd = \n");
-  // mju_printMat(jac0fd, 3, 3);
+TEST(BlockInBand, Set) {
+  // set up (0)
+  double block0[9] = {1, 2, 3, 2, 4, 5, 3, 5, 6};
+  int ntotal = 3;
+  int nband = 3;
+  int nblock = 3;
 
-  // printf("jac10 = \n");
-  // mju_printMat(jac10, 3, 3);
+  // band 
+  double band0[9] = {0};
 
-  // printf("jac1fd = \n");
-  // mju_printMat(jac1fd, 3, 3);
+  // set block in band
+  SetBlockInBand(band0, block0, ntotal, nband, nblock, 0);
 
-  // printf("jac11 = \n");
-  // mju_printMat(jac11, 3, 3);
+  // band solution 
+  double band0_sol[9] = {0, 0, 1, 0, 2, 4, 3, 5, 6};
+
+  // test 
+  for (int i = 0; i < 9; i++) {
+    EXPECT_NEAR(band0[i], band0_sol[i], 1.0e-6);
+  }
+
+  // set up (1)
+  double block1a[4] = {1, 2, 2, 3};
+  double block1b[4] = {6, 8, 8, 9};
+
+  ntotal = 4;
+  nband = 2;
+  nblock = 2;
+
+  double band1[8] = {0};
+
+  // set blocka in band 
+  SetBlockInBand(band1, block1a, ntotal, nband, nblock, 0);
+
+  // set blockb in band 
+  SetBlockInBand(band1, block1b, ntotal, nband, nblock, 2);
+
+  // band solution 
+  double band1_sol[8] = {0, 1, 2, 3, 0, 6, 8, 9};
+
+  // test 
+  for (int i = 0; i < 8; i++) {
+    EXPECT_NEAR(band1[i], band1_sol[i], 1.0e-6);
+  }
+
+  // set up (2)
+  double block2a[9] = {1, 2, 4, 2, 2, 4, 4, 4, 5};
+  double block2b[9] = {1, 1, 7, 1, 1, 8, 7, 8, 9};
+
+  ntotal = 4;
+  nband = 3;
+  nblock = 3;
+
+  double band2[12] = {0};
+
+  // set block2a in band 
+  SetBlockInBand(band2, block2a, ntotal, nband, nblock, 0);
+
+  // set block2b in band 
+  SetBlockInBand(band2, block2b, ntotal, nband, nblock, 1);
+
+  // band solution 
+  double band2_sol[12] = {0, 0, 1, 0, 2, 3, 4, 5, 6, 7, 8, 9};
+
+  // test 
+  for (int i = 0; i < 12; i++) {
+    EXPECT_NEAR(band2[i], band2_sol[i], 1.0e-6);
+  }
 }
 
 }  // namespace

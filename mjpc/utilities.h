@@ -413,6 +413,10 @@ void DifferentiateQuatIntegrate(double* jacquat, double* jacvel,
 void Slerp(double* res, const double* quat0, const double* quat1, double t,
            double* jac0, double* jac1);
 
+// set symmetric block matrix in band matrix
+void SetBlockInBand(double* band, const double* block, int ntotal, int nband,
+                    int nblock, int shift);
+
 }  // namespace mjpc
 
 #endif  // MJPC_UTILITIES_H_
