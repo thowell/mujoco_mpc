@@ -67,6 +67,7 @@ class Batch : public Estimator {
   Batch() = default;
   Batch(int mode) {
     settings.filter = mode;
+    settings.prior_flag = true;
     max_history_ = kMaxFilterHistory;
   }
   Batch(const mjModel* model, int length = 3, int max_history_ = 0) {
@@ -241,6 +242,26 @@ class Batch : public Estimator {
   double Expected() const { return expected_; }
   double ReductionRatio() const { return reduction_ratio_; }
 
+  // set prior weights 
+  void SetPriorWeights(const double* weights, double scale = 1.0) {
+    // dimension 
+    int nv = model->nv;
+    int ntotal = nv * configuration_length_;
+
+    // allocate memory
+    weight_prior_.resize(ntotal * ntotal);
+    weight_prior_band_.resize(ntotal * (3 * nv));
+
+    // set weights 
+    mju_copy(weight_prior_.data(), weights, ntotal * ntotal);
+
+    // set scaling
+    scale_prior = scale;
+
+    // set flag
+    settings.prior_flag = true;
+  }
+
   // model
   mjModel* model = nullptr;
 
@@ -257,10 +278,8 @@ class Batch : public Estimator {
   // sensor noise (nsensor_)
   std::vector<double> noise_sensor;
 
-  // prior
+  // prior scaling
   double scale_prior;
-  std::vector<double>
-      weight_prior;  // (nv * max_history_) * (nv * max_history_)
 
   // trajectories
   EstimatorTrajectory<double> configuration;           // nq x T
@@ -285,7 +304,7 @@ class Batch : public Estimator {
 
   // settings
   struct BatchSettings {
-    bool prior_flag = true;   // flag for prior cost computation
+    bool prior_flag = false;  // flag for prior cost computation
     bool sensor_flag = true;  // flag for sensor cost computation
     bool force_flag = true;   // flag for force cost computation
     int max_search_iterations =
@@ -297,7 +316,6 @@ class Batch : public Estimator {
     bool verbose_optimize = false;   // flag for printing optimize status
     bool verbose_cost = false;       // flag for printing cost
     bool verbose_prior = false;  // flag for printing prior weight update status
-    bool band_prior = true;      // approximate covariance for prior
     SearchType search_type =
         kCurveSearch;           // search type (line search, curve search)
     double step_scaling = 0.5;  // step size scaling
@@ -524,11 +542,12 @@ class Batch : public Estimator {
   std::vector<double> norm_gradient_force_;   // nv * max_history_
 
   // norm Hessian
-  std::vector<double> norm_hessian_sensor_;  // (ns * ns * max_history_)
   std::vector<double>
-      norm_hessian_force_;  // (nv * max_history_) * (nv * max_history_)
-  std::vector<double> norm_blocks_sensor_;  // (ns * ns) x max_history_
-  std::vector<double> norm_blocks_force_;   // (nv * nv) x max_history_
+      norm_hessian_sensor_;  // (ns * max_history_) x (ns * max_history_)
+  std::vector<double>
+      norm_hessian_force_;  // (nv * max_history_) x (nv * max_history_)
+  std::vector<double> norm_blocks_sensor_;   // (ns * ns) x max_history_
+  std::vector<double> norm_blocks_force_;    // (nv * nv) x max_history_
 
   // cost gradient
   std::vector<double> cost_gradient_prior_;   // nv * max_history_
@@ -572,15 +591,9 @@ class Batch : public Estimator {
 
   // prior weights
   std::vector<double>
+      weight_prior_;  // (nv * max_history_) * (nv * max_history_)
+  std::vector<double>
       weight_prior_band_;  // (nv * max_history_) * (nv * max_history_)
-
-  // covariance
-  std::vector<double>
-      prior_matrix_factor_;  // (nv * max_history_) * (nv * max_history_)
-  std::vector<double>
-      scratch0_covariance_;  // (nv * max_history_) * (nv * max_history_)
-  std::vector<double>
-      scratch1_covariance_;  // (nv * max_history_) * (nv * max_history_)
 
   // conditioned matrix
   std::vector<double> mat00_;

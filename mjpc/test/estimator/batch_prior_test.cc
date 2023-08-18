@@ -45,11 +45,8 @@ TEST(PriorCost, Particle) {
 
   // ----- estimator ----- //
   Batch estimator(model, T);
-  estimator.scale_prior = 5.0;
-  estimator.settings.prior_flag = true;
   estimator.settings.sensor_flag = false;
   estimator.settings.force_flag = false;
-  estimator.settings.band_prior = false;
 
   // copy configuration, prior
   mju_copy(estimator.configuration.Data(), sim.qpos.Data(), nq * T);
@@ -76,11 +73,11 @@ TEST(PriorCost, Particle) {
   mju_mulMatTMat(P.data(), F.data(), F.data(), nvar, nvar, nvar);
 
   // set prior
-  mju_copy(estimator.weight_prior.data(), P.data(), nvar * nvar);
+  estimator.SetPriorWeights(P.data(), 5.0);
 
   // ----- cost ----- //
-  auto cost_prior = [&estimator = estimator,
-                     &model = model](const double* configuration) {
+  auto cost_prior = [&estimator = estimator, &model = model,
+                     &P = P](const double* configuration) {
     // dimension
     int nq = model->nq;
     int nv = model->nv;
@@ -103,10 +100,15 @@ TEST(PriorCost, Particle) {
 
     // ----- 0.5 * w * r' * P * r ----- //
 
+    // weights band
+    std::vector<double> weight_band(nvar * nvar);
+    mju_dense2Band(weight_band.data(), P.data(), nvar,
+                   3 * nv, 0);
+
     // scratch
     std::vector<double> scratch(nvar);
-    mju_mulMatVec(scratch.data(), estimator.weight_prior.data(),
-                  residual.data(), nvar, nvar);
+    mju_bandMulMatVec(scratch.data(), weight_band.data(), residual.data(), nvar,
+                      3 * nv, 0, 1, true);
 
     // weighted cost
     return 0.5 * estimator.scale_prior / nvar *
@@ -153,85 +155,6 @@ TEST(PriorCost, Particle) {
   EXPECT_NEAR(mju_norm(hessian_error.data(), nvar * nvar) / (nvar * nvar), 0.0,
               1.0e-3);
 
-  // ----- band prior ----- //
-  // change settings
-  estimator.settings.band_prior = true;
-
-  // ----- cost ----- //
-  auto cost_band_prior = [&estimator = estimator,
-                          &model = model](const double* configuration) {
-    // dimension
-    int nq = model->nq;
-    int nv = model->nv;
-    int T = estimator.ConfigurationLength();
-    int nvar = nv * T;
-
-    // residual
-    std::vector<double> residual(nvar);
-
-    // loop over configurations
-    for (int t = 0; t < T; t++) {
-      // terms
-      double* rt = residual.data() + t * nv;
-      double* qt_prior = estimator.configuration_previous.Get(t);
-      const double* qt = configuration + t * nq;
-
-      // configuration difference
-      mju_sub(rt, qt, qt_prior, nv);
-    }
-
-    // ----- 0.5 * w * r' * P * r ----- //
-
-    // weights band
-    std::vector<double> weight_band(nvar * nvar);
-    mju_dense2Band(weight_band.data(), estimator.weight_prior.data(), nvar,
-                   3 * nv, 0);
-
-    // scratch
-    std::vector<double> scratch(nvar);
-    mju_bandMulMatVec(scratch.data(), weight_band.data(), residual.data(), nvar,
-                      3 * nv, 0, 1, true);
-
-    // weighted cost
-    return 0.5 * estimator.scale_prior / nvar *
-           mju_dot(residual.data(), scratch.data(), nvar);
-  };
-
-  // ----- lambda ----- //
-
-  // cost
-  double cost_band_lambda = cost_band_prior(estimator.configuration.Data());
-
-  // gradient
-  fdg.Compute(cost_band_prior, estimator.configuration.Data(), nvar);
-
-  // Hessian
-  fdh.Compute(cost_band_prior, estimator.configuration.Data(), nvar);
-
-  // ----- estimator ----- //
-
-  // evaluate cost
-  std::fill(cost_gradient.begin(), cost_gradient.end(), 0.0);
-  std::fill(cost_hessian.begin(), cost_hessian.end(), 0.0);
-  double cost_band_estimator =
-      estimator.Cost(cost_gradient.data(), cost_hessian.data(), pool);
-
-  // ----- error ----- //
-
-  // cost
-  EXPECT_NEAR(cost_band_estimator - cost_band_lambda, 0.0, 1.0e-4);
-
-  // gradient
-  mju_sub(gradient_error.data(), cost_gradient.data(), fdg.gradient.data(),
-          nvar);
-  EXPECT_NEAR(mju_norm(gradient_error.data(), nvar) / nvar, 0.0, 1.0e-4);
-
-  // Hessian
-  mju_sub(hessian_error.data(), cost_hessian.data(), fdh.hessian.data(),
-          nvar * nvar);
-  EXPECT_NEAR(mju_norm(hessian_error.data(), nvar * nvar) / (nvar * nvar), 0.0,
-              1.0e-3);
-
   // delete data + model
   mj_deleteData(data);
   mj_deleteModel(model);
@@ -255,11 +178,8 @@ TEST(PriorCost, Box) {
 
   // ----- estimator ----- //
   Batch estimator(model, T);
-  estimator.scale_prior = 5.0;
-  estimator.settings.prior_flag = true;
   estimator.settings.sensor_flag = false;
   estimator.settings.force_flag = false;
-  estimator.settings.band_prior = false;
 
   // copy configuration, prior
   mju_copy(estimator.configuration.Data(), sim.qpos.Data(), nq * T);
@@ -288,11 +208,11 @@ TEST(PriorCost, Box) {
   mju_mulMatTMat(P.data(), F.data(), F.data(), nvar, nvar, nvar);
 
   // set prior
-  mju_copy(estimator.weight_prior.data(), P.data(), nvar * nvar);
+  estimator.SetPriorWeights(P.data(), 5.0);
 
   // ----- cost ----- //
-  auto cost_prior = [&estimator = estimator,
-                     &model = model](const double* update) {
+  auto cost_prior = [&estimator = estimator, &model = model,
+                     &P = P](const double* update) {
     // dimension
     int nq = model->nq;
     int nv = model->nv;
@@ -324,10 +244,15 @@ TEST(PriorCost, Box) {
 
     // ----- 0.5 * w * r' * P * r ----- //
 
+    // weights band
+    std::vector<double> weight_band(nvar * nvar);
+    mju_dense2Band(weight_band.data(), P.data(), nvar,
+                   3 * nv, 0);
+
     // scratch
     std::vector<double> scratch(nvar);
-    mju_mulMatVec(scratch.data(), estimator.weight_prior.data(),
-                  residual.data(), nvar, nvar);
+    mju_bandMulMatVec(scratch.data(), weight_band.data(), residual.data(), nvar,
+                      3 * nv, 0, 1, true);
 
     // weighted cost
     return 0.5 * estimator.scale_prior / nvar *
@@ -346,10 +271,6 @@ TEST(PriorCost, Box) {
   // gradient
   FiniteDifferenceGradient fdg(nvar);
   fdg.Compute(cost_prior, update.data(), nvar);
-
-  // Hessian
-  FiniteDifferenceHessian fdh(nvar);
-  fdh.Compute(cost_prior, update.data(), nvar);
 
   // ----- estimator ----- //
   ThreadPool pool(1);
