@@ -24,7 +24,7 @@
 namespace mjpc {
 namespace {
 
-TEST(MeasurementCost, Particle) {
+TEST(SensorCost, Particle) {
   // load model
   // note: needs to be a linear system to satisfy Gauss-Newton Hessian
   // approximation
@@ -240,11 +240,18 @@ TEST(MeasurementCost, Particle) {
   estimator.settings.sensor_flag = true;
   estimator.settings.force_flag = false;
 
-  // cost
+  // ----- estimator cost ----- //
   std::vector<double> cost_gradient(nvar);
   std::vector<double> cost_hessian(nvar * nvar);
+  std::vector<double> cost_hessian_band(nvar * 3 * nv);
+
+  // evaluate cost
   double cost_estimator =
-      estimator.Cost(cost_gradient.data(), cost_hessian.data(), pool);
+      estimator.Cost(cost_gradient.data(), cost_hessian_band.data(), pool);
+
+  // convert band cost Hessian to dense cost Hessian
+  mju_band2Dense(cost_hessian.data(), cost_hessian_band.data(), nvar, 3 * nv, 0,
+                 1);
 
   // ----- error ----- //
 
@@ -270,7 +277,7 @@ TEST(MeasurementCost, Particle) {
   mj_deleteModel(model);
 }
 
-TEST(MeasurementCost, Box) {
+TEST(SensorCost, Box) {
   // load model
   // note: needs to be a linear system to satisfy Gauss-Newton Hessian
   // approximation

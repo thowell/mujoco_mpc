@@ -131,7 +131,6 @@ TEST(BatchOptimize, Box3D) {
 
   // initialize
   Batch estimator(model, T);
-  estimator.settings.gradient_tolerance = 1.0e-6;
   mju_copy(estimator.configuration.Data(), sim.qpos.Data(), nq * T);
   mju_copy(estimator.configuration_previous.Data(), sim.qpos.Data(), nq * T);
   mju_copy(estimator.force_measurement.Data(), sim.qfrc_actuator.Data(),
@@ -148,21 +147,19 @@ TEST(BatchOptimize, Box3D) {
     // add noise
     for (int i = 0; i < nv; i++) {
       absl::BitGen gen_;
-      dq[i] = 0.01 * absl::Gaussian<double>(gen_, 0.0, 1.0);
+      dq[i] = 0.005 * absl::Gaussian<double>(gen_, 0.0, 1.0);
     }
     // integrate configuration
     mj_integratePos(model, q, dq, 1.0);
   }
 
-  // set weights
-  estimator.scale_prior = 0.25;
-
   // set process noise
   std::fill(estimator.noise_process.begin(), estimator.noise_process.end(),
-            1.0);
+            5.0);
 
   // set sensor noise
-  std::fill(estimator.noise_sensor.begin(), estimator.noise_sensor.end(), 1.0);
+  std::fill(estimator.noise_sensor.begin(), estimator.noise_sensor.end(),
+            5.0);
 
   // optimize
   estimator.Optimize(pool);

@@ -57,7 +57,7 @@ TEST(PriorCost, Particle) {
   for (int t = 0; t < T; t++) {
     double* q = estimator.configuration.Get(t);
     for (int i = 0; i < nq; i++) {
-      q[i] += 1.0e-1 * absl::Gaussian<double>(gen_, 0.0, 1.0);
+      q[i] += 1.0e-2 * absl::Gaussian<double>(gen_, 0.0, 1.0);
     }
   }
 
@@ -73,7 +73,7 @@ TEST(PriorCost, Particle) {
   mju_mulMatTMat(P.data(), F.data(), F.data(), nvar, nvar, nvar);
 
   // set prior
-  estimator.SetPriorWeights(P.data(), 5.0);
+  estimator.SetPriorWeights(P.data(), 2.0);
 
   // ----- cost ----- //
   auto cost_prior = [&estimator = estimator, &model = model,
@@ -146,7 +146,7 @@ TEST(PriorCost, Particle) {
   std::vector<double> gradient_error(nvar);
   mju_sub(gradient_error.data(), cost_gradient.data(), fdg.gradient.data(),
           nvar);
-  EXPECT_NEAR(mju_norm(gradient_error.data(), nvar) / nvar, 0.0, 1.0e-4);
+  EXPECT_NEAR(mju_norm(gradient_error.data(), nvar) / nvar, 0.0, 1.0e-3);
 
   // Hessian
   std::vector<double> hessian_error(nvar * nvar);

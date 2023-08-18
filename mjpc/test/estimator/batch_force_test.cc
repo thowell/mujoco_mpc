@@ -163,11 +163,18 @@ TEST(ForceCost, Particle) {
   FiniteDifferenceHessian fdh(nvar);
   fdh.Compute(cost_inverse_dynamics, estimator.configuration.Data(), nvar);
 
-  // ----- estimator ----- //
+  // ----- estimator cost ----- //
   std::vector<double> cost_gradient(nvar);
   std::vector<double> cost_hessian(nvar * nvar);
+  std::vector<double> cost_hessian_band(nvar * 3 * nv);
+
+  // evaluate cost and derivatives
   double cost_estimator =
-      estimator.Cost(cost_gradient.data(), cost_hessian.data(), pool);
+      estimator.Cost(cost_gradient.data(), cost_hessian_band.data(), pool);
+
+  // convert band cost Hessian to dense cost Hessian
+  mju_band2Dense(cost_hessian.data(), cost_hessian_band.data(), nvar, 3 * nv, 0,
+                 1);
 
   // ----- error ----- //
 

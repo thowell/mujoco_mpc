@@ -193,19 +193,17 @@ void Batch::Initialize(const mjModel* model) {
   cost_gradient_.resize(ntotal);
 
   // cost Hessian
-  cost_hessian_prior_.resize(ntotal * ntotal);
-  cost_hessian_sensor_.resize(ntotal * ntotal);
-  cost_hessian_force_.resize(ntotal * ntotal);
-  cost_hessian_.resize(ntotal * ntotal);
-  cost_hessian_band_.resize(ntotal * ntotal);
-  cost_hessian_band_factor_.resize(ntotal * ntotal);
-  cost_hessian_factor_.resize(ntotal * ntotal);
+  cost_hessian_prior_band_.resize(ntotal * 3 * nv);
+  cost_hessian_sensor_band_.resize(ntotal * 3 * nv);
+  cost_hessian_force_band_.resize(ntotal * 3 * nv);
+  cost_hessian_.resize(settings.filter * ntotal * ntotal);
+  cost_hessian_band_.resize(ntotal * 3 * nv);
+  cost_hessian_band_factor_.resize(ntotal * 3 * nv);
 
   // prior weights - only allocate if prior_flag = true
   scale_prior = GetNumberOrDefault(1.0, model, "batch_scale_prior");
   weight_prior_.resize(settings.prior_flag * ntotal * ntotal);
   weight_prior_band_.resize(settings.prior_flag * ntotal * (3 * nv));
-  scratch_prior_weight_.resize(2 * nv * nv);
 
   // cost norms
   norm_type_sensor.resize(nsensor_);
@@ -245,7 +243,7 @@ void Batch::Initialize(const mjModel* model) {
   norm_blocks_force_.resize(nv * ntotal);
 
   // scratch
-  scratch0_prior_.resize(ntotal);
+  scratch0_prior_.resize(std::max(3 * nv * 3 * nv, ntotal));
   scratch1_prior_.resize(4 * nv * nv);
 
   scratch0_sensor_.resize(std::max(nv, nsensordata_) * 3 * nv * max_history_);
@@ -355,7 +353,7 @@ void Batch::Reset(const mjData* data) {
   std::fill(noise_sensor.begin(), noise_sensor.end(), noise_sensor_scl);
 
   // scale prior
-  scale_prior = GetNumberOrDefault(1.0e-1, model, "batch_scale_prior");
+  scale_prior = GetNumberOrDefault(0.0, model, "batch_scale_prior");
 
   // trajectories
   configuration.Reset();
@@ -447,18 +445,22 @@ void Batch::Reset(const mjData* data) {
 
   // cost Hessian
   std::fill(cost_hessian_prior_.begin(), cost_hessian_prior_.end(), 0.0);
+  std::fill(cost_hessian_prior_band_.begin(), cost_hessian_prior_band_.end(),
+            0.0);
   std::fill(cost_hessian_sensor_.begin(), cost_hessian_sensor_.end(), 0.0);
+  std::fill(cost_hessian_sensor_band_.begin(), cost_hessian_sensor_band_.end(),
+            0.0);
   std::fill(cost_hessian_force_.begin(), cost_hessian_force_.end(), 0.0);
+  std::fill(cost_hessian_force_band_.begin(), cost_hessian_force_band_.end(),
+            0.0);
   std::fill(cost_hessian_.begin(), cost_hessian_.end(), 0.0);
   std::fill(cost_hessian_band_.begin(), cost_hessian_band_.end(), 0.0);
   std::fill(cost_hessian_band_factor_.begin(), cost_hessian_band_factor_.end(),
             0.0);
-  std::fill(cost_hessian_factor_.begin(), cost_hessian_factor_.end(), 0.0);
 
   // weight
   std::fill(weight_prior_.begin(), weight_prior_.end(), 0.0);
   std::fill(weight_prior_band_.begin(), weight_prior_band_.end(), 0.0);
-  std::fill(scratch_prior_weight_.begin(), scratch_prior_weight_.end(), 0.0);
 
   // norm
   std::fill(norm_sensor_.begin(), norm_sensor_.end(), 0.0);
@@ -617,15 +619,24 @@ void Batch::Update(const double* ctrl, const double* sensor) {
 
   // dimension
   int nvar = nv * configuration_length_;
+  int nband = 3 * nv;
 
-  // prior weights
+  // weights 
   double* weights = weight_prior_.data();
+  double* weights_band = weight_prior_band_.data();
+
+  // band to dense prior weights
+  mju_band2Dense(weights, weights_band, nvar, nband, 0, 1);
 
   // recursive update
   if (settings.recursive_prior_update &&
       configuration_length_ == configuration_length_cache) {
     // condition dimension
     int ncondition = nv * (configuration_length_ - 1);
+
+    // band to dense cost Hessian
+    mju_band2Dense(cost_hessian_.data(), cost_hessian_band_.data(), nvar, nband,
+                   0, 1);
 
     // compute conditioned matrix
     double* condmat = condmat_.data();
@@ -637,8 +648,8 @@ void Batch::Update(const double* ctrl, const double* sensor) {
     mju_zero(weights, nvar * nvar);
 
     // set conditioned matrix in prior weights
-    SetBlockInMatrix(weights, condmat, 1.0, nvar, nvar, ncondition, ncondition,
-                     0, 0);
+    SetBlockInMatrix(weights, condmat, 1.0, nvar, nvar, ncondition,
+                     ncondition, 0, 0);
 
     // set bottom right to scale_prior * I
     for (int i = ncondition; i < nvar; i++) {
@@ -668,6 +679,9 @@ void Batch::Update(const double* ctrl, const double* sensor) {
       }
     }
   }
+
+  // dense to band
+  mju_dense2Band(weights_band, weights, nvar, nband, 0);
 
   // restore configuration length
   if (configuration_length_ != configuration_length_cache) {
@@ -881,6 +895,7 @@ double Batch::CostPrior(double* gradient, double* hessian) {
   // residual dimension
   int nv = model->nv;
   int dim = model->nv * configuration_length_;
+  int nband = 3 * nv;
 
   // total scaling
   double scale = scale_prior / dim;
@@ -901,10 +916,6 @@ double Batch::CostPrior(double* gradient, double* hessian) {
     int ntotal = dim;
     int nband = 3 * model->nv;
     int ndense = 0;
-
-    // dense2band
-    mju_dense2Band(weight_prior_band_.data(), weight_prior_.data(), ntotal,
-                    nband, ndense);
 
     // multiply: tmp = P * r
     mju_bandMulMatVec(tmp, weight_prior_band_.data(), r, ntotal, nband,
@@ -942,6 +953,10 @@ double Batch::CostPrior(double* gradient, double* hessian) {
       // number of columns to loop over for row
       int num_cols = mju_min(3, configuration_length_ - t);
 
+      // mat
+      double* mat = scratch0_prior_.data();
+      mju_zero(mat, nband * nband);
+
       for (int j = t; j < t + num_cols; j++) {
         // unpack
         double* bbij =
@@ -950,8 +965,6 @@ double Batch::CostPrior(double* gradient, double* hessian) {
             scratch1_prior_.data() + 1 * nv * nv;
         double* tmp1 =
             scratch1_prior_.data() + 2 * nv * nv;
-        double* tmp2 =
-            scratch1_prior_.data() + 3 * nv * nv;
 
         // get matrices
         BlockFromMatrix(bbij, weight_prior_.data(), nv, nv, dim, dim, t * nv,
@@ -967,15 +980,14 @@ double Batch::CostPrior(double* gradient, double* hessian) {
         // tmp1 = bdi' * tmp0
         mju_mulMatTMat(tmp1, bdi, tmp0, nv, nv, nv);
 
-        // set scaled block in matrix
-        SetBlockInMatrix(hessian, tmp1, scale, dim, dim, nv, nv, t * nv,
-                         j * nv);
-        if (j > t) {
-          mju_transpose(tmp2, tmp1, nv, nv);
-          SetBlockInMatrix(hessian, tmp2, scale, dim, dim, nv, nv, j * nv,
-                           t * nv);
-        }
+        // set scaled block in mat
+        SetBlockInMatrix(mat, tmp1, scale, num_cols * nv, num_cols * nv, nv, nv,
+                         (num_cols - 1) * nv, (j - t) * nv);
       }
+
+      // set mat in band Hessian
+      SetBlockInBand(hessian, mat, 1.0, dim, nband, num_cols * nv,
+                     std::max(-2 * nv + t * nv, 0), (num_cols - 1) * nv);
     }
   }
 
@@ -1057,6 +1069,7 @@ double Batch::CostSensor(double* gradient, double* hessian) {
   // update dimension
   int nv = model->nv, ns = nsensordata_;
   int nvar = nv * configuration_length_;
+  int nband = 3 * nv;
   int nsen = ns * (configuration_length_ - 1);
 
   // residual
@@ -1069,7 +1082,7 @@ double Batch::CostSensor(double* gradient, double* hessian) {
 
   // zero memory
   if (gradient) mju_zero(gradient, nvar);
-  if (hessian) mju_zero(hessian, nvar * nvar);
+  if (hessian) mju_zero(hessian, nvar * 3 * nv);
 
   // time scaling
   double time_scale = 1.0;
@@ -1198,10 +1211,9 @@ double Batch::CostSensor(double* gradient, double* hessian) {
         double* tmp1 = scratch1_sensor_.data();
         mju_mulMatTMat(tmp1, blocki, tmp0, nsi, block_columns, block_columns);
 
-        // add
-        AddBlockInMatrix(hessian, tmp1, weight, nvar, nvar, block_columns,
-                         block_columns, nv * std::max(0, t - 1),
-                         nv * std::max(0, t - 1));
+        // add block in Hessian
+        SetBlockInBand(hessian, tmp1, weight, nvar, nband, nband,
+                       nv * std::max(0, t - 1));
       }
 
       // shift by individual sensor dimension
@@ -1224,6 +1236,7 @@ double Batch::CostForce(double* gradient, double* hessian) {
   // update dimension
   int nv = model->nv;
   int nvar = nv * configuration_length_;
+  int nband = 3 * nv;
   int nforce = nv * (configuration_length_ - 2);
 
   // residual
@@ -1236,7 +1249,7 @@ double Batch::CostForce(double* gradient, double* hessian) {
 
   // zero memory
   if (gradient) mju_zero(gradient, nvar);
-  if (hessian) mju_zero(hessian, nvar * nvar);
+  if (hessian) mju_zero(hessian, nvar * 3 * nv);
 
   // time scaling
   double time_scale2 = 1.0;
@@ -1316,9 +1329,8 @@ double Batch::CostForce(double* gradient, double* hessian) {
       double* tmp1 = scratch1_force_.data();
       mju_mulMatTMat(tmp1, block, tmp0, nv, 3 * nv, 3 * nv);
 
-      // add
-      AddBlockInMatrix(hessian, tmp1, 1.0, nvar, nvar, 3 * nv, 3 * nv,
-                       nv * (t - 1), nv * (t - 1));
+      // add block in Hessian
+      SetBlockInBand(hessian, tmp1, 1.0, nvar, nband, nband, nv * (t - 1));
     }
   }
 
@@ -2110,26 +2122,32 @@ double Batch::Cost(double* gradient, double* hessian, ThreadPool& pool) {
   bool gradient_flag = (gradient ? true : false);
   bool hessian_flag = (hessian ? true : false);
 
-  // individual derivatives
+  // ----- individual derivatives ----- //
+
+  // prior
   if (settings.prior_flag) {
     pool.Schedule([&batch = *this, gradient_flag, hessian_flag]() {
       batch.cost_prior_ = batch.CostPrior(
           gradient_flag ? batch.cost_gradient_prior_.data() : NULL,
-          hessian_flag ? batch.cost_hessian_prior_.data() : NULL);
+          hessian_flag ? batch.cost_hessian_prior_band_.data() : NULL);
     });
   }
+
+  // sensor
   if (settings.sensor_flag) {
     pool.Schedule([&batch = *this, gradient_flag, hessian_flag]() {
       batch.cost_sensor_ = batch.CostSensor(
           gradient_flag ? batch.cost_gradient_sensor_.data() : NULL,
-          hessian_flag ? batch.cost_hessian_sensor_.data() : NULL);
+          hessian_flag ? batch.cost_hessian_sensor_band_.data() : NULL);
     });
   }
+
+  // force
   if (settings.force_flag) {
     pool.Schedule([&batch = *this, gradient_flag, hessian_flag]() {
       batch.cost_force_ = batch.CostForce(
           gradient_flag ? batch.cost_gradient_force_.data() : NULL,
-          hessian_flag ? batch.cost_hessian_force_.data() : NULL);
+          hessian_flag ? batch.cost_hessian_force_band_.data() : NULL);
     });
   }
 
@@ -2201,24 +2219,20 @@ void Batch::TotalHessian(double* hessian) {
   auto start = std::chrono::steady_clock::now();
 
   // dimension
-  int dim = configuration_length_ * model->nv;
+  int ntotal = configuration_length_ * model->nv;
+  int nband = 3 * model->nv;
 
-  // zero memory
-  mju_zero(hessian, dim * dim);
-
-  // individual Hessians
-  if (settings.prior_flag)
-    SymmetricBandMatrixCopy(hessian, cost_hessian_prior_.data(), model->nv, 3,
-                            dim, configuration_length_, 0, 0, 0, 0,
-                            scratch0_prior_.data());
+  // sum individual Hessians
+  if (settings.prior_flag) {
+    mju_copy(hessian, cost_hessian_prior_band_.data(), ntotal * nband);
+  } else {
+    // zero memory
+    mju_zero(hessian, ntotal * nband);
+  }
   if (settings.sensor_flag)
-    SymmetricBandMatrixCopy(hessian, cost_hessian_sensor_.data(), model->nv, 3,
-                            dim, configuration_length_, 0, 0, 0, 0,
-                            scratch0_sensor_.data());
+    mju_addTo(hessian, cost_hessian_sensor_band_.data(), ntotal * nband);
   if (settings.force_flag)
-    SymmetricBandMatrixCopy(hessian, cost_hessian_force_.data(), model->nv, 3,
-                            dim, configuration_length_, 0, 0, 0, 0,
-                            scratch0_force_.data());
+    mju_addTo(hessian, cost_hessian_force_band_.data(), ntotal * nband);
 
   // stop Hessian timer
   timer_.cost_hessian += GetDuration(start);
@@ -2261,7 +2275,7 @@ void Batch::Optimize(ThreadPool& pool) {
        iterations_smoother_++) {
     // evalute cost derivatives
     cost_skip_ = true;
-    Cost(cost_gradient_.data(), cost_hessian_.data(), pool);
+    Cost(cost_gradient_.data(), cost_hessian_band_.data(), pool);
 
     // start timer
     auto start_search = std::chrono::steady_clock::now();
@@ -2461,14 +2475,14 @@ void Batch::SearchDirection() {
   // unpack
   double* direction = search_direction_.data();
   double* gradient = cost_gradient_.data();
-  double* hessian = cost_hessian_.data();
+  // double* hessian = cost_hessian_.data();
   double* hessian_band = cost_hessian_band_.data();
   double* hessian_band_factor = cost_hessian_band_factor_.data();
 
   // -- linear system solver -- //
 
   // dense to band
-  mju_dense2Band(hessian_band, cost_hessian_.data(), ntotal, nband, ndense);
+  // mju_dense2Band(hessian_band, cost_hessian_.data(), ntotal, nband, ndense);
 
   // increase regularization until full rank
   double min_diag = 0.0;
@@ -2480,8 +2494,7 @@ void Batch::SearchDirection() {
     }
 
     // copy
-    mju_copy(hessian_band_factor, hessian_band,
-              ntotal * ntotal);  // TODO(taylor): band copy
+    mju_copy(hessian_band_factor, hessian_band, ntotal * nband);
 
     // factorize
     min_diag = mju_cholFactorBand(hessian_band_factor, ntotal, nband, ndense,
@@ -2503,7 +2516,8 @@ void Batch::SearchDirection() {
   // set regularization
   if (regularization_ > 0.0) {
     for (int i = 0; i < ntotal; i++) {
-      hessian[i * ntotal + i] += regularization_;
+      hessian_band[i * nband + nband - 1] += regularization_;
+      // hessian[i * ntotal + i] += regularization_;
     }
   }
 
