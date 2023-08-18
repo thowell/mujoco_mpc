@@ -321,7 +321,6 @@ class Batch : public Estimator {
     double step_scaling = 0.5;  // step size scaling
     double regularization_initial = 1.0e-12;       // initial regularization
     double regularization_scaling = mju_sqrt(10);  // regularization scaling
-    bool band_copy = true;                       // copy band matrices by block
     bool time_scaling_force = true;              // scale force costs
     bool time_scaling_sensor = true;             // scale sensor costs
     double search_direction_tolerance = 1.0e-8;  // search direction tolerance
@@ -569,20 +568,14 @@ class Batch : public Estimator {
       cost_hessian_factor_;  // (nv * max_history_) * (nv * max_history_)
 
   // cost scratch
+  std::vector<double> scratch0_prior_;  // (nv * max_history_)
+  std::vector<double> scratch1_prior_;  // 4 * nv * nv
   std::vector<double>
-      scratch0_prior_;  // (nv * max_history_) * (nv * max_history_)
+      scratch0_sensor_;  // (max(nv, ns) * 3 * nv) x max_history_
   std::vector<double>
-      scratch1_prior_;  // (nv * max_history_) * (nv * max_history_)
-  std::vector<double>
-      scratch0_sensor_;  // (max(ns, 3 * nv) * max(ns, 3 * nv) * max_history_)
-  std::vector<double>
-      scratch1_sensor_;  // (max(ns, 3 * nv) * max(ns, 3 * nv) * max_history_)
-  std::vector<double>
-      scratch0_force_;  // (nv * max_history_) * (nv * max_history_)
-  std::vector<double>
-      scratch1_force_;  // (nv * max_history_) * (nv * max_history_)
-  std::vector<double>
-      scratch2_force_;  // (nv * max_history_) * (nv * max_history_)
+      scratch1_sensor_;                 // (max(nv, ns) * 3 * nv) x max_history_
+  std::vector<double> scratch0_force_;  // (nv * 3 * nv) x max_history_
+  std::vector<double> scratch1_force_;  // (nv * 3 * nv) x max_history_
   std::vector<double> scratch_prior_weight_;  // 2 * nv * nv
   std::vector<double> scratch_expected_;      // nv * max_history_
 
@@ -659,7 +652,7 @@ class Batch : public Estimator {
   } timer_;
 
   // max history
-  int max_history_ = 3;
+  int max_history_ = kMinBatchHistory;
 
   // trajectory cache
   EstimatorTrajectory<double> configuration_cache_;           // nq x T
