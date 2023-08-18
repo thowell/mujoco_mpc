@@ -67,7 +67,7 @@ class Batch : public Estimator {
   Batch() = default;
   Batch(int mode) {
     settings.filter = mode;
-    settings.prior_flag = true;
+    settings.prior_flag = false;
     max_history_ = kMaxFilterHistory;
   }
   Batch(const mjModel* model, int length = 3, int max_history_ = 0) {

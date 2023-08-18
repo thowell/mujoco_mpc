@@ -628,60 +628,60 @@ void Batch::Update(const double* ctrl, const double* sensor) {
   // band to dense prior weights
   mju_band2Dense(weights, weights_band, nvar, nband, 0, 1);
 
-  // recursive update
-  if (settings.recursive_prior_update &&
-      configuration_length_ == configuration_length_cache) {
-    // condition dimension
-    int ncondition = nv * (configuration_length_ - 1);
+  // // recursive update
+  // if (settings.recursive_prior_update &&
+  //     configuration_length_ == configuration_length_cache) {
+  //   // condition dimension
+  //   int ncondition = nv * (configuration_length_ - 1);
 
-    // band to dense cost Hessian
-    mju_band2Dense(cost_hessian_.data(), cost_hessian_band_.data(), nvar, nband,
-                   0, 1);
+  //   // band to dense cost Hessian
+  //   mju_band2Dense(cost_hessian_.data(), cost_hessian_band_.data(), nvar, nband,
+  //                  0, 1);
 
-    // compute conditioned matrix
-    double* condmat = condmat_.data();
-    ConditionMatrix(condmat, cost_hessian_.data(), mat00_.data(), mat10_.data(),
-                    mat11_.data(), scratch0_condmat_.data(),
-                    scratch1_condmat_.data(), nvar, nv, ncondition);
+  //   // compute conditioned matrix
+  //   double* condmat = condmat_.data();
+  //   ConditionMatrix(condmat, cost_hessian_.data(), mat00_.data(), mat10_.data(),
+  //                   mat11_.data(), scratch0_condmat_.data(),
+  //                   scratch1_condmat_.data(), nvar, nv, ncondition);
 
-    // zero memory
-    mju_zero(weights, nvar * nvar);
+  //   // zero memory
+  //   mju_zero(weights, nvar * nvar);
 
-    // set conditioned matrix in prior weights
-    SetBlockInMatrix(weights, condmat, 1.0, nvar, nvar, ncondition,
-                     ncondition, 0, 0);
+  //   // set conditioned matrix in prior weights
+  //   SetBlockInMatrix(weights, condmat, 1.0, nvar, nvar, ncondition,
+  //                    ncondition, 0, 0);
 
-    // set bottom right to scale_prior * I
-    for (int i = ncondition; i < nvar; i++) {
-      weights[nvar * i + i] = scale_prior;
-    }
-  } else {
-    // dimension
-    int nvar_new = nvar;
-    if (current_time_index < configuration_length_ - 2) {
-      nvar_new += nv;
-    }
+  //   // set bottom right to scale_prior * I
+  //   for (int i = ncondition; i < nvar; i++) {
+  //     weights[nvar * i + i] = scale_prior;
+  //   }
+  // } else {
+  //   // dimension
+  //   int nvar_new = nvar;
+  //   if (current_time_index < configuration_length_ - 2) {
+  //     nvar_new += nv;
+  //   }
 
-    // check same size
-    if (nvar != nvar_new) {
-      // get previous weights
-      double* previous_weights = scratch0_condmat_.data();
-      mju_copy(previous_weights, weights, nvar * nvar);
+  //   // check same size
+  //   if (nvar != nvar_new) {
+  //     // get previous weights
+  //     double* previous_weights = scratch0_condmat_.data();
+  //     mju_copy(previous_weights, weights, nvar * nvar);
 
-      // set previous in new weights (dimension may have increased)
-      mju_zero(weights, nvar_new * nvar_new);
-      SetBlockInMatrix(weights, previous_weights, 1.0, nvar_new, nvar_new, nvar,
-                       nvar, 0, 0);
+  //     // set previous in new weights (dimension may have increased)
+  //     mju_zero(weights, nvar_new * nvar_new);
+  //     SetBlockInMatrix(weights, previous_weights, 1.0, nvar_new, nvar_new, nvar,
+  //                      nvar, 0, 0);
 
-      // scale_prior * I
-      for (int i = nvar; i < nvar_new; i++) {
-        weights[nvar_new * i + i] = scale_prior;
-      }
-    }
-  }
+  //     // scale_prior * I
+  //     for (int i = nvar; i < nvar_new; i++) {
+  //       weights[nvar_new * i + i] = scale_prior;
+  //     }
+  //   }
+  // }
 
   // dense to band
-  mju_dense2Band(weights_band, weights, nvar, nband, 0);
+  // mju_dense2Band(weights_band, weights, nvar, nband, 0);
 
   // restore configuration length
   if (configuration_length_ != configuration_length_cache) {
@@ -1949,7 +1949,8 @@ void Batch::VelocityAccelerationDerivatives() {
 // initialize filter mode
 void Batch::InitializeFilter() {
   // dimensions
-  int nq = model->nq, nv = model->nv;
+  // int nq = model->nq, nv = model->nv;
+  int nq = model->nq;
 
   // filter mode status
   current_time_index = 1;
@@ -2023,10 +2024,14 @@ void Batch::InitializeFilter() {
   }
 
   // prior weight
-  int nvar = nv * configuration_length_;
-  for (int i = 0; i < nvar; i++) {
-    weight_prior_[nvar * i + i] = scale_prior;
-  }
+  // int nvar = nv * configuration_length_;
+  // for (int i = 0; i < nvar; i++) {
+  //   weight_prior_[nvar * i + i] = scale_prior;
+  // }
+
+  // // dense to band
+  // mju_dense2Band(weight_prior_band_.data(), weight_prior_.data(), nvar, 3 * nv,
+  //                0);
 }
 
 // shift head and resize trajectories
