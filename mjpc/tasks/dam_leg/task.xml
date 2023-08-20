@@ -1,0 +1,29 @@
+<mujoco model="DAM leg">
+  <include file="../common.xml"/>
+  <include file="leg.xml" />
+
+  <size memory="1M"/>
+
+  <custom>
+    <numeric name="agent_planner" data="2" />
+    <numeric name="agent_horizon" data="0.5" />
+    <numeric name="agent_timestep" data="0.01" />
+    <numeric name="agent_integrator" data="3"/>
+    <numeric name="sampling_sample_width" data="0.01" />
+    <numeric name="sampling_control_width" data="0.015" />
+    <numeric name="sampling_spline_points" data="10" />
+    <numeric name="sampling_exploration" data="0.5" />
+    <numeric name="gradient_spline_points" data="10" />
+    <numeric name="residual_Goal" data="0.0 -1.5 1.5" />
+  </custom>
+
+  <sensor>
+    <user name="Vertical" dim="1" user="0 1.0 0 10.0"/>
+    <user name="Centered" dim="1" user="0 1.0 0 10.0"/>
+    <user name="Velocity" dim="4" user="0 0.1 0 10.0"/>
+    <user name="Control" dim="3" user="0 0.1 0 10.0"/>
+    <framepos name="trace0" objtype="site" objname="tip"/>
+    <framepos name="position" objtype="site" objname="tip"/>
+    <framelinvel name="velocity" objtype="site" objname="tip"/>
+  </sensor>
+</mujoco>

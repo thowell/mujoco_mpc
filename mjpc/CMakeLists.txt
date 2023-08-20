@@ -40,6 +40,8 @@ add_library(
   tasks/acrobot/acrobot.h
   tasks/cartpole/cartpole.cc
   tasks/cartpole/cartpole.h
+  tasks/dam_leg/leg.cc
+  tasks/dam_leg/leg.h
   tasks/hand/hand.cc
   tasks/hand/hand.h
   tasks/humanoid/stand/stand.cc
