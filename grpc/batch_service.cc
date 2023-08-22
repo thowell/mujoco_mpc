@@ -490,6 +490,12 @@ grpc::Status BatchService::Settings(grpc::ServerContext* context,
   output->set_assemble_force_norm_hessian(
       batch_.settings.assemble_force_norm_hessian);
 
+  // joint limits
+  if (input->has_joint_limits()) {
+    batch_.settings.joint_limits = input.joint_limits();
+  }
+  output->set_joint_limits(batch_.settings.joint_limits);
+
   return grpc::Status::OK;
 }
 
@@ -507,7 +513,7 @@ grpc::Status BatchService::Cost(grpc::ServerContext* context,
   double total_cost = batch_.Cost(
       derivatives ? batch_.GetCostGradient() : NULL,
       derivatives ? batch_.GetCostHessianBand() : NULL, thread_pool_);
-  
+
   // cost
   response->set_total(total_cost);
 
