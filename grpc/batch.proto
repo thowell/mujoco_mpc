@@ -253,9 +253,11 @@ message TimingResponse {
 
 message PriorWeightsRequest {
   repeated double weights = 1 [packed = true];
+  optional double scale = 2;
 }
 
 message PriorWeightsResponse {
   repeated double weights = 1 [packed = true];
-  int32 dimension = 2;
+  double scale = 2;
+  int32 dimension = 3;
 }

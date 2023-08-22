@@ -548,15 +548,17 @@ class BatchTest(absltest.TestCase):
     prior0 = batch.prior_weights()
 
     # test
-    self.assertTrue(prior0.shape == (dim, dim))
-    self.assertTrue(not prior0.any())
+    self.assertTrue(prior0["weights"].shape == (dim, dim))
+    self.assertTrue(not prior0["weights"].any())
 
     # identity
     in_weights = np.eye(dim)
-    out_prior = batch.prior_weights(weights=in_weights)
+    in_scale = 2.0
+    out_prior = batch.prior_weights(weights=in_weights, scale=in_scale)
 
     # test
-    self.assertLess(np.linalg.norm(in_weights - out_prior), 1.0e-4)
+    self.assertLess(np.linalg.norm(in_weights - out_prior["weights"]), 1.0e-4)
+    self.assertLess(np.abs(in_scale - out_prior["scale"]), 1.0e-4)
 
   def test_norm(self):
     # load model

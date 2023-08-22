@@ -872,6 +872,14 @@ grpc::Status BatchService::PriorWeights(
     }
   }
 
+  // set prior scale
+  if (request->has_scale()) {
+    batch_.scale_prior = request->scale();
+  }
+
+  // get prior scale 
+  response->set_scale(batch_.scale_prior);
+
   return grpc::Status::OK;
 }
 

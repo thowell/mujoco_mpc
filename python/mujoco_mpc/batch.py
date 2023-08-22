@@ -77,7 +77,7 @@ class Batch:
         [str(server_binary_path), f"--mjpc_port={self.port}"],
         stdout=subprocess.PIPE if colab_logging else None,
     )
-    # os.set_blocking(self.server_process.stdout.fileno(), False)
+    os.set_blocking(self.server_process.stdout.fileno(), False)
     atexit.register(self.server_process.kill)
 
     credentials = grpc.local_channel_credentials(
@@ -446,11 +446,13 @@ class Batch:
     self._wait(self.stub.Optimize.future(request))
 
   def prior_weights(
-      self, weights: Optional[npt.ArrayLike] = None
-  ) -> np.ndarray:
+      self, weights: Optional[npt.ArrayLike] = None,
+      scale: Optional[float] = None,
+  ) -> dict[str, np.ndarray | float]:
     # prior request
     request = batch_pb2.PriorWeightsRequest(
-        weights=weights.flatten() if weights is not None else None
+        weights=weights.flatten() if weights is not None else None,
+        scale=scale,
     )
 
     # prior response
@@ -462,7 +464,10 @@ class Batch:
     )
 
     # return prior matrix
-    return mat
+    return {
+      "weights": mat,
+      "scale": response.scale,
+    }
 
   def print_cost(self):
     # get costs
@@ -512,11 +517,11 @@ class Batch:
 
   def _wait(self, future):
     """Waits for the future to complete, while printing out subprocess stdout."""
-    # if self._colab_logging:
-    #     while True:
-    # line = self.server_process.stdout.readline()
-    # if line:
-    #     sys.stdout.write(line.decode("utf-8"))
-    # if future.done():
-    #     break
+    if self._colab_logging:
+      while True:
+        line = self.server_process.stdout.readline()
+        if line:
+            sys.stdout.write(line.decode("utf-8"))
+        if future.done():
+            break
     return future.result()

@@ -64,7 +64,7 @@
   <worldbody>
     <!-- ball -->
     <body name="ball" pos="-.125 0 .022" childclass="object">
-      <joint name="ball_x" type="slide" axis="1 0 0" ref="-.124"/>
+      <joint name="ball_x" type="slide" axis="1 0 0" ref="-.125"/>
       <joint name="ball_z" type="slide" axis="0 0 1" ref=".022"/>
       <geom  name="ball" type="sphere" size=".022" />
       <site  name="ball" type="sphere" rgba="1 0 1 1" size="0.01" pos="0 -0.015 0"  />
