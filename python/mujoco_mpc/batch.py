@@ -223,6 +223,9 @@ class Batch:
       assemble_force_jacobian: Optional[bool] = None,
       assemble_sensor_norm_hessian: Optional[bool] = None,
       assemble_force_norm_hessian: Optional[bool] = None,
+      first_step_position_sensor: Optional[bool] = None,
+      final_step_position_sensor: Optional[bool] = None,
+      final_step_velocity_sensor: Optional[bool] = None,
   ) -> dict[str, int | bool]:
     # assemble settings
     inputs = batch_pb2.Settings(
@@ -250,6 +253,9 @@ class Batch:
         assemble_force_jacobian=assemble_force_jacobian,
         assemble_sensor_norm_hessian=assemble_sensor_norm_hessian,
         assemble_force_norm_hessian=assemble_force_norm_hessian,
+        first_step_position_sensor=first_step_position_sensor,
+        final_step_position_sensor=final_step_position_sensor,
+        final_step_velocity_sensor=final_step_velocity_sensor,
     )
 
     # settings request
@@ -286,6 +292,9 @@ class Batch:
         "assemble_force_jacobian": settings.assemble_force_jacobian,
         "assemble_sensor_norm_hessian": settings.assemble_sensor_norm_hessian,
         "assemble_force_norm_hessian": settings.assemble_force_norm_hessian,
+        "first_step_position_sensor": settings.first_step_position_sensor,
+        "final_step_position_sensor": settings.final_step_position_sensor,
+        "final_step_velocity_sensor": settings.final_step_velocity_sensor,
     }
 
   def noise(

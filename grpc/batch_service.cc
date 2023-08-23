@@ -490,6 +490,30 @@ grpc::Status BatchService::Settings(grpc::ServerContext* context,
   output->set_assemble_force_norm_hessian(
       batch_.settings.assemble_force_norm_hessian);
 
+  // first step position sensor
+  if (input.has_first_step_position_sensor()) {
+    batch_.settings.first_step_position_sensor =
+        input.first_step_position_sensor();
+  }
+  output->set_first_step_position_sensor(
+      batch_.settings.first_step_position_sensor);
+
+  // final step position sensor
+  if (input.has_final_step_position_sensor()) {
+    batch_.settings.final_step_position_sensor =
+        input.final_step_position_sensor();
+  }
+  output->set_final_step_position_sensor(
+      batch_.settings.final_step_position_sensor);
+
+  // final step velocity sensor
+  if (input.has_final_step_velocity_sensor()) {
+    batch_.settings.final_step_velocity_sensor =
+        input.final_step_velocity_sensor();
+  }
+  output->set_final_step_velocity_sensor(
+      batch_.settings.final_step_velocity_sensor);
+
   return grpc::Status::OK;
 }
 

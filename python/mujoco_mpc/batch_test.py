@@ -314,6 +314,27 @@ class BatchTest(absltest.TestCase):
         assemble_force_norm_hessian == settings["assemble_force_norm_hessian"]
     )
 
+    # get/set first step position sensor
+    first_step_pos = False
+    settings = batch.settings(
+        first_step_position_sensor=first_step_pos,
+    )
+    self.assertTrue(settings["first_step_position_sensor"] == first_step_pos)
+
+    # get/set final step position sensor
+    final_step_pos = True
+    settings = batch.settings(
+        final_step_position_sensor=final_step_pos,
+    )
+    self.assertTrue(settings["final_step_position_sensor"] == final_step_pos)
+
+    # get/set final step velocity sensor
+    final_step_vel = True
+    settings = batch.settings(
+        final_step_velocity_sensor=final_step_vel,
+    )
+    self.assertTrue(settings["final_step_velocity_sensor"] == final_step_vel)
+
   def test_costs(self):
     # load model
     model_path = (
@@ -595,6 +616,7 @@ class BatchTest(absltest.TestCase):
         np.linalg.norm(sensor_parameters - data["sensor_parameters"]),
         1.0e-5,
     )
+
 
 if __name__ == "__main__":
   absltest.main()
