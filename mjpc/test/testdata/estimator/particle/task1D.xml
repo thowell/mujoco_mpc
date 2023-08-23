@@ -43,7 +43,7 @@
     <geom name="ground" type="plane" pos="0 0 0" size=".3 .3 .1" material="grid" />
 
     <body name="pointmass" pos="0 0 0">
-      <joint name="root_z" type="slide" damping="1" pos="0 0 0" axis="0 0 1" />
+      <joint name="root_z" type="slide" pos="0 0 0" axis="0 0 1" />
       <geom name="pointmass" type="sphere" size=".01" material="self" mass="1.0"/>
     </body>
   </worldbody>
