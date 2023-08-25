@@ -208,7 +208,7 @@ void Batch::Initialize(const mjModel* model) {
   // cost norms
   norm_type_sensor.resize(nsensor_);
 
-  // TODO(taylor): method for xml to initial norm
+  // TODO(taylor): method for xml to initialize norm
   for (int i = 0; i < nsensor_; i++) {
     norm_type_sensor[i] =
         (NormType)GetNumberOrDefault(0, model, "batch_norm_sensor");
@@ -1616,7 +1616,6 @@ void Batch::JacobianForce(ThreadPool& pool) {
 }
 
 // compute force
-// TODO(taylor): combine with Jacobian method
 void Batch::InverseDynamicsPrediction(ThreadPool& pool) {
   // compute sensor and force predictions
   auto start = std::chrono::steady_clock::now();
@@ -2317,7 +2316,7 @@ void Batch::Optimize(ThreadPool& pool) {
     }
 
     // backtracking until cost decrease
-    // TODO(taylor): Armijo, Wolfe conditions
+    // TODO(taylor): Armijo, Wolfe conditions ?
     while (cost_candidate >= cost_) {
       // check for max iterations
       if (iteration_search > settings.max_search_iterations) {
@@ -2868,11 +2867,19 @@ void Batch::GUI(mjUI& ui, EstimatorGUIData& data) {
 
 // set GUI data
 void Batch::SetGUIData(EstimatorGUIData& data) {
+  // copy noise
   mju_copy(noise_process.data(), data.process_noise.data(), DimensionProcess());
   mju_copy(noise_sensor.data(), data.sensor_noise.data(), DimensionSensor());
+
+  // copy model time step
   model->opt.timestep = data.timestep;
+
+  // copy model integrator
   model->opt.integrator = data.integrator;
 
+  // copy scale prior
+  scale_prior = data.scale_prior;
+  
   // store estimation horizon
   int horizon = data.horizon;
 
