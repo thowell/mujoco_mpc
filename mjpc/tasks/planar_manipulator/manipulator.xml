@@ -22,12 +22,12 @@
       <geom type="capsule" material="self" density="500"/>
       <joint type="hinge" pos="0 0 0" axis="0 -1 0" limited="true"/>
       <default class="hand">
-        <joint damping="0" range="-10 60"/>
+        <joint damping=".5" range="-10 60"/>
         <geom size=".008"/>
         <!-- <site  type="box" size=".018 .005 .005" pos=".022 0 -.002" euler="0 15 0" group="4"/> -->
         <default class="fingertip">
           <geom type="sphere" size=".008" material="effector"/>
-          <joint damping="0" stiffness=".01" range="-40 20"/>
+          <joint damping=".01" stiffness=".01" range="-40 20"/>
           <!-- <site  size=".012 .005 .008" pos=".003 0 .003" group="4" euler="0 0 0"/> -->
         </default>
       </default>
@@ -57,19 +57,19 @@
     <geom name="arm_root" type="cylinder" fromto="0 -.022 .4 0 .022 .4" size=".024"
           material="decoration" contype="0" conaffinity="0"/>
     <body name="upper_arm" pos="0 0 .4" childclass="arm">
-      <joint name="arm_root" damping="0" limited="false"/>
+      <joint name="arm_root" damping="2" limited="false"/>
       <geom  name="upper_arm"  size=".02" fromto="0 0 0 0 0 .18"/>
       <site name="upper_arm_site" rgba="1 0 1 1" type="sphere" size="0.01" pos="0 -0.015 0.09" />
       <body  name="middle_arm" pos="0 0 .18" childclass="arm">
-        <joint name="arm_shoulder" damping="0" range="-160 160"/>
+        <joint name="arm_shoulder" damping="1.5" range="-160 160"/>
         <geom  name="middle_arm"  size=".017" fromto="0 0 0 0 0 .15"/>
         <site name="middle_arm_site" rgba="1 0 1 1" type="sphere" size="0.01" pos="0 -0.0125 0.075" />
         <body  name="lower_arm" pos="0 0 .15">
-          <joint name="arm_elbow" damping="0" range="-160 160"/>
+          <joint name="arm_elbow" damping="1" range="-160 160"/>
           <geom  name="lower_arm" size=".014" fromto="0 0 0 0 0 .12"/>
           <site name="lower_arm_site" rgba="1 0 1 1" type="sphere" size="0.01" pos="0 -0.01 0.06" />
           <body  name="hand" pos="0 0 .12">
-            <joint name="arm_wrist" damping="0" range="-140 140" />
+            <joint name="arm_wrist" damping=".5" range="-140 140" />
             <geom  name="hand" size=".011" fromto="0 0 0 0 0 .03"/>
             <geom  name="palm1"  fromto="0 0 .03  .03 0 .045" class="hand"/>
             <geom  name="palm2"  fromto="0 0 .03 -.03 0 .045" class="hand"/>
