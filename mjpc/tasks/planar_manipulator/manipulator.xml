@@ -59,15 +59,18 @@
     <body name="upper_arm" pos="0 0 .4" childclass="arm">
       <joint name="arm_root" damping="2" limited="false"/>
       <geom  name="upper_arm"  size=".02" fromto="0 0 0 0 0 .18"/>
-      <site name="upper_arm_site" rgba="1 0 1 1" type="sphere" size="0.01" pos="0 -0.015 0.09" />
+      <site name="upper_arm_site" rgba="1 0 1 1" type="sphere" size="0.01" pos="0 -0.015 0.095" />
+      <site name="upper_arm_site2" rgba="1 0 1 1" type="sphere" size="0.01" pos="0 -0.015 0.18" />
       <body  name="middle_arm" pos="0 0 .18" childclass="arm">
         <joint name="arm_shoulder" damping="1.5" range="-160 160"/>
         <geom  name="middle_arm"  size=".017" fromto="0 0 0 0 0 .15"/>
-        <site name="middle_arm_site" rgba="1 0 1 1" type="sphere" size="0.01" pos="0 -0.0125 0.075" />
+        <site name="middle_arm_site" rgba="1 0 1 1" type="sphere" size="0.01" pos="0 -0.0125 0.085" />
+        <site name="middle_arm_site2" rgba="1 0 1 1" type="sphere" size="0.01" pos="0 -0.0125 0.15" />
         <body  name="lower_arm" pos="0 0 .15">
           <joint name="arm_elbow" damping="1" range="-160 160"/>
           <geom  name="lower_arm" size=".014" fromto="0 0 0 0 0 .12"/>
-          <site name="lower_arm_site" rgba="1 0 1 1" type="sphere" size="0.01" pos="0 -0.01 0.06" />
+          <site name="lower_arm_site" rgba="1 0 1 1" type="sphere" size="0.01" pos="0 -0.01 0.07" />
+          <site name="lower_arm_site2" rgba="1 0 1 1" type="sphere" size="0.01" pos="0 -0.01 0.12" />
           <body  name="hand" pos="0 0 .12">
             <joint name="arm_wrist" damping=".5" range="-140 140" />
             <geom  name="hand" size=".011" fromto="0 0 0 0 0 .03"/>
@@ -75,6 +78,8 @@
             <geom  name="palm2"  fromto="0 0 .03 -.03 0 .045" class="hand"/>
             <site  name="grasp" pos="0 0 .065" />
             <site  name="wrist_site" rgba="1 0 1 1" type="sphere" size="0.01" pos="0 -0.005 0.0325" />
+            <site  name="wrist_site2" rgba="1 0 1 1" type="sphere" size="0.0075" pos="0.0375 -0.005 0.0625" />
+            <site  name="wrist_site3" rgba="1 0 1 1" type="sphere" size="0.0075" pos="-0.0375 -0.005 0.0625" />
             <body  name="pinch site" pos="0 0 .090">
               <site  name="pinch"/>
               <inertial pos="0 0 0" mass="1e-6" diaginertia="1e-12 1e-12 1e-12"/>
@@ -85,13 +90,13 @@
               <joint name="thumb"/>
               <geom  name="thumb1"  fromto="0 0 0 .02 0 -.01" size=".007"/>
               <geom  name="thumb2"  fromto=".02 0 -.01 .04 0 -.01" size=".007"/>
-              <site  name="thumb_touch" pos=".05 0 -.01" rgba="1 1 1 1" type="sphere" size="0.0075"/>
+              <site  name="thumb_touch" pos=".0375 -0.005 -.01" rgba="1 0 1 1" type="sphere" size="0.0075"/>
             </body>
             <body name="finger" pos="-.03 0 .045" euler="0 90 180" childclass="hand">
               <joint name="finger"/>
               <geom  name="finger1"  fromto="0 0 0 .02 0 -.01" size=".007" />
               <geom  name="finger2"  fromto=".02 0 -.01 .04 0 -.01" size=".007"/>
-              <site  name="finger_touch" pos=".05 0 -.01" rgba="1 1 1 1" type="sphere" size="0.0075"/>
+              <site  name="finger_touch" pos="0.0375 0.005 -.01" rgba="1 0 1 1" type="sphere" size="0.0075"/>
             </body>
           </body>
         </body>
