@@ -56,6 +56,8 @@ add_library(
   tasks/panda/panda.h
   tasks/particle/particle.cc
   tasks/particle/particle.h
+  tasks/planar_reach/planar_reach.cc
+  tasks/planar_reach/planar_reach.h
   tasks/quadrotor/quadrotor.cc
   tasks/quadrotor/quadrotor.h
   tasks/quadruped/quadruped.cc

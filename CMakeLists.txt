@@ -41,7 +41,7 @@ include(MpcOptions)
 include(MujocoMacOS)
 
 option(MJPC_BUILD_TESTS "Build tests for MJPC" ON)
-option(MJPC_GRPC_BUILD_TESTS "Build tests for gRPC" ON)
+option(MJPC_GRPC_BUILD_TESTS "Build tests for gRPC" OFF)
 option(MJPC_BUILD_GRPC_SERVICE "Build MJPC gRPC service." OFF)
 option(PYMJPC_BUILD_TESTS "Build tests for Python bindings" ON)
 
@@ -65,7 +65,7 @@ findorfetch(
   GIT_REPO
   https://github.com/deepmind/mujoco.git
   GIT_TAG
-  main
+  f44c657
   TARGETS
   mujoco::mujoco
   mujoco::platform_ui_adapter
