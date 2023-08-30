@@ -18,14 +18,6 @@
     <site name="target" type="sphere" pos="0 0 4" size="0.2" material="target" group="3"/>
     <camera name="fixed" pos="0 -6 2" zaxis="0 -1 0"/>
     <camera name="lookat" mode="targetbodycom" target="upper_arm" pos="0 -2 3"/>
-    <!-- ball -->
-    <body name="ball" pos="-.125 0 .1">
-      <joint name="ball_x" type="slide" axis="1 0 0" ref="0"/>
-      <joint name="ball_z" type="slide" axis="0 0 1" ref=".1"/>
-      <geom  name="ball_geom" type="sphere" size=".1" material="self"/>
-      <site  name="ball_site1" type="sphere" rgba="1 0 1 1" size="0.025" pos="0 -0.1 0.01"  />
-      <site  name="ball_site2" type="sphere" rgba="1 0 1 1" size="0.025" pos="0 -0.1 -0.01"  />
-    </body>
     <!-- arm -->
     <body name="upper_arm" pos="0 0 2">
       <joint name="shoulder" type="hinge" axis="0 1 0"/>
@@ -44,12 +36,6 @@
       <geom type="sphere" size="0.03" rgba="0 1 1 1" contype="0" conaffinity="0"/>
     </body>
     <body name="mocap_tip" mocap="true">
-      <geom type="sphere" size="0.03" rgba="0 1 1 1" contype="0" conaffinity="0"/>
-    </body>
-    <body name="mocap_ball1" mocap="true">
-      <geom type="sphere" size="0.03" rgba="0 1 1 1" contype="0" conaffinity="0"/>
-    </body>
-    <body name="mocap_ball2" mocap="true">
       <geom type="sphere" size="0.03" rgba="0 1 1 1" contype="0" conaffinity="0"/>
     </body>
   </worldbody>

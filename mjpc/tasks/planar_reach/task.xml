@@ -19,7 +19,7 @@
 
     <!-- estimator -->
     <numeric name="estimator_sensor_start" data="3" />
-    <numeric name="estimator_number_sensor" data="4" />
+    <numeric name="estimator_number_sensor" data="2" />
   </custom>
 
   <sensor>
@@ -31,9 +31,7 @@
     <!-- estimator sensors -->
     <framepos name="elbow_site" objtype="site" objname="elbow_site"/>
     <framepos name="tip_site" objtype="site" objname="tip_site"/>
-    <framepos name="ball_site1" objtype="site" objname="ball_site1"/>
-    <framepos name="ball_site2" objtype="site" objname="ball_site2"/>
-
+  
     <!-- trace -->
     <framepos name="trace0" objtype="site" objname="tip"/>
 
