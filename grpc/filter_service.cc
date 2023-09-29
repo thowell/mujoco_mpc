@@ -158,7 +158,7 @@ grpc::Status FilterService::State(grpc::ServerContext* context,
   int nstate = model->nq + model->nv + model->na;
   if (input.state_size() > 0) {
     CHECK_SIZE("state", nstate, input.state_size());
-    mju_copy(state, input.state().data(), nstate);
+    active_filter->SetState(input.state().data());
   }
 
   // get state
@@ -168,7 +168,7 @@ grpc::Status FilterService::State(grpc::ServerContext* context,
 
   // set time
   if (input.has_time()) {
-    active_filter->Time() = input.time();
+    active_filter->SetTime(input.time());
   }
 
   // get time
