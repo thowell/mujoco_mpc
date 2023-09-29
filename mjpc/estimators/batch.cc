@@ -871,6 +871,14 @@ void Batch::SetTime(double time) {
   current_time_index_ = 1;
 }
 
+// set covariance
+void Batch::SetCovariance(const double* covariance) {
+  // set covariance into memory
+  mju_copy(this->covariance.data(), covariance, ndstate_ * ndstate_);
+  
+  // TODO(etom): recover prior weights from covariance
+}
+
 // compute and return dense cost Hessian
 double* Batch::GetCostHessian() {
   // resize

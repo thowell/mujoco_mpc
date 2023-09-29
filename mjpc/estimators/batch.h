@@ -126,10 +126,7 @@ class Batch : public Estimator {
   void SetTime(double time) override;
 
   // set covariance
-  void SetCovariance(const double* covariance) override {
-    mju_copy(this->covariance.data(), covariance, ndstate_ * ndstate_);
-    // TODO(taylor): set prior weight = covariance^-1
-  };
+  void SetCovariance(const double* covariance) override;
 
   // estimator-specific GUI elements
   void GUI(mjUI& ui) override;
