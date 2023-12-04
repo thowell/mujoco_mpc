@@ -62,7 +62,7 @@ findorfetch(
   GIT_REPO
   https://github.com/deepmind/mujoco.git
   GIT_TAG
-  main
+  8c7f6ce
   TARGETS
   mujoco::mujoco
   mujoco::platform_ui_adapter
