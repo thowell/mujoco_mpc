@@ -13,6 +13,9 @@
     <numeric name="sampling_representation" data="0" />
     <numeric name="ilqg_representation" data="0" />
     <numeric name="residual_Height Goal" data="1.68 0.0 1.85" />
+    <numeric name="residual_Cadence" data="1.0 0.0 2.0" />
+    <numeric name="residual_Amplitude" data="0.1 0.0 2.0" />
+    <numeric name="residual_Duty ratio" data="0.5 0.0 2.0" />
   </custom>
 
   <sensor>
@@ -22,6 +25,7 @@
     <user name="Joint Vel." dim="19" user="0 1.0e-3 0.0 0.1" />
     <user name="Control" dim="19" user="3 0.01 0.0 0.1 0.3" />
     <user name="Nominal" dim="19" user="0 1.0 0.0 1.0" />
+    <!-- <user name="Gait" dim="2" user="6 0.0 0 10 0.03" /> -->
 
     <framepos name="trace0" objtype="site" objname="torso"/>
     <framepos name="head_position" objtype="site" objname="head"/>
@@ -31,5 +35,7 @@
     <framepos name="sp1" objtype="site" objname="sp1"/>
     <framepos name="sp2" objtype="site" objname="sp2"/>
     <framepos name="sp3" objtype="site" objname="sp3"/>
+    <framepos name="foot_left" objtype="site" objname="fl"/>
+    <framepos name="foot_right" objtype="site" objname="fr"/>
   </sensor>
 </mujoco>

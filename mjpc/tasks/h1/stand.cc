@@ -96,6 +96,24 @@ void Stand::ResidualFn::Residual(const mjModel* model, const mjData* data,
   }
   counter += 19;
 
+  // ----- gait ----- //
+  // double step[2];
+  // FootStep(step, GetPhase(data->time));
+
+  // double foot_pos[2][3];
+  // double* foot_right = SensorByName(model, data, "foot_right");
+  // double* foot_left = SensorByName(model, data, "foot_left");
+  // mju_copy(foot_pos[0], foot_left, 3);
+  // mju_copy(foot_pos[1], foot_right, 3);
+
+  // for (int i = 0; i < 2; i++) {
+  //   double query[3] = {foot_pos[i][0], foot_pos[i][1], foot_pos[i][2]};
+  //   double ground_height = Ground(model, data, query);
+  //   double height_target = ground_height + 0.025 + step[i];
+  //   double height_difference = foot_pos[i][2] - height_target;
+  //   residual[counter++] = step[i] ? height_difference : 0;
+  // }
+
   // sensor dim sanity check
   // TODO: use this pattern everywhere and make this a utility function
   int user_sensor_dim = 0;
@@ -109,6 +127,51 @@ void Stand::ResidualFn::Residual(const mjModel* model, const mjData* data,
         "mismatch between total user-sensor dimension "
         "and actual length of residual %d",
         counter);
+  }
+}
+
+// save task-related ids
+void Stand::ResetLocked(const mjModel* model) {
+  // ----------  task identifiers  ----------
+  residual_.cadence_param_id_ = ParameterIndex(model, "Cadence");
+  residual_.amplitude_param_id_ = ParameterIndex(model, "Amplitude");
+  residual_.duty_param_id_ = ParameterIndex(model, "Duty ratio");
+}
+
+void Stand::TransitionLocked(mjModel* model, mjData* data) {
+  // ---------- handle mjData reset ----------
+  if (data->time < residual_.last_transition_time_ ||
+      residual_.last_transition_time_ == -1) {
+    residual_.last_transition_time_ = residual_.phase_start_time_ =
+        residual_.phase_start_ = data->time;
+  }
+}
+
+// return phase as a function of time
+double Stand::ResidualFn::GetPhase(double time) const {
+  return phase_start_ + (time - phase_start_time_) * phase_velocity_;
+}
+
+// return normalized target step height
+double Stand::ResidualFn::StepHeight(double time, double footphase,
+                                     double duty_ratio) const {
+  double angle = std::fmod(time + mjPI - footphase, 2 * mjPI) - mjPI;
+  double value = 0;
+  if (duty_ratio < 1) {
+    angle *= 0.5 / (1 - duty_ratio);
+    value = mju_cos(mju_clip(angle, -mjPI / 2, mjPI / 2));
+  }
+  return mju_abs(value) < 1e-6 ? 0.0 : value;
+}
+
+// compute target step height for all feet
+void Stand::ResidualFn::FootStep(double* step, double time) const {
+  double amplitude = parameters_[amplitude_param_id_];
+  double duty_ratio = parameters_[duty_param_id_];
+  double gait_phase[2] = {0.0, 0.5};
+  for (int i = 0; i < 2; i++) {
+    double footphase = 2 * mjPI * gait_phase[i];
+    step[i] = amplitude * StepHeight(time, footphase, duty_ratio);
   }
 }
 
