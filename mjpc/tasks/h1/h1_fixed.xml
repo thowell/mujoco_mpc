@@ -45,10 +45,10 @@
   <worldbody>
     <geom name="floor" type="plane" conaffinity="1" size="50 50 .05" material="blue_grid"/>
     <light mode="targetbodycom" target="torso_link" pos="1 0 2.5"/>
-    <body name="pelvis" pos="0 0 1.1" childclass="h1">
+    <body name="pelvis" pos="0 0 0.98" childclass="h1">
       <inertial pos="-0.0002 4e-05 -0.04522" quat="0.498303 0.499454 -0.500496 0.501741" mass="5.39"
         diaginertia="0.0490211 0.0445821 0.00824619"/>
-      <freejoint/>
+      <!-- <freejoint/> -->
       <geom class="visual" mesh="pelvis"/>
       <geom class="collision" mesh="pelvis"/>
       <body name="left_hip_yaw_link" pos="0 0.0875 -0.1742">
@@ -222,8 +222,6 @@
   <keyframe>
     <key name="home"
       qpos="
-    0 0 0.98
-    1 0 0 0
     0 0 -0.4 0.8 -0.4
     0 0 -0.4 0.8 -0.4
     0

@@ -44,6 +44,8 @@ add_library(
   tasks/fingers/fingers.h
   tasks/hand/hand.cc
   tasks/hand/hand.h
+  tasks/h1/walk.cc
+  tasks/h1/walk.h
   tasks/h1/stand.cc
   tasks/h1/stand.h
   tasks/humanoid/stand/stand.cc

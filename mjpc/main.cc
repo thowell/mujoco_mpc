@@ -47,6 +47,6 @@ int main(int argc, char** argv) {
 #endif
   absl::ParseCommandLine(argc, argv);
 
-  mjpc::StartApp(mjpc::GetTasks(), 4);  // start with H1 stand
+  mjpc::StartApp(mjpc::GetTasks(), 5);  // start with H1 walk
   return 0;
 }
