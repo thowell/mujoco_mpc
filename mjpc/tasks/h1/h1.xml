@@ -13,6 +13,7 @@
       </default>
       <site size="0.001" rgba="0.5 0.5 0.5 0.3" group="4"/>
     </default>
+    <motor ctrllimited="true" ctrlrange="-0.95 0.95"/>
   </default>
 
   <asset>
@@ -135,8 +136,8 @@
         <geom class="collision" mesh="torso_link"/>
         <geom class="visual" material="white" mesh="logo_link"/>
         <site name="imu" size="0.01" pos="-0.04452 -0.01891 0.27756"/>
-        <site name="torso" size="0.1" rgba="1 0 0 0" pos="0 0 0.4" group="1"/>
-        <site name="head" size="0.05" rgba="1 0 0 0" pos="0.05 0 0.7" group="1"/>
+        <site name="torso" size="0.1" rgba="1 0 0 0" pos="0 0 0.4" group="3"/>
+        <site name="head" size="0.05" rgba="1 0 0 0" pos="0.05 0 0.7" group="3"/>
         <body name="left_shoulder_pitch_link" pos="0.0055 0.15535 0.42999" quat="0.976296 0.216438 0 0">
           <inertial pos="0.005045 0.053657 -0.015715" quat="0.814858 0.579236 -0.0201072 -0.00936488" mass="1.033"
             diaginertia="0.00129936 0.000987113 0.000858198"/>
@@ -198,25 +199,25 @@
   </worldbody>
 
   <actuator>
-    <motor class="h1" name="left_hip_yaw" joint="left_hip_yaw" gear="200" ctrlrange="-1 1"/>
-    <motor class="h1" name="left_hip_roll" joint="left_hip_roll" gear="200" ctrlrange="-1 1"/>
-    <motor class="h1" name="left_hip_pitch" joint="left_hip_pitch" gear="200" ctrlrange="-1 1"/>
-    <motor class="h1" name="left_knee" joint="left_knee" gear="300" ctrlrange="-1 1"/>
-    <motor class="h1" name="left_ankle" joint="left_ankle" gear="40" ctrlrange="-1 1"/>
-    <motor class="h1" name="right_hip_yaw" joint="right_hip_yaw" gear="200" ctrlrange="-1 1"/>
-    <motor class="h1" name="right_hip_roll" joint="right_hip_roll" gear="200" ctrlrange="-1 1"/>
-    <motor class="h1" name="right_hip_pitch" joint="right_hip_pitch" gear="200" ctrlrange="-1 1"/>
-    <motor class="h1" name="right_knee" joint="right_knee" gear="300" ctrlrange="-1 1"/>
-    <motor class="h1" name="right_ankle" joint="right_ankle" gear="40" ctrlrange="-1 1"/>
-    <motor class="h1" name="torso" joint="torso" gear="200" ctrlrange="-1 1"/>
-    <motor class="h1" name="left_shoulder_pitch" joint="left_shoulder_pitch" gear="40" ctrlrange="-1 1"/>
-    <motor class="h1" name="left_shoulder_roll" joint="left_shoulder_roll" gear="40" ctrlrange="-1 1"/>
-    <motor class="h1" name="left_shoulder_yaw" joint="left_shoulder_yaw" gear="18" ctrlrange="-1 1"/>
-    <motor class="h1" name="left_elbow" joint="left_elbow" gear="18" ctrlrange="-1 1"/>
-    <motor class="h1" name="right_shoulder_pitch" joint="right_shoulder_pitch" gear="40" ctrlrange="-1 1"/>
-    <motor class="h1" name="right_shoulder_roll" joint="right_shoulder_roll" gear="40" ctrlrange="-1 1"/>
-    <motor class="h1" name="right_shoulder_yaw" joint="right_shoulder_yaw" gear="18" ctrlrange="-1 1"/>
-    <motor class="h1" name="right_elbow" joint="right_elbow" gear="18" ctrlrange="-1 1"/>
+    <motor class="h1" name="left_hip_yaw" joint="left_hip_yaw" gear="40" />
+    <motor class="h1" name="left_hip_roll" joint="left_hip_roll" gear="40" />
+    <motor class="h1" name="left_hip_pitch" joint="left_hip_pitch" gear="120" />
+    <motor class="h1" name="left_knee" joint="left_knee" gear="100" />
+    <motor class="h1" name="left_ankle" joint="left_ankle" gear="20" />
+    <motor class="h1" name="right_hip_yaw" joint="right_hip_yaw" gear="40" />
+    <motor class="h1" name="right_hip_roll" joint="right_hip_roll" gear="40" />
+    <motor class="h1" name="right_hip_pitch" joint="right_hip_pitch" gear="120" />
+    <motor class="h1" name="right_knee" joint="right_knee" gear="100" />
+    <motor class="h1" name="right_ankle" joint="right_ankle" gear="20" />
+    <motor class="h1" name="torso" joint="torso" gear="40" />
+    <motor class="h1" name="left_shoulder_pitch" joint="left_shoulder_pitch" gear="20" />
+    <motor class="h1" name="left_shoulder_roll" joint="left_shoulder_roll" gear="20" />
+    <motor class="h1" name="left_shoulder_yaw" joint="left_shoulder_yaw" gear="20" />
+    <motor class="h1" name="left_elbow" joint="left_elbow" gear="40" />
+    <motor class="h1" name="right_shoulder_pitch" joint="right_shoulder_pitch" gear="20" />
+    <motor class="h1" name="right_shoulder_roll" joint="right_shoulder_roll" gear="20" />
+    <motor class="h1" name="right_shoulder_yaw" joint="right_shoulder_yaw" gear="20" />
+    <motor class="h1" name="right_elbow" joint="right_elbow" gear="40" />
   </actuator>
 
   <keyframe>

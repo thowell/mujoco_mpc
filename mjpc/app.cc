@@ -84,6 +84,19 @@ void controller(const mjModel* m, mjData* d);
 
 // controller callback
 void controller(const mjModel* m, mjData* data) {
+  // double* torso_position = mjpc::SensorByName(m, d, "torso_position");
+  // printf("torso height: %f\n", torso_position[2]);
+
+  // double* f1_position = mjpc::SensorByName(m, d, "sp0");
+  // double* f2_position = mjpc::SensorByName(m, d, "sp1");
+  // double* f3_position = mjpc::SensorByName(m, d, "sp2");
+  // double* f4_position = mjpc::SensorByName(m, d, "sp3");
+  // double avg_feet_height = 0.25 * (f1_position[2] + f2_position[2] +
+  //                                  f3_position[2] + f4_position[2]);
+  // printf("avg feet height: %f\n", avg_feet_height);
+
+  // printf("goal height diff: %f\n", torso_position[2] - avg_feet_height);
+
   // if agent, skip
   if (data != d) {
     return;

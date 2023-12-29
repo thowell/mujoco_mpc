@@ -31,59 +31,33 @@ void Walk::ResidualFn::Residual(const mjModel* model, const mjData* data,
   // start counter
   int counter = 0;
 
+  // ---------- Upright ----------
+  int pelvis_id = mj_name2id(model, mjOBJ_XBODY, "pelvis");
+  double* pelvis_xmat = data->xmat + 9 * pelvis_id;
+  residual[counter++] = pelvis_xmat[8] - 1;
+  residual[counter++] = 0;
+  residual[counter++] = 0;
+
   // ----- Height: head feet vertical error ----- //
+  double height_goal = parameters_[ParameterIndex(model, "Height Goal")];
 
   // feet sensor positions
   double* f1_position = SensorByName(model, data, "sp0");
   double* f2_position = SensorByName(model, data, "sp1");
   double* f3_position = SensorByName(model, data, "sp2");
   double* f4_position = SensorByName(model, data, "sp3");
-  double* head_position = SensorByName(model, data, "head_position");
-  double head_feet_error =
-      head_position[2] - 0.25 * (f1_position[2] + f2_position[2] +
-                                 f3_position[2] + f4_position[2]);
-  residual[counter++] = head_feet_error - parameters_[ParameterIndex(model, "Height Goal")];
-  
-  // ----- Balance: CoM-feet xy error ----- //
+  double* torso_position = SensorByName(model, data, "torso_position");
+  double torso_feet_error =
+      torso_position[2] -
+      0.25 *
+          (f1_position[2] + f2_position[2] + f3_position[2] + f4_position[2]);
+  residual[counter++] = torso_feet_error - height_goal;
 
-  // capture point
-  double* com_position = SensorByName(model, data, "torso_subtreecom");
-  double* com_velocity = SensorByName(model, data, "torso_subtreelinvel");
-  double kFallTime = 0.2;
-  double capture_point[3] = {com_position[0], com_position[1], com_position[2]};
-  mju_addToScl3(capture_point, com_velocity, kFallTime);
-
-  // average feet xy position
-  double fxy_avg[2] = {0.0};
-  mju_addTo(fxy_avg, f1_position, 2);
-  mju_addTo(fxy_avg, f2_position, 2);
-  mju_addTo(fxy_avg, f3_position, 2);
-  mju_addTo(fxy_avg, f4_position, 2);
-  mju_scl(fxy_avg, fxy_avg, 0.25, 2);
-
-  mju_subFrom(fxy_avg, capture_point, 2);
-  double com_feet_distance = mju_norm(fxy_avg, 2);
-  residual[counter++] = com_feet_distance;
-
-  // ----- COM xy velocity should be 0 ----- //
-  mju_copy(&residual[counter], com_velocity, 2);
-  counter += 2;
-
-  // ----- joint velocity ----- //
-  mju_copy(residual + counter, data->qvel + 6, model->nv - 6);
-  counter += model->nv - 6;
-
-  // ----- action ----- //
-  mju_copy(&residual[counter], data->actuator_force, model->nu);
-  counter += model->nu;
-
-  // ----- nominal ----- //
-  // if (head_position[2] < 1.25) {
-  //   mju_zero(residual + counter, 19);
-  // } else {
-  mju_sub(residual + counter, data->qpos + 7, model->key_qpos + 7, 19);
-  // }
-  counter += 19;
+  // ---------- Position -------
+  double* target = data->mocap_pos;
+  mju_sub3(residual + counter, torso_position, target);
+  residual[counter + 2] *= 0.01;
+  counter += 3;
 
   // ---------- Gait ----------
   double step[kNumFoot];
@@ -91,24 +65,57 @@ void Walk::ResidualFn::Residual(const mjModel* model, const mjData* data,
   double foot_pos[2][3];
   mju_copy3(foot_pos[0], SensorByName(model, data, "foot_left"));
   mju_copy3(foot_pos[1], SensorByName(model, data, "foot_right"));
-  double foot_min_height[2];
-  foot_min_height[0] = std::min(SensorByName(model, data, "sp0")[2],
-                                SensorByName(model, data, "sp1")[2]);
-  foot_min_height[1] = std::min(SensorByName(model, data, "sp2")[2],
-                                SensorByName(model, data, "sp3")[2]);
 
   for (H1Foot foot : kFootAll) {
     double query[3] = {foot_pos[foot][0], foot_pos[foot][1], foot_pos[foot][2]};
     double ground_height = Ground(model, data, query);
-    double height_target = ground_height + kFootRadius + step[foot];
-    double height_difference = foot_min_height[foot] - height_target;
+    double height_target = ground_height + 0 * kFootRadius + step[foot];
+    double height_difference = foot_pos[foot][2] - height_target;
     residual[counter++] = step[foot] ? height_difference : 0;
   }
+  residual[counter++] = 0.0;
+  residual[counter++] = 0.0;
 
-  // goal
-  double* torso_position = SensorByName(model, data, "torso_position");
-  mju_sub(residual + counter, torso_position, data->mocap_pos, 2);
-  counter += 2;
+  // ---------- Balance ----------
+  double* compos = SensorByName(model, data, "torso_subtreecom");
+  double* comvel = SensorByName(model, data, "torso_subtreelinvel");
+  double capture_point[3];
+  double avg_foot_pos[3];
+  mju_add3(avg_foot_pos, foot_pos[0], foot_pos[1]);
+  mju_scl3(avg_foot_pos, avg_foot_pos, 0.5);
+  double fall_time = mju_sqrt(2.0 * height_goal / 9.81);
+  mju_addScl3(capture_point, compos, comvel, fall_time);
+  residual[counter++] = capture_point[0] - avg_foot_pos[0];
+  residual[counter++] = capture_point[1] - avg_foot_pos[1];
+
+  // ---------- Effort ----------
+  mju_scl(residual + counter, data->actuator_force, 2e-2, model->nu);
+  counter += model->nu;
+
+  // ---------- Posture ----------
+  double* home = KeyQPosByName(model, data, "home");
+  mju_sub(residual + counter, data->qpos + 7, home + 7, model->nu);
+  // for (H1Foot foot : kFootAll) {
+  //   for (int joint = 0; joint < 3; joint++) {
+  //     residual[counter + 3*foot + joint] *= kJointPostureGain[joint];
+  //   }
+  // }
+
+  // loosen arms
+  residual[counter + 11] *= 0.1;
+  residual[counter + 12] *= 0.1;
+  residual[counter + 13] *= 0.1;
+  residual[counter + 14] *= 0.1;
+  residual[counter + 15] *= 0.1;
+  residual[counter + 16] *= 0.1;
+  residual[counter + 17] *= 0.1;
+  residual[counter + 18] *= 0.1;
+
+  counter += model->nu;
+
+  // ----- joint velocity -----
+  mju_copy(residual + counter, data->qvel, model->nv);
+  counter += model->nv;
 
   // sensor dim sanity check
   CheckSensorDim(model, counter);

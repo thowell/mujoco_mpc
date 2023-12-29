@@ -12,36 +12,39 @@
     <numeric name="sampling_exploration" data="0.05" />
     <numeric name="sampling_representation" data="0" />
     <numeric name="ilqg_representation" data="0" />
-    <numeric name="residual_Height Goal" data="1.68 0.0 1.85" />
+    <numeric name="residual_Height Goal" data="1.371 0.0 1.85" />
     <numeric name="residual_Cadence" data="1 0 4" />
-    <numeric name="residual_Amplitude" data=".05 0 0.2" />
+    <numeric name="residual_Amplitude" data=".03 0 0.2" />
     <numeric name="residual_Duty ratio" data="0.5 0 1"/>
   </custom>
 
   <sensor>
-    <user name="Height" dim="1" user="6 1.0 0.0 100.0 0.1" />
-    <user name="Balance" dim="1" user="6 1.0 0.0 100.0 0.1" />
-    <user name="CoM Vel." dim="2" user="0 1.0e-3 0.0 1.0" />
-    <user name="Joint Vel." dim="19" user="0 1.0e-3 0.0 0.1" />
-    <user name="Control" dim="19" user="3 0.01 0.0 0.1 0.3" />
-    <user name="Nominal" dim="19" user="0 0.5 0.0 10.0" />
-    <user name="Gait" dim="2" user="0 0.0 0.0 100.0" />
-    <user name="Goal" dim="2" user="0 0.0 0.0 10.0" />
+    <user name="Upright" dim="3" user="6 1 0 3 0.05" />
+    <user name="Height" dim="1" user="6 1 0 3 0.04" />
+    <user name="Position" dim="3" user="2 0.2 0 0.5 0.1" />
+    <user name="Gait" dim="4" user="6 0 0 10 0.03" />
+    <user name="Balance" dim="2" user="2 0.2 0 0.3 0.1" />
+    <user name="Effort" dim="19" user="0 0.03 0.0 0.1" />
+    <user name="Posture" dim="19" user="0 0.02 0.0 0.1" />
+    <user name="Jnt Vel" dim="25" user="0 1.0e-3 0.0 0.1" />
+
     <framepos name="trace0" objtype="site" objname="torso"/>
     <framepos name="head_position" objtype="site" objname="head"/>
     <framepos name="torso_position" objtype="site" objname="torso"/>
     <framelinvel name="torso_subtreelinvel" objtype="site" objname="torso" />
-    <subtreecom name="torso_subtreecom" body="torso_link"/>
+    <subtreecom name="torso_subtreecom" body="pelvis"/>
     <framepos name="sp0" objtype="site" objname="sp0"/>
     <framepos name="sp1" objtype="site" objname="sp1"/>
     <framepos name="sp2" objtype="site" objname="sp2"/>
     <framepos name="sp3" objtype="site" objname="sp3"/>
     <framepos name="foot_left" objtype="site" objname="fl"/>
     <framepos name="foot_right" objtype="site" objname="fr"/>
+    <framelinvel name="vel_left" objtype="site" objname="fl"/>
+    <framelinvel name="vel_right" objtype="site" objname="fr"/>
   </sensor>
 
   <worldbody>
-    <body name="goal" mocap="true" pos="0.5 0 1.28">
+    <body name="goal" mocap="true" pos="0.1 0 1.3">
       <geom size="0.12" contype="0" conaffinity="0" rgba="0 1 0 .5" group="2"/>
     </body>
   </worldbody>
