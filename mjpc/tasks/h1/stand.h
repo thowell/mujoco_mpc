@@ -45,33 +45,9 @@ class Stand : public Task {
 
    private:
     friend class Stand;
-
-    // return internal phase clock
-    double GetPhase(double time) const;
-
-    // return normalized target step height
-    double StepHeight(double time, double footphase, double duty_ratio) const;
-
-    // compute target step height for all feet
-    void FootStep(double* step, double time) const;
-
-    double last_transition_time_ = -1;
-
-    // gait-related states
-    double phase_start_ = 0;
-    double phase_start_time_ = 0;
-    double phase_velocity_ = 0;
-
-    // parameter id
-    int cadence_param_id_ = -1;
-    int amplitude_param_id_ = -1;
-    int duty_param_id_ = -1;
   };
 
   Stand() : residual_(this) {}
-  void TransitionLocked(mjModel* model, mjData* data) override;
-  // call base-class Reset, save task-related ids
-  void ResetLocked(const mjModel* model) override;
 
   std::string Name() const override;
   std::string XmlPath() const override;
