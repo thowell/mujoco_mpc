@@ -12,7 +12,7 @@
     <motor ctrlrange="-0.05 0.05"/>
     <default class="cubelet">
       <joint type="ball" armature="0.00005" damping="0.0005" frictionloss="0.00005"/>
-      <geom type="mesh" condim="1" mesh="cubelet"/>
+      <geom type="mesh" condim="1" mesh="cubelet" quat="1 0 0 1"/>
     </default>
     <default class="core">
       <geom type="sphere" contype="0" conaffinity="0" group="4" size="0.01"/>
