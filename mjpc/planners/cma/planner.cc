@@ -54,7 +54,7 @@ void CMAPlanner::Initialize(mjModel* model, const Task& task) {
   winner = 0;
 
   // CMA-ES
-  eps = 1.0e-16;
+  eps = 1.0e-5;
 }
 
 // allocate memory
@@ -222,134 +222,137 @@ void CMAPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
   // sample random policies and rollout
   double best_return = trajectories[winner].total_return;
 
-  // CMA-ES
-  int num_parameters = candidate_policy[0].num_parameters;
-  int num_sample = num_trajectories - 1;
-  num_elite = mju_floor(num_sample / 2);
+  for (int g = 0; g < 5; g++) {
 
-  // compute weights
-  for (int i = 0; i < num_sample; i++) {
-    weight[i] = mju_log(0.5 * (num_sample + 1)) - mju_log(i + 1);
-  }
+    // CMA-ES
+    int num_parameters = candidate_policy[0].num_parameters;
+    int num_sample = num_trajectories - 1;
+    num_elite = mju_floor(num_sample / 2);
 
-  // elite weight normalization
-  double elite_sum = mju_sum(weight.data(), num_elite);
-  for (int i = 0; i < num_elite; i++) {
-    weight[i] /= elite_sum;
-  }
+    // compute weights
+    for (int i = 0; i < num_sample; i++) {
+      weight[i] = mju_log(0.5 * (num_sample + 1)) - mju_log(i + 1);
+    }
 
-  // parameters
-  mu_eff = 1.0 / mju_dot(weight.data(), weight.data(), num_elite);
-  c_sigma = (mu_eff + 2.0) / (num_parameters + mu_eff + 5.0);
-  d_sigma =
-      1.0 +
-      2.0 * mju_max(0.0,
-                    mju_sqrt((mu_eff - 1.0) / (num_parameters + 1.0)) - 1.0) +
-      c_sigma;
-  c_Sigma = (4.0 + mu_eff / num_parameters) /
-            (num_parameters + 4.0 + 2.0 * mu_eff / num_parameters);
-  c1 = 2.0 / ((num_parameters + 1.3) * (num_parameters + 1.3) + mu_eff);
-  c_mu = mju_min(
-      1.0 - c1, 2.0 * (mu_eff - 2.0 + 1.0 / mu_eff) /
-                    ((num_parameters + 2.0) * (num_parameters + 2.0) + mu_eff));
-  E = mju_sqrt(num_parameters) *
-      (1.0 - 1.0 / (4 * num_parameters) +
-       1.0 / (21.0 * num_parameters * num_parameters));
+    // elite weight normalization
+    double elite_sum = mju_sum(weight.data(), num_elite);
+    for (int i = 0; i < num_elite; i++) {
+      weight[i] /= elite_sum;
+    }
 
-  // scale non-elite weights
-  double nonelite_sum =
-      mju_sum(weight.data() + num_elite, num_sample - num_elite);
-  for (int i = num_elite; i < num_sample; i++) {
-    weight[i] *= -1.0 * (1.0 + c1 / c_mu) / nonelite_sum;
-  }
+    // parameters
+    mu_eff = 1.0 / mju_dot(weight.data(), weight.data(), num_elite);
+    c_sigma = (mu_eff + 2.0) / (num_parameters + mu_eff + 5.0);
+    d_sigma =
+        1.0 +
+        2.0 * mju_max(0.0,
+                      mju_sqrt((mu_eff - 1.0) / (num_parameters + 1.0)) - 1.0) +
+        c_sigma;
+    c_Sigma = (4.0 + mu_eff / num_parameters) /
+              (num_parameters + 4.0 + 2.0 * mu_eff / num_parameters);
+    c1 = 2.0 / ((num_parameters + 1.3) * (num_parameters + 1.3) + mu_eff);
+    c_mu = mju_min(
+        1.0 - c1, 2.0 * (mu_eff - 2.0 + 1.0 / mu_eff) /
+                      ((num_parameters + 2.0) * (num_parameters + 2.0) + mu_eff));
+    E = mju_sqrt(num_parameters) *
+        (1.0 - 1.0 / (4 * num_parameters) +
+        1.0 / (21.0 * num_parameters * num_parameters));
 
-  // simulate noisy policies
-  this->Rollouts(num_trajectories, horizon, pool);
+    // scale non-elite weights
+    double nonelite_sum =
+        mju_sum(weight.data() + num_elite, num_sample - num_elite);
+    for (int i = num_elite; i < num_sample; i++) {
+      weight[i] *= -1.0 * (1.0 + c1 / c_mu) / nonelite_sum;
+    }
 
-  // ----- CMA-ES update ----- //
-  // fitness sort
-  sort_indices(fitness_sort, fitness, num_sample);
+    // simulate noisy policies
+    this->Rollouts(num_trajectories, horizon, pool);
 
-  // ----- selection and mean update ----- //
+    // ----- CMA-ES update ----- //
+    // fitness sort
+    sort_indices(fitness_sort, fitness, num_sample);
 
-  // sum(weight[i] * delta_s[rank[i]])
-  mju_zero(delta_w.data(), num_parameters);
-  for (int i = 0; i < num_elite; i++) {
-    int idx = fitness_sort[i];
-    mju_addToScl(delta_w.data(), mjpc::DataAt(delta_s, idx * num_parameters),
-                 weight[i], num_parameters);
-  }
+    // ----- selection and mean update ----- //
 
-  // update m += step_size * delta_w
-  mju_addToScl(candidate_policy[0].parameters.data(), delta_w.data(), step_size,
-               num_parameters);
+    // sum(weight[i] * delta_s[rank[i]])
+    mju_zero(delta_w.data(), num_parameters);
+    for (int i = 0; i < num_elite; i++) {
+      int idx = fitness_sort[i];
+      mju_addToScl(delta_w.data(), mjpc::DataAt(delta_s, idx * num_parameters),
+                  weight[i], num_parameters);
+    }
 
-  // ----- step-size control ----- //
-  mju_mulMatVec(p_sigma_tmp.data(), C.data(), delta_w.data(), num_parameters,
+    // update m += step_size * delta_w
+    mju_addToScl(candidate_policy[0].parameters.data(), delta_w.data(), step_size,
                 num_parameters);
 
-  mju_scl(p_sigma_tmp.data(), p_sigma_tmp.data(),
-          mju_sqrt(c_sigma * (2.0 - c_sigma) * mu_eff), num_parameters);
+    // ----- step-size control ----- //
+    mju_mulMatVec(p_sigma_tmp.data(), C.data(), delta_w.data(), num_parameters,
+                  num_parameters);
 
-  mju_scl(p_sigma.data(), p_sigma.data(), 1.0 - c_sigma, num_parameters);
-  mju_addTo(p_sigma.data(), p_sigma_tmp.data(), num_parameters);
+    mju_scl(p_sigma_tmp.data(), p_sigma_tmp.data(),
+            mju_sqrt(c_sigma * (2.0 - c_sigma) * mu_eff), num_parameters);
 
-  step_size *= mju_exp(c_sigma / d_sigma *
-                       (mju_norm(p_sigma.data(), num_parameters) / E - 1.0));
-  // step_size = mju_min(mju_max(1.0e-8, step_size), 10.0);
+    mju_scl(p_sigma.data(), p_sigma.data(), 1.0 - c_sigma, num_parameters);
+    mju_addTo(p_sigma.data(), p_sigma_tmp.data(), num_parameters);
 
-  // ----- covariance adaptation ----- //
-  int k = 0;
-  int h_sigma = (mju_norm(p_sigma.data(), num_parameters) /
-                     mju_sqrt(1.0 - mju_pow(1.0 - c_sigma, 2 * (k + 1))) <
-                 (1.4 + 2.0 / (num_parameters + 1)) * E)
-                    ? 1
-                    : 0;
+    step_size *= mju_exp(c_sigma / d_sigma *
+                        (mju_norm(p_sigma.data(), num_parameters) / E - 1.0));
+    // step_size = mju_min(mju_max(1.0e-8, step_size), 10.0);
 
-  mju_scl(p_Sigma.data(), p_Sigma.data(), 1.0 - c_Sigma, num_parameters);
-  mju_addToScl(p_Sigma.data(), delta_w.data(),
-               h_sigma * mju_sqrt(c_Sigma * (2.0 - c_Sigma) * mu_eff),
-               num_parameters);
+    // ----- covariance adaptation ----- //
+    int k = 0;
+    int h_sigma = (mju_norm(p_sigma.data(), num_parameters) /
+                      mju_sqrt(1.0 - mju_pow(1.0 - c_sigma, 2 * (k + 1))) <
+                  (1.4 + 2.0 / (num_parameters + 1)) * E)
+                      ? 1
+                      : 0;
 
-  for (int i = 0; i < num_sample; i++) {
-    if (weight[i] >= 0.0) {
-      weight_update[i] = weight[i];
-    } else {
-      int idx = fitness_sort[i];
-      mju_mulMatVec(C_delta_s.data(), C.data(),
-                    mjpc::DataAt(delta_s, idx * num_parameters), num_parameters,
-                    num_parameters);
-      weight_update[i] =
-          num_parameters * weight[i] /
-          mju_dot(C_delta_s.data(), C_delta_s.data(), num_parameters);
+    mju_scl(p_Sigma.data(), p_Sigma.data(), 1.0 - c_Sigma, num_parameters);
+    mju_addToScl(p_Sigma.data(), delta_w.data(),
+                h_sigma * mju_sqrt(c_Sigma * (2.0 - c_Sigma) * mu_eff),
+                num_parameters);
+
+    for (int i = 0; i < num_sample; i++) {
+      if (weight[i] >= 0.0) {
+        weight_update[i] = weight[i];
+      } else {
+        int idx = fitness_sort[i];
+        mju_mulMatVec(C_delta_s.data(), C.data(),
+                      mjpc::DataAt(delta_s, idx * num_parameters), num_parameters,
+                      num_parameters);
+        weight_update[i] =
+            num_parameters * weight[i] /
+            mju_dot(C_delta_s.data(), C_delta_s.data(), num_parameters);
+      }
     }
-  }
 
-  mju_scl(
-      Sigma.data(), Sigma.data(),
-      (1.0 - c1 - c_mu) + (c1 * (1.0 - h_sigma) * c_Sigma * (2.0 - c_Sigma)),
-      num_parameters * num_parameters);
+    mju_scl(
+        Sigma.data(), Sigma.data(),
+        (1.0 - c1 - c_mu) + (c1 * (1.0 - h_sigma) * c_Sigma * (2.0 - c_Sigma)),
+        num_parameters * num_parameters);
 
-  mju_mulMatMatT(Sigma_tmp.data(), p_Sigma.data(), p_Sigma.data(),
-                 num_parameters, 1, num_parameters);
+    mju_mulMatMatT(Sigma_tmp.data(), p_Sigma.data(), p_Sigma.data(),
+                  num_parameters, 1, num_parameters);
 
-  mju_scl(Sigma_tmp.data(), Sigma_tmp.data(), c1,
-          num_parameters * num_parameters);
-
-  mju_addTo(Sigma.data(), Sigma_tmp.data(), num_parameters * num_parameters);
-
-  for (int i = 0; i < num_sample; i++) {
-    int idx = fitness_sort[i];
-    mju_mulMatMatT(Sigma_tmp.data(),
-                   mjpc::DataAt(delta_s, idx * num_parameters),
-                   mjpc::DataAt(delta_s, idx * num_parameters), num_parameters,
-                   1, num_parameters);
-    mju_scl(Sigma_tmp.data(), Sigma_tmp.data(), c_mu * weight_update[i],
+    mju_scl(Sigma_tmp.data(), Sigma_tmp.data(), c1,
             num_parameters * num_parameters);
-    mju_addTo(Sigma.data(), Sigma_tmp.data(), num_parameters * num_parameters);
-  }
 
-  mju_symmetrize(Sigma.data(), Sigma.data(), num_parameters);
+    mju_addTo(Sigma.data(), Sigma_tmp.data(), num_parameters * num_parameters);
+
+    for (int i = 0; i < num_sample; i++) {
+      int idx = fitness_sort[i];
+      mju_mulMatMatT(Sigma_tmp.data(),
+                    mjpc::DataAt(delta_s, idx * num_parameters),
+                    mjpc::DataAt(delta_s, idx * num_parameters), num_parameters,
+                    1, num_parameters);
+      mju_scl(Sigma_tmp.data(), Sigma_tmp.data(), c_mu * weight_update[i],
+              num_parameters * num_parameters);
+      mju_addTo(Sigma.data(), Sigma_tmp.data(), num_parameters * num_parameters);
+    }
+
+    mju_symmetrize(Sigma.data(), Sigma.data(), num_parameters);
+  }
 
   // ----- compare rollouts ----- //
   // reset
