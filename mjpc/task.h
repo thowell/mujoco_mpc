@@ -119,8 +119,9 @@ class Task {
   // holding a lock
   double CostValue(const double* residual) const;
 
+  // TODO(taylor): const Estimator
   virtual void ModifyScene(const mjModel* model, const mjData* data,
-                           const Estimator* estimator, mjvScene* scene) const {}
+                           Estimator* estimator, mjvScene* scene) const {}
 
   virtual std::string Name() const = 0;
   virtual std::string XmlPath() const = 0;

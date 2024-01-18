@@ -399,8 +399,7 @@ constexpr float kPcpRgba[4] = {0.5, 0.5, 0.2, 1};   // projected capture point
 
 // draw task-related geometry in the scene
 void QuadrupedFlat::ModifyScene(const mjModel* model, const mjData* data,
-                                const Estimator* estimator,
-                                mjvScene* scene) const {
+                                Estimator* estimator, mjvScene* scene) const {
   // flip target pose
   if (residual_.current_mode_ == ResidualFn::kModeFlip) {
     double flip_time = data->time - residual_.mode_start_time_;

@@ -17,7 +17,9 @@
 
 #include <memory>
 #include <string>
+
 #include <mujoco/mujoco.h>
+#include "mjpc/estimators/estimator.h"
 #include "mjpc/task.h"
 
 namespace mjpc {
@@ -39,6 +41,10 @@ class Particle : public Task {
   };
   Particle() : residual_(this) {}
   void TransitionLocked(mjModel* model, mjData* data) override;
+
+  // draw task-related geometry in the scene
+  void ModifyScene(const mjModel* model, const mjData* data,
+                   Estimator* estimator, mjvScene* scene) const override;
 
  protected:
   std::unique_ptr<mjpc::ResidualFn> ResidualLocked() const override {

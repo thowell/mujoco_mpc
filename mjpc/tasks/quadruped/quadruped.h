@@ -17,6 +17,7 @@
 
 #include <string>
 #include <mujoco/mujoco.h>
+#include "mjpc/estimators/estimator.h"
 #include "mjpc/task.h"
 
 namespace mjpc {
@@ -234,7 +235,7 @@ class QuadrupedFlat : public Task {
 
   // draw task-related geometry in the scene
   void ModifyScene(const mjModel* model, const mjData* data,
-                   const Estimator* estimator, mjvScene* scene) const override;
+                   Estimator* estimator, mjvScene* scene) const override;
 
  protected:
   std::unique_ptr<mjpc::ResidualFn> ResidualLocked() const override {
