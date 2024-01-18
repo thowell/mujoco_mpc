@@ -13,7 +13,7 @@
     <position ctrlrange="-10 10"/>
     <default class="cubelet">
       <joint type="ball" armature="0.001" damping="0.001" frictionloss="0.001"/>
-      <geom type="mesh" condim="1" mesh="cubelet"/>
+      <geom type="mesh" condim="1" mesh="cubelet" quat="1 0 0 1"/>
     </default>
     <default class="core">
       <geom type="sphere" contype="0" conaffinity="0" group="4" size="0.01"/>
