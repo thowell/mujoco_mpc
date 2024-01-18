@@ -21,6 +21,7 @@
 #include <vector>
 
 #include <mujoco/mujoco.h>
+#include "mjpc/estimators/estimator.h"
 #include "mjpc/norm.h"
 
 namespace mjpc {
@@ -119,7 +120,7 @@ class Task {
   double CostValue(const double* residual) const;
 
   virtual void ModifyScene(const mjModel* model, const mjData* data,
-                           mjvScene* scene) const {}
+                           const Estimator* estimator, mjvScene* scene) const {}
 
   virtual std::string Name() const = 0;
   virtual std::string XmlPath() const = 0;

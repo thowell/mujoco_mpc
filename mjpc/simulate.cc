@@ -1859,7 +1859,8 @@ void Simulate::Render() {
   if (this->uiloadrequest.load() == 0) {
     // task-specific
     if (this->agent->ActiveTask()->visualize) {
-      this->agent->ActiveTask()->ModifyScene(this->m, this->d, &this->scn);
+      this->agent->ActiveTask()->ModifyScene(
+          this->m, this->d, &this->agent->ActiveEstimator(), &this->scn);
     }
     // common to all tasks
     this->agent->ModifyScene(&this->scn);

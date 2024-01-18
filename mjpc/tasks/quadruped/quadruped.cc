@@ -17,6 +17,7 @@
 #include <string>
 
 #include <mujoco/mujoco.h>
+#include "mjpc/estimators/estimator.h"
 #include "mjpc/task.h"
 #include "mjpc/utilities.h"
 
@@ -398,7 +399,8 @@ constexpr float kPcpRgba[4] = {0.5, 0.5, 0.2, 1};   // projected capture point
 
 // draw task-related geometry in the scene
 void QuadrupedFlat::ModifyScene(const mjModel* model, const mjData* data,
-                           mjvScene* scene) const {
+                                const Estimator* estimator,
+                                mjvScene* scene) const {
   // flip target pose
   if (residual_.current_mode_ == ResidualFn::kModeFlip) {
     double flip_time = data->time - residual_.mode_start_time_;

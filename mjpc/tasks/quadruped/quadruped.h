@@ -110,34 +110,34 @@ class QuadrupedFlat : public Task {
     // - canter actually has a wider range than gallop
 
     // automatic gait switching: time constant for com speed filter
-    constexpr static double kAutoGaitFilter = 0.2;    // second
+    constexpr static double kAutoGaitFilter = 0.2;  // second
 
     // automatic gait switching: minimum time between switches
-    constexpr static double kAutoGaitMinTime = 1;     // second
+    constexpr static double kAutoGaitMinTime = 1;  // second
 
     // target torso height over feet when quadrupedal
     constexpr static double kHeightQuadruped = 0.25;  // meter
 
     // target torso height over feet when bipedal
-    constexpr static double kHeightBiped = 0.6;       // meter
+    constexpr static double kHeightBiped = 0.6;  // meter
 
     // radius of foot geoms
-    constexpr static double kFootRadius = 0.02;       // meter
+    constexpr static double kFootRadius = 0.02;  // meter
 
     // below this target yaw velocity, walk straight
-    constexpr static double kMinAngvel = 0.01;        // radian/second
+    constexpr static double kMinAngvel = 0.01;  // radian/second
 
     // posture gain factors for abduction, hip, knee
     constexpr static double kJointPostureGain[3] = {2, 1, 1};  // unitless
 
     // flip: crouching height, from which leap is initiated
-    constexpr static double kCrouchHeight = 0.15;     // meter
+    constexpr static double kCrouchHeight = 0.15;  // meter
 
     // flip: leap height, beginning of flight phase
-    constexpr static double kLeapHeight = 0.5;        // meter
+    constexpr static double kLeapHeight = 0.5;  // meter
 
     // flip: maximum height of flight phase
-    constexpr static double kMaxHeight = 0.8;         // meter
+    constexpr static double kMaxHeight = 0.8;  // meter
 
     //  ============  methods  ============
     // return internal phase clock
@@ -234,7 +234,7 @@ class QuadrupedFlat : public Task {
 
   // draw task-related geometry in the scene
   void ModifyScene(const mjModel* model, const mjData* data,
-                   mjvScene* scene) const override;
+                   const Estimator* estimator, mjvScene* scene) const override;
 
  protected:
   std::unique_ptr<mjpc::ResidualFn> ResidualLocked() const override {
@@ -246,7 +246,6 @@ class QuadrupedFlat : public Task {
   friend class ResidualFn;
   ResidualFn residual_;
 };
-
 
 class QuadrupedHill : public Task {
  public:
@@ -268,6 +267,7 @@ class QuadrupedHill : public Task {
     // -----------------------------------------------------------------------
     void Residual(const mjModel* model, const mjData* data,
                   double* residual) const override;
+
    private:
     friend class QuadrupedHill;
     int current_mode_;
