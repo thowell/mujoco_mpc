@@ -130,11 +130,9 @@ class MPPIPlanner : public Planner {
   double rollouts_compute_time;
   double policy_update_compute_time;
 
-  // mppi
-  double lambda_;                   // the temp of the energy-based model
-  std::vector<double> weight_vec;  // MPPI weights
-  double denom;                    // sum of weight_vec
-  double temp_weight;              // temp variable for storing weights
+  // MPPI variables
+  double lambda_;                // the temp of the energy-based model
+  std::vector<double> weights_;  // MPPI weights
 
   int num_trajectory_;
   mutable std::shared_mutex mtx_;

@@ -59,11 +59,6 @@ void MPPIPlanner::Initialize(mjModel* model, const Task& task) {
   // set the temperature of the cost energy distribution
   lambda_ = GetNumberOrDefault(0.01, model, "lambda");
 
-  // initialize weights
-  std::fill(weight_vec.begin(), weight_vec.end(), 0.0);
-  denom = 0.0;
-  temp_weight = 0.0;
-
   if (num_trajectory_ > kMaxTrajectory) {
     mju_error_i("Too many trajectories, %d is the maximum allowed.",
                 kMaxTrajectory);
@@ -94,7 +89,7 @@ void MPPIPlanner::Allocate() {
   noise.resize(kMaxTrajectory * (model->nu * kMaxTrajectoryHorizon));
 
   // allocating weights for MPPI update
-  weight_vec.resize(kMaxTrajectory);
+  weights_.resize(kMaxTrajectory);
 
   // need to initialize an arbitrary order of the trajectories
   trajectory_order.resize(kMaxTrajectory);
@@ -225,18 +220,16 @@ void MPPIPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
   int idx = trajectory_order[0];
 
   // ----- MPPI update ----- //
-  temp_weight = 0.0;  // storage for intermediate weights
-  denom = 0.0;
-  std::fill(weight_vec.begin(), weight_vec.end(), 0.0);
+  double total_weight = 0.0;
   double lambda = lambda_;  // fixed in this function
+  std::fill(weights_.begin(), weights_.end(), 0.0);
 
   // (1) computing MPPI weights
   for (int i = 0; i < num_trajectory; i++) {
     // subtract a baseline for variance reduction + numerical stability
     double diff = trajectory[i].total_return - trajectory[idx].total_return;
-    temp_weight = std::exp(-diff / lambda);
-    denom += temp_weight;
-    weight_vec[i] = temp_weight;
+    weights_[i] = std::exp(-diff / lambda);
+    total_weight += weights_[i];
   }
 
   // (2) updating the distribution parameters
@@ -251,24 +244,26 @@ void MPPIPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
     // where \sum_i{w_i} = 1, so
     //     mu <- \sum_i{w_i * (mu + dU)}, where mu + dU = U.
 
+    // normalized weight
+    double norm_weight = weights_[i] / total_weight;
+
     // add to parameters of nominal policy
     mju_addToScl(parameters_scratch.data(),
-                 candidate_policy[i].parameters.data(), weight_vec[i] / denom,
+                 candidate_policy[i].parameters.data(), norm_weight,
                  policy.num_parameters);
 
     // add to nominal trajectory
     mju_addToScl(nominal_trajectory.actions.data(),
-                 trajectory[i].actions.data(), weight_vec[i] / denom,
+                 trajectory[i].actions.data(), norm_weight,
                  model->nu * (horizon - 1));
     mju_addToScl(nominal_trajectory.trace.data(), trajectory[i].trace.data(),
-                 weight_vec[i] / denom, 3 * horizon);
+                 norm_weight, 3 * horizon);
     mju_addToScl(nominal_trajectory.residual.data(),
-                 trajectory[i].residual.data(), weight_vec[i] / denom,
+                 trajectory[i].residual.data(), norm_weight,
                  nominal_trajectory.dim_residual * horizon);
     mju_addToScl(nominal_trajectory.costs.data(), trajectory[i].costs.data(),
-                 weight_vec[i] / denom, horizon);
-    nominal_trajectory.total_return +=
-        trajectory[i].total_return * weight_vec[i] / denom;
+                 norm_weight, horizon);
+    nominal_trajectory.total_return += trajectory[i].total_return * norm_weight;
   }
 
   // update
