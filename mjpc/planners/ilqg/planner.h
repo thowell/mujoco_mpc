@@ -71,6 +71,11 @@ class iLQGPlanner : public Planner {
   void Plots(mjvFigure* fig_planner, mjvFigure* fig_timer, int planner_shift,
              int timer_shift, int planning, int* shift) override;
 
+  // return number of parameters optimized by planner
+  int NumParameters() override {
+    return policy.trajectory.dim_action * (policy.trajectory.horizon - 1);
+  };
+
   // single iLQG iteration
   void Iteration(int horizon, ThreadPool& pool);
 
@@ -84,8 +89,6 @@ class iLQGPlanner : public Planner {
   int BestRollout();
 
   void UpdateNumTrajectoriesFromGUI();
-
-  //
 
   // ----- members ----- //
   mjModel* model;
@@ -154,6 +157,7 @@ class iLQGPlanner : public Planner {
  private:
   int num_trajectory_ = 1;
   int num_rollouts_gui_ = 1;
+  int derivative_skip_ = 0;
 };
 
 }  // namespace mjpc

@@ -59,6 +59,16 @@ void iLQGPolicy::Allocate(const mjModel* model, const Task& task, int horizon) {
 // reset memory to zeros
 void iLQGPolicy::Reset(int horizon, const double* initial_repeated_action) {
   trajectory.Reset(horizon, initial_repeated_action);
+
+  // initialize ctrl
+  int home_id = mj_name2id(model, mjOBJ_KEY, "home");
+  if (home_id >= 0) {
+    for (int t = 0; t < horizon - 1; t++) {
+      mju_copy(trajectory.actions.data() + t * model->nu, model->key_ctrl,
+               model->nu);
+    }
+  }
+
   std::fill(
       feedback_gain.begin(),
       feedback_gain.begin() + horizon * model->nu * (2 * model->nv + model->na),

@@ -292,40 +292,9 @@ double* KeyActByName(const mjModel* m, const mjData* d,
   }
 }
 
-// return a power transformed sequence
-void PowerSequence(double* t, double t_step, double t1, double t2, double p,
-                   double N) {
-  // y = a * t^p + b
-  double den = (mju_pow(t1, p) - mju_pow(t2, p));
-  double a = (t1 - t2) / den;
-  double b = (-t1 * mju_pow(t2, p) + t2 * mju_pow(t1, p)) / den;
-
-  double t_running = t1;
+void LinearRange(double* t, double t_step, double t0, int N) {
   for (int i = 0; i < N; i++) {
-    t[i] = a * mju_pow(t_running, p) + b;
-    t_running += t_step;
-  }
-}
-
-// find interval in monotonic sequence containing value
-void FindInterval(int* bounds, const std::vector<double>& sequence,
-                  double value, int length) {
-  // get bounds
-  auto it =
-      std::upper_bound(sequence.begin(), sequence.begin() + length, value);
-  int upper_bound = it - sequence.begin();
-  int lower_bound = upper_bound - 1;
-
-  // set bounds
-  if (lower_bound < 0) {
-    bounds[0] = 0;
-    bounds[1] = 0;
-  } else if (lower_bound > length - 1) {
-    bounds[0] = length - 1;
-    bounds[1] = length - 1;
-  } else {
-    bounds[0] = mju_max(lower_bound, 0);
-    bounds[1] = mju_min(upper_bound, length - 1);
+    t[i] = t0 + i * t_step;
   }
 }
 

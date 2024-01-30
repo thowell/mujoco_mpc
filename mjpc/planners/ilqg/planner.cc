@@ -137,6 +137,9 @@ void iLQGPlanner::Reset(int horizon, const double* initial_repeated_action) {
   improvement = 0.0;
   expected = 0.0;
   surprise = 0.0;
+
+  // derivative skip
+  derivative_skip_ = GetNumberOrDefault(0, model, "derivative_skip");
 }
 
 // set state
@@ -165,6 +168,9 @@ void iLQGPlanner::NominalTrajectory(int horizon, ThreadPool& pool) {
   if (num_trajectory_ == 0) {
     return;
   }
+  // set policy trajectory horizon
+  policy.trajectory.horizon = horizon;
+
   // resize data for rollouts
   ResizeMjData(model, pool.NumThreads());
 
@@ -245,6 +251,7 @@ void iLQGPlanner::GUI(mjUI& ui) {
        "Zero\nLinear\nCubic"},
       {mjITEM_SELECT, "Reg. Type", 2, &settings.regularization_type,
        "Control\nFeedback\nValue\nNone"},
+      {mjITEM_SLIDERINT, "Deriv. Skip", 2, &derivative_skip_, "0 16"},
       {mjITEM_CHECKINT, "Terminal Print", 2, &settings.verbose, ""},
       {mjITEM_END}};
 
@@ -390,7 +397,7 @@ void iLQGPlanner::Iteration(int horizon, ThreadPool& pool) {
       candidate_policy[0].trajectory.actions.data(),
       candidate_policy[0].trajectory.times.data(), dim_state,
       dim_state_derivative, dim_action, dim_sensor, horizon,
-      settings.fd_tolerance, settings.fd_mode, pool);
+      settings.fd_tolerance, settings.fd_mode, pool, derivative_skip_);
 
   // stop timer
   double model_derivative_time = GetDuration(model_derivative_start);

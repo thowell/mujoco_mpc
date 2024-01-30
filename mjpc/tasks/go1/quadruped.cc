@@ -145,9 +145,11 @@ void Go1::ResidualFn::Residual(const mjModel* model, const mjData* data,
   residual[counter++] = capture_point[1] - avg_foot_pos[1];
 
   // ---------- Effort ----------
-  // mju_scl(residual + counter, data->ctrl, 2e-2, model->nu);
-  mju_sub(residual + counter, data->ctrl, model->key_ctrl, model->nu);
-  // mju_scl(residual + counter, residual + counter, 2.0e-2, model->nu);
+  if (current_mode_ == kModeBiped) {
+    mju_scl(residual + counter, data->actuator_force, 2e-2, model->nu);
+  } else {
+    mju_sub(residual + counter, data->ctrl, model->key_ctrl, model->nu);
+  }
   counter += model->nu;
 
   // ---------- Posture ----------

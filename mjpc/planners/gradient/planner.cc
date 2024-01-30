@@ -49,9 +49,6 @@ void GradientPlanner::Initialize(mjModel* model, const Task& task) {
   // task
   this->task = &task;
 
-  // rollout parameters
-  timestep_power = 1.0;
-
   // dimensions
   dim_state = model->nq + model->nv + model->na;  // state dimension
   dim_state_derivative =
@@ -147,6 +144,9 @@ void GradientPlanner::Reset(int horizon,
   expected = 0.0;
   improvement = 0.0;
   surprise = 0.0;
+
+  // derivative skip
+  derivative_skip_ = GetNumberOrDefault(0, model, "derivative_skip");
 }
 
 // set state
@@ -203,7 +203,8 @@ void GradientPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
     model_derivative.Compute(
         model, data_, trajectory[0].states.data(), trajectory[0].actions.data(),
         trajectory[0].times.data(), dim_state, dim_state_derivative, dim_action,
-        dim_sensor, horizon, settings.fd_tolerance, settings.fd_mode, pool);
+        dim_sensor, horizon, settings.fd_tolerance, settings.fd_mode, pool,
+        derivative_skip_);
 
     // stop timer
     model_derivative_time += GetDuration(model_derivative_start);
@@ -374,11 +375,8 @@ void GradientPlanner::ResamplePolicy(int horizon) {
   mju_copy(candidate_policy[0].times.data(), times_scratch.data(),
            num_spline_points);
 
-  // time step power scaling
-  PowerSequence(candidate_policy[0].times.data(), time_shift,
-                candidate_policy[0].times[0],
-                candidate_policy[0].times[num_spline_points - 1],
-                timestep_power, num_spline_points);
+  LinearRange(candidate_policy[0].times.data(), time_shift,
+              candidate_policy[0].times[0], num_spline_points);
 }
 
 // compute candidate trajectories
@@ -474,7 +472,7 @@ void GradientPlanner::GUI(mjUI& ui) {
       {mjITEM_SELECT, "Spline", 2, &policy.representation,
        "Zero\nLinear\nCubic"},
       {mjITEM_SLIDERINT, "Spline Pts", 2, &policy.num_spline_points, "0 1"},
-      // {mjITEM_SLIDERNUM, "Spline Pow. ", 2, &timestep_power, "0 10"},
+      {mjITEM_SLIDERINT, "Deriv. Skip", 2, &derivative_skip_, "0 16"},
       {mjITEM_END}};
 
   // set number of trajectory slider limits
