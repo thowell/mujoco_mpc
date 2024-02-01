@@ -201,6 +201,10 @@ void Go1::ResidualFn::Residual(const mjModel* model, const mjData* data,
   residual[counter++] = torso_heading[0] - mju_cos(heading_goal);
   residual[counter++] = torso_heading[1] - mju_sin(heading_goal);
 
+  // ---------- Linear Velocity  ----------
+  mju_copy3(residual + counter, SensorByName(model, data, "torso_subtreelinvel"));
+  counter += 3;
+
   // ---------- Angular momentum ----------
   mju_copy3(residual + counter, SensorByName(model, data, "torso_angmom"));
   counter += 3;
