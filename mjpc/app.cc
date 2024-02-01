@@ -377,9 +377,6 @@ void PhysicsLoop(mj::Simulate& sim) {
       }
     }  // release sim.mtx
 
-    // printf("act dot:\n");
-    // mju_printMat(d->act_dot, 1, m->na);
-
     // state
     if (sim.uiloadrequest.load() == 0) {
       // set ground truth state if no active estimator
