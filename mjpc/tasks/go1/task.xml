@@ -15,7 +15,7 @@
     <numeric name="derivative_skip" data="0"/>
 
     <!-- residual -->
-    <numeric name="residual_select_Gait" data="0"/>
+    <numeric name="residual_select_Gait" data="1"/>
     <text name="residual_list_Gait" data="Stand|Walk|Trot|Canter|Gallop"/>
     <numeric name="residual_select_Gait switch" data="1"/>
     <text name="residual_list_Gait switch" data="Manual|Automatic"/>
@@ -31,11 +31,11 @@
     <numeric name="residual_Heading" data="0 -3.14 3.14" />
 
     <!-- estimator -->
-    <numeric name="estimator" data="0" />
-    <numeric name="estimator_sensor_start" data="9" />
-    <numeric name="estimator_number_sensor" data="21" />
-    <numeric name="estimator_timestep" data="0.005" />
-    <numeric name="estimator_integrator" data="3" />
+    <numeric name="estimator" data="1" />
+    <numeric name="estimator_sensor_start" data="11" />
+    <numeric name="estimator_number_sensor" data="17" />
+    <!-- <numeric name="estimator_timestep" data="0.005" /> -->
+    <numeric name="estimator_integrator" data="0" />
   </custom>
 
   <visual>
@@ -111,7 +111,7 @@
     <user name="Linvel" dim="3" user="0 0.0 0 1.0e-1" />
     <user name="Angmom" dim="3" user="0 0.0 0 1.0e-1" />
     <user name="Jnt. Vel." dim="12" user="0 0.0 0 1.0e-4" />
-    <user name="Act dot" dim="12" user="0 1.0e-4 0 1.0e-2"/>
+    <!-- <user name="Act dot" dim="12" user="0 1.0e-4 0 1.0e-2"/> -->
 
     <!-- estimator measurements -->
     <framepos name="torso_pos" objtype="body" objname="trunk" />
@@ -133,10 +133,10 @@
     <jointpos name="pos_RL_thigh_joint" joint="RL_thigh_joint" />
     <jointpos name="pos_RL_calf_joint" joint="RL_calf_joint" />
 
-    <touch name="FR_touch" site="FR"/>
+    <!-- <touch name="FR_touch" site="FR"/>
     <touch name="FL_touch" site="FL"/>
     <touch name="RR_touch" site="RR"/>
-    <touch name="RL_touch" site="RL"/>
+    <touch name="RL_touch" site="RL"/> -->
 
     <!-- trace -->
     <framepos      name="trace0" objtype="site" objname="head"/>

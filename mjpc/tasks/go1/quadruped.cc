@@ -214,12 +214,12 @@ void Go1::ResidualFn::Residual(const mjModel* model, const mjData* data,
   counter += model->nv - 6;
 
   // ---------- Act dot        ----------
-  if (data->time < 1.0e-4) {
-    mju_zero(residual + counter, model->na);
-  } else {
-    mju_copy(residual + counter, data->act_dot, model->na);
-  }
-  counter += model->na;
+  // if (data->time < 1.0e-4) {
+  //   mju_zero(residual + counter, model->na);
+  // } else {
+  //   mju_copy(residual + counter, data->act_dot, model->na);
+  // }
+  // counter += model->na;
 
   // sensor dim sanity check
   CheckSensorDim(model, counter);
