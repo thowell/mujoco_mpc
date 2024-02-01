@@ -57,12 +57,12 @@
     <geom name="hill" class="prop" pos="6 6 -5.5" size="6" type="sphere"/>
   </worldbody>
 
-  <contact>
+  <!-- <contact>
     <pair geom1="RL" geom2="floor"/>
     <pair geom1="RR" geom2="floor"/>
     <pair geom1="FL" geom2="floor"/>
     <pair geom1="FR" geom2="floor"/>
-  </contact>
+  </contact> -->
 
   <default>
     <default class="task">
