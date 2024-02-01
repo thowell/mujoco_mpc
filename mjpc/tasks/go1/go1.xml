@@ -8,18 +8,18 @@
       <!-- <geom friction="0.6" margin="0.001" condim="1"/> -->
       <geom condim="3" friction="1.0" margin="0.001" solref=".015 1" contype="0" conaffinity="0"/>
       <joint axis="0 1 0" damping="2" armature="0.01" frictionloss="0.2"/>
-      <position kp="100" forcerange="-23.7 23.7"/>
+      <general dyntype="filter" dynprm="0.01" forcerange="-23.7 23.7" biastype="affine" gainprm="100 0 0 0 0 0 0 0 0 0" biasprm="0 -100 0 0 0 0 0 0 0 0"/>
       <default class="abduction">
-        <joint axis="1 0 0" damping="1" range="-0.863 0.863"/>
-        <position ctrlrange="-0.863 0.863"/>
+        <joint range="-0.863 0.863" damping="1"/>
+        <general ctrlrange="-0.863 0.863"/>
       </default>
       <default class="hip">
         <joint range="-0.686 4.501"/>
-        <position ctrlrange="-0.686 4.501"/>
+        <general ctrlrange="-0.686 4.501"/>
       </default>
       <default class="knee">
         <joint range="-2.818 -0.888"/>
-        <position forcerange="-35.55 35.55" ctrlrange="-2.818 -0.888"/>
+        <general ctrlrange="-2.818 -0.888" forcerange="-35.55 35.55"/>
       </default>
       <default class="visual">
         <geom type="mesh" contype="0" conaffinity="0" group="2" material="dark"/>
