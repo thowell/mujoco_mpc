@@ -209,6 +209,10 @@ void Go1::ResidualFn::Residual(const mjModel* model, const mjData* data,
   mju_copy3(residual + counter, SensorByName(model, data, "torso_angmom"));
   counter += 3;
 
+  // ---------- Joint velocity ----------
+  mju_copy(residual + counter, data->qvel + 6, model->nv - 6);
+  counter += model->nv - 6;
+
   // sensor dim sanity check
   CheckSensorDim(model, counter);
 }

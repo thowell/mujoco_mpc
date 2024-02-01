@@ -57,12 +57,12 @@
     <geom name="hill" class="prop" pos="6 6 -5.5" size="6" type="sphere"/>
   </worldbody>
 
-  <!-- <contact>
+  <contact>
     <pair geom1="RL" geom2="floor"/>
     <pair geom1="RR" geom2="floor"/>
     <pair geom1="FL" geom2="floor"/>
     <pair geom1="FR" geom2="floor"/>
-  </contact> -->
+  </contact>
 
   <default>
     <default class="task">
@@ -106,8 +106,9 @@
     <user name="Effort" dim="12" user="0 0.03 0.0 10.0" />
     <user name="Posture" dim="12" user="0 0.02 0.0 10.0" />
     <user name="Orientation" dim="2" user="0 0 0 10.0" />
-    <user name="Linvel" dim="3" user="0 1.0 0 10.0" />
-    <user name="Angmom" dim="3" user="0 1.0 0 10.0" />
+    <user name="Linvel" dim="3" user="0 1.0e-1 0 10.0" />
+    <user name="Angmom" dim="3" user="0 1.0e-1 0 10.0" />
+    <user name="Jnt. Vel." dim="12" user="0 1.0e-5 0 10.0" />
 
     <!-- estimator measurements -->
     <framepos name="torso_pos" objtype="body" objname="trunk" />
