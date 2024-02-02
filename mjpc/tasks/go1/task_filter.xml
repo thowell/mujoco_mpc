@@ -1,38 +1,12 @@
-<mujoco model="Quadruped Go1">
+<mujoco model="Quadruped Go1 Filter">
   <include file="../common.xml"/>
 
   <size memory="1M"/>
 
   <custom>
-    <!-- agent -->
-    <text name="task_transition" data="Quadruped|Biped|Walk|Scramble|Flip" />
-    <numeric name="agent_planner" data="2 " />
-    <numeric name="agent_horizon" data="0.35" />
-    <numeric name="agent_timestep" data="0.01" />
-    <numeric name="agent_integrator" data="3" />
-    <numeric name="ilqg_num_rollouts" data="7" />
-    <numeric name="ilqg_representation" data="2" />
-    <numeric name="derivative_skip" data="0"/>
-
-    <!-- residual -->
-    <numeric name="residual_select_Gait" data="0"/>
-    <text name="residual_list_Gait" data="Stand|Walk|Trot|Canter|Gallop"/>
-    <numeric name="residual_select_Gait switch" data="1"/>
-    <text name="residual_list_Gait switch" data="Manual|Automatic"/>
-    <numeric name="residual_Cadence" data="2 0 4" />
-    <numeric name="residual_Amplitude" data=".06 0 0.2" />
-    <numeric name="residual_Duty ratio" data="0 0 1"/>
-    <numeric name="residual_Walk speed" data="0 0 4"/>
-    <numeric name="residual_Walk turn" data="0 -2 2"/>
-    <numeric name="residual_select_Flip dir" data="0"/>
-    <text name="residual_list_Flip dir" data="Back Flip|Front Flip"/>
-    <numeric name="residual_select_Biped type" data="0"/>
-    <text name="residual_list_Biped type" data="Foot Stand|Hand Stand"/>
-    <numeric name="residual_Heading" data="0 -3.14 3.14" />
-
     <!-- estimator -->
-    <!-- <numeric name="estimator" data="0" />
-    <numeric name="estimator_sensor_start" data="11" />
+    <numeric name="estimator" data="1" />
+    <!-- <numeric name="estimator_sensor_start" data="11" />
     <numeric name="estimator_number_sensor" data="21" />
     <numeric name="estimator_timestep" data="0.005" />
     <numeric name="estimator_integrator" data="3" /> -->
@@ -59,13 +33,6 @@
     <geom name="hill" class="prop" pos="6 6 -5.5" size="6" type="sphere"/>
   </worldbody>
 
-  <!-- <contact>
-    <pair geom1="RL" geom2="floor"/>
-    <pair geom1="RR" geom2="floor"/>
-    <pair geom1="FL" geom2="floor"/>
-    <pair geom1="FR" geom2="floor"/>
-  </contact> -->
-
   <default>
     <default class="task">
       <site rgba="1 0 0 1" size=".02" group="5"/>
@@ -81,7 +48,7 @@
     </default>
   </default>
 
-  <include file="go1.xml" />
+  <include file="go1_filter.xml" />
 
   <actuator>
     <general class="abduction" name="FR_hip" joint="FR_hip_joint"/>
@@ -99,22 +66,8 @@
   </actuator>
 
   <sensor>
-    <!-- cost -->
-    <user name="Upright" dim="3" user="6 1 0 100 0.05" />
-    <user name="Height" dim="1" user="6 1 0 100 0.04" />
-    <user name="Position" dim="3" user="2 0.2 0 10.0 0.1" />
-    <user name="Gait" dim="4" user="6 2 0 100 0.03" />
-    <user name="Balance" dim="2" user="2 0.2 0 10.0 0.1" />
-    <user name="Effort" dim="12" user="0 0.03 0.0 10.0" />
-    <user name="Posture" dim="12" user="0 0.02 0.0 10.0" />
-    <user name="Orientation" dim="2" user="0 0.0 0 10.0" />
-    <user name="Linvel" dim="3" user="0 0.0 0 1.0" />
-    <user name="Angmom" dim="3" user="0 0.0 0 1.0" />
-    <user name="Jnt. Vel." dim="12" user="0 0.0 0 1.0e-4" />
-    <user name="Act dot" dim="12" user="0 1.0e-4 0 1.0e-2"/>
-
     <!-- estimator measurements -->
-    <!-- <framepos name="torso_pos" objtype="body" objname="trunk" />
+    <framepos name="torso_pos" objtype="body" objname="trunk" />
     <framepos name="FR_pos" objtype="site" objname="FR" />
     <framepos name="FL_pos" objtype="site" objname="FL" />
     <framepos name="RR_pos" objtype="site" objname="RR" />
@@ -131,7 +84,7 @@
     <jointpos name="pos_RR_calf_joint" joint="RR_calf_joint" />
     <jointpos name="pos_RL_hip_joint" joint="RL_hip_joint" />
     <jointpos name="pos_RL_thigh_joint" joint="RL_thigh_joint" />
-    <jointpos name="pos_RL_calf_joint" joint="RL_calf_joint" /> -->
+    <jointpos name="pos_RL_calf_joint" joint="RL_calf_joint" />
 
     <!-- <framepos name="c0" objtype="site" objname="c0"/>
     <framepos name="c1" objtype="site" objname="c1"/>
@@ -145,18 +98,10 @@
     <!-- <gyro site="imu" name="gyro"/>
     <accelerometer site="imu" name="accelerometer"/> -->
 
-    <!-- <touch name="FR_touch" site="FR"/>
+    <touch name="FR_touch" site="FR"/>
     <touch name="FL_touch" site="FL"/>
     <touch name="RR_touch" site="RR"/>
-    <touch name="RL_touch" site="RL"/> -->
-
-    <!-- trace -->
-    <framepos      name="trace0" objtype="site" objname="head"/>
-
-    <!-- residual -->
-    <subtreecom    name="torso_subtreecom" body="trunk"/>
-    <subtreelinvel name="torso_subtreelinvel" body="trunk"/>
-    <subtreeangmom name="torso_angmom" body="trunk"/>
+    <touch name="RL_touch" site="RL"/>
   </sensor>
 
   <keyframe>
@@ -171,12 +116,5 @@
             0 0.9 -1.8 
             0 0.9 -1.8 
             0 0.9 -1.8"/>
-    <key name="crouch"
-         qpos="-0.0501827 0.00107117 0.143925
-               1 0 0 0
-               0 0 -0.5
-               0 0 -0.5
-               0 0 -0.5
-               0 0 -0.5"/>
   </keyframe>
 </mujoco>

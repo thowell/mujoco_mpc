@@ -139,7 +139,7 @@
     <!-- residual -->
     <subtreecom    name="torso_subtreecom" body="trunk"/>
     <subtreelinvel name="torso_subtreelinvel" body="trunk"/>
-    <subtreelinvel name="torso_angmom" body="trunk"/>
+    <subtreeangmom name="torso_angmom" body="trunk"/>
   </sensor>
 
   <keyframe>
