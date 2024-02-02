@@ -6,15 +6,11 @@
   <custom>
     <!-- estimator -->
     <numeric name="estimator" data="1" />
-    <!-- <numeric name="estimator_sensor_start" data="11" />
-    <numeric name="estimator_number_sensor" data="21" />
-    <numeric name="estimator_timestep" data="0.005" />
-    <numeric name="estimator_integrator" data="3" /> -->
   </custom>
 
   <visual>
     <headlight diffuse="0.6 0.6 0.6"  ambient="0.3 0.3 0.3" specular="0 0 0"/>
-    <global azimuth="-90"/>
+    <global azimuth="-90" offheight="1024" offwidth="1024"/>
   </visual>
 
   <statistic extent="1" center="0 0 .3"/>
@@ -67,11 +63,11 @@
 
   <sensor>
     <!-- estimator measurements -->
-    <framepos name="torso_pos" objtype="body" objname="trunk" />
+    <!-- <framepos name="torso_pos" objtype="body" objname="trunk" />
     <framepos name="FR_pos" objtype="site" objname="FR" />
     <framepos name="FL_pos" objtype="site" objname="FL" />
     <framepos name="RR_pos" objtype="site" objname="RR" />
-    <framepos name="RL_pos" objtype="site" objname="RL" />
+    <framepos name="RL_pos" objtype="site" objname="RL" /> -->
 
     <jointpos name="pos_FR_hip_joint" joint="FR_hip_joint" />
     <jointpos name="pos_FR_thigh_joint" joint="FR_thigh_joint" />
@@ -86,17 +82,8 @@
     <jointpos name="pos_RL_thigh_joint" joint="RL_thigh_joint" />
     <jointpos name="pos_RL_calf_joint" joint="RL_calf_joint" />
 
-    <!-- <framepos name="c0" objtype="site" objname="c0"/>
-    <framepos name="c1" objtype="site" objname="c1"/>
-    <framepos name="c2" objtype="site" objname="c2"/>
-    <framepos name="c3" objtype="site" objname="c3"/> -->
-    <!-- <framepos name="c4" objtype="site" objname="c4"/>
-    <framepos name="c5" objtype="site" objname="c5"/>
-    <framepos name="c6" objtype="site" objname="c6"/>
-    <framepos name="c7" objtype="site" objname="c7"/> -->
-
-    <!-- <gyro site="imu" name="gyro"/>
-    <accelerometer site="imu" name="accelerometer"/> -->
+    <gyro site="imu" name="gyro"/>
+    <accelerometer site="imu" name="accelerometer"/>
 
     <touch name="FR_touch" site="FR"/>
     <touch name="FL_touch" site="FL"/>
