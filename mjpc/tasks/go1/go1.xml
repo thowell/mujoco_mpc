@@ -8,7 +8,8 @@
       <geom friction="0.6" margin="0.001" condim="1"/>
       <!-- <geom condim="3" friction="0.6" margin="0.001" solref=".015 1" contype="0" conaffinity="0"/> -->
       <joint axis="0 1 0" damping="2" armature="0.01" frictionloss="0.2"/>
-      <general dyntype="filter" dynprm="0.005" forcerange="-23.7 23.7" biastype="affine" gainprm="100 0 0 0 0 0 0 0 0 0" biasprm="0 -100 0 0 0 0 0 0 0 0"/>
+      <!-- <general dyntype="filter" dynprm="0.005" forcerange="-23.7 23.7" biastype="affine" gainprm="100 0 0 0 0 0 0 0 0 0" biasprm="0 -100 0 0 0 0 0 0 0 0"/> -->
+      <general forcerange="-23.7 23.7" biastype="affine" gainprm="100 0 0 0 0 0 0 0 0 0" biasprm="0 -100 0 0 0 0 0 0 0 0"/>
       <default class="abduction">
         <joint range="-0.863 0.863" damping="1"/>
         <general ctrlrange="-0.863 0.863"/>

@@ -104,7 +104,7 @@
     <user name="Linvel" dim="3" user="0 0.0 0 1.0" />
     <user name="Angmom" dim="3" user="0 0.0 0 1.0" />
     <user name="Jnt. Vel." dim="12" user="0 0.0 0 1.0e-4" />
-    <user name="Act dot" dim="12" user="0 1.0e-4 0 1.0e-2"/>
+    <!-- <user name="Act dot" dim="12" user="0 1.0e-4 0 1.0e-2"/> -->
 
     <!-- trace -->
     <framepos      name="trace0" objtype="site" objname="head"/>
