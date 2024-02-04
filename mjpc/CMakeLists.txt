@@ -120,6 +120,8 @@ add_library(
   direct/trajectory.h
   direct/model_parameters.cc
   direct/model_parameters.h
+  direct_planner/direct.cc
+  direct_planner/direct.h
   app.cc
   app.h
   norm.cc
