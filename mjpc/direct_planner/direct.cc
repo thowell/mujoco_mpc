@@ -229,10 +229,14 @@ void Direct2::Initialize(const mjModel* model, int qpos_horizon) {
   search_direction_norm_ = 0.0;
   step_size_ = 1.0;
   solve_status_ = kUnsolved;
+
+  // pinned
+  pinned.resize(qpos_horizon_);
+  std::fill(pinned.begin(), pinned.end(), false);
 }
 
 // reset memory
-void Direct2::Reset(const mjData* data) {
+void Direct2::Reset() {
   // force weight
   double wf = GetNumberOrDefault(1.0e-4, model, "direct_force_weight");
   std::fill(weight_force.begin(), weight_force.end(), wf);
@@ -365,10 +369,6 @@ void Direct2::EvaluateConfigurations() {
 
 // configurations derivatives
 void Direct2::ConfigurationDerivative() {
-  // operations
-  int opsensor = qpos_horizon_;
-  int opforce = qpos_horizon_ - 2;
-
   // inverse dynamics derivatives
   InverseDynamicsDerivatives();
 
@@ -386,14 +386,15 @@ void Direct2::ConfigurationDerivative() {
   JacobianForce();
 
   // wait
-  pool_.WaitCount(count_begin + opsensor + opforce);
+  pool_.WaitCount(count_begin + 2 * (qpos_horizon_ - 2));
 
   // reset count
   pool_.ResetCount();
 
   // timers
-  timer_.jacobian_sensor += mju_sum(timer_.sensor_step.data(), opsensor);
-  timer_.jacobian_force += mju_sum(timer_.force_step.data(), opforce);
+  timer_.jacobian_sensor +=
+      mju_sum(timer_.sensor_step.data(), qpos_horizon_ - 2);
+  timer_.jacobian_force += mju_sum(timer_.force_step.data(), qpos_horizon_ - 2);
   timer_.jacobian_total += GetDuration(timer_jacobian_start);
 }
 
@@ -475,14 +476,6 @@ double Direct2::CostSensor(double* gradient, double* hessian) {
       // weight
       double weight = time_weight * weight_sensor[i] / nsi / qpos_horizon_;
 
-      // first time step
-      if (t == 0) weight *= settings.first_step_position_sensors;
-
-      // last time step
-      if (t == qpos_horizon_ - 1)
-        weight *= (settings.last_step_position_sensors ||
-                   settings.last_step_velocity_sensors);
-
       // parameters
       double* pi = norm_parameters_sensor.data() + kMaxNormParameters * i;
 
@@ -559,7 +552,7 @@ void Direct2::ResidualSensor() {
   auto start = std::chrono::steady_clock::now();
 
   // loop over predictions
-  for (int t = 0; t < qpos_horizon_; t++) {
+  for (int t = 1; t < qpos_horizon_ - 1; t++) {
     // terms
     double* rt = residual_sensor_.data() + t * nsensordata_;
     double* yt_sensor = sensor_target.Get(t);
@@ -567,59 +560,6 @@ void Direct2::ResidualSensor() {
 
     // sensor difference
     mju_sub(rt, yt_model, yt_sensor, nsensordata_);
-
-    // zero out non-position sensors at first time step
-    if (t == 0) {
-      // loop over position sensors
-      for (int i = 0; i < nsensor_; i++) {
-        // sensor stage
-        int sensor_stage = model->sensor_needstage[sensor_start_ + i];
-
-        // check for position
-        if (sensor_stage == mjSTAGE_POS) continue;
-
-        // -- zero memory -- //
-        // dimension
-        int sensor_dim = model->sensor_dim[sensor_start_ + i];
-
-        // address
-        int sensor_adr = model->sensor_adr[sensor_start_ + i];
-
-        // copy sensor data
-        mju_zero(rt + sensor_adr - sensor_start_index_, sensor_dim);
-      }
-    }
-
-    // zero out qacc sensors at last time step
-    if (t == qpos_horizon_ - 1) {
-      // loop over position sensors
-      for (int i = 0; i < nsensor_; i++) {
-        // sensor stage
-        int sensor_stage = model->sensor_needstage[sensor_start_ + i];
-
-        // check for position
-        if (sensor_stage == mjSTAGE_POS &&
-            settings.last_step_position_sensors) {
-          continue;
-        }
-
-        // check for qvel
-        if (sensor_stage == mjSTAGE_VEL &&
-            settings.last_step_velocity_sensors) {
-          continue;
-        }
-
-        // -- zero memory -- //
-        // dimension
-        int sensor_dim = model->sensor_dim[sensor_start_ + i];
-
-        // address
-        int sensor_adr = model->sensor_adr[sensor_start_ + i];
-
-        // copy sensor data
-        mju_zero(rt + sensor_adr - sensor_start_index_, sensor_dim);
-      }
-    }
   }
 
   // stop timer
@@ -633,64 +573,6 @@ void Direct2::BlockSensor(int index) {
 
   // shift
   int shift = sensor_start_index_ * nv;
-
-  // first time step
-  if (index == 0) {
-    double* jac = jac_sensor_qpos.Get(0) + shift;
-
-    // unpack
-    double* dsdq012 = jac_sensor_qpos012.Get(0);
-
-    // set dsdq1
-    SetBlockInMatrix(dsdq012, jac, 1.0, ns, nband_, ns, nv, 0, nv);
-
-    return;
-  }
-
-  // last time step
-  if (index == qpos_horizon_ - 1) {
-    // dqds
-    double* dsdq = jac_sensor_qpos.Get(index) + shift;
-
-    // dvds
-    double* dsdv = jac_sensor_qvel.Get(index) + shift;
-
-    // -- qpos previous: dsdq0 = dsdv * dvdq0-- //
-
-    // unpack
-    double* dsdq0 = jac_sensor_qpos0.Get(index);
-    double* tmp = jac_sensor_scratch.Get(index);
-
-    // dsdq0 <- dvds' * dvdq0
-    double* dvdq0 = jac_qvel1_qpos0.Get(index);
-    mju_mulMatMat(dsdq0, dsdv, dvdq0, ns, nv, nv);
-
-    // -- qpos current: dsdq1 = dsdq + dsdv * dvdq1 --
-
-    // unpack
-    double* dsdq1 = jac_sensor_qpos1.Get(index);
-
-    // dsdq1 <- dqds'
-    mju_copy(dsdq1, dsdq, ns * nv);
-
-    // dsdq1 += dvds' * dvdq1
-    double* dvdq1 = jac_qvel1_qpos1.Get(index);
-    mju_mulMatMat(tmp, dsdv, dvdq1, ns, nv, nv);
-    mju_addTo(dsdq1, tmp, ns * nv);
-
-    // -- assemble dsdq01 Jacobian -- //
-
-    // unpack
-    double* dsdq01 = jac_sensor_qpos012.Get(index);
-
-    // set dfdq0
-    SetBlockInMatrix(dsdq01, dsdq0, 1.0, ns, 2 * nv, ns, nv, 0, 0 * nv);
-
-    // set dfdq1
-    SetBlockInMatrix(dsdq01, dsdq1, 1.0, ns, 2 * nv, ns, nv, 0, 1 * nv);
-
-    return;
-  }
 
   // -- timesteps [1,...,T - 1] -- //
 
@@ -764,7 +646,7 @@ void Direct2::BlockSensor(int index) {
 // note: pool wait is called outside this function
 void Direct2::JacobianSensor() {
   // loop over predictions
-  for (int t = 0; t < qpos_horizon_; t++) {
+  for (int t = 1; t < qpos_horizon_ - 1; t++) {
     // schedule by time step
     pool_.Schedule([&direct = *this, t]() {
       // start Jacobian timer
@@ -1001,53 +883,6 @@ void Direct2::InverseDynamicsPrediction() {
   // pool count
   int count_before = pool_.GetCount();
 
-  // first time step
-  pool_.Schedule([&direct = *this, nq, nv]() {
-    // time index
-    int t = 0;
-
-    // data
-    mjData* d = direct.data_[t].get();
-
-    // terms
-    double* q0 = direct.qpos.Get(t);
-    double* y0 = direct.sensor.Get(t);
-    mju_zero(y0, direct.nsensordata_);
-
-    // set data
-    mju_copy(d->qpos, q0, nq);
-    mju_zero(d->qvel, nv);
-    mju_zero(d->qacc, nv);
-    d->time = direct.time.Get(t)[0];
-
-    // position sensors
-    mj_fwdPosition(direct.model, d);
-    mj_sensorPos(direct.model, d);
-    if (direct.model->opt.enableflags & (mjENBL_ENERGY)) {
-      mj_energyPos(direct.model, d);
-    }
-
-    // loop over position sensors
-    for (int i = 0; i < direct.nsensor_; i++) {
-      // sensor stage
-      int sensor_stage =
-          direct.model->sensor_needstage[direct.sensor_start_ + i];
-
-      // check for position
-      if (sensor_stage == mjSTAGE_POS) {
-        // dimension
-        int sensor_dim = direct.model->sensor_dim[direct.sensor_start_ + i];
-
-        // address
-        int sensor_adr = direct.model->sensor_adr[direct.sensor_start_ + i];
-
-        // copy sensor data
-        mju_copy(y0 + sensor_adr - direct.sensor_start_index_,
-                 d->sensordata + sensor_adr, sensor_dim);
-      }
-    }
-  });
-
   // loop over predictions
   for (int t = 1; t < qpos_horizon_ - 1; t++) {
     // schedule
@@ -1078,63 +913,8 @@ void Direct2::InverseDynamicsPrediction() {
     });
   }
 
-  // last time step
-  pool_.Schedule([&direct = *this, nq, nv]() {
-    // time index
-    int t = direct.qpos_horizon_ - 1;
-
-    // data
-    mjData* d = direct.data_[t].get();
-
-    // terms
-    double* qT = direct.qpos.Get(t);
-    double* vT = direct.qvel.Get(t);
-    double* yT = direct.sensor.Get(t);
-    mju_zero(yT, direct.nsensordata_);
-
-    // set data
-    mju_copy(d->qpos, qT, nq);
-    mju_copy(d->qvel, vT, nv);
-    mju_zero(d->qacc, nv);
-    d->time = direct.time.Get(t)[0];
-
-    // position sensors
-    mj_fwdPosition(direct.model, d);
-    mj_sensorPos(direct.model, d);
-    if (direct.model->opt.enableflags & (mjENBL_ENERGY)) {
-      mj_energyPos(direct.model, d);
-    }
-
-    // qvel sensors
-    mj_fwdVelocity(direct.model, d);
-    mj_sensorVel(direct.model, d);
-    if (direct.model->opt.enableflags & (mjENBL_ENERGY)) {
-      mj_energyVel(direct.model, d);
-    }
-
-    // loop over position sensors
-    for (int i = 0; i < direct.nsensor_; i++) {
-      // sensor stage
-      int sensor_stage =
-          direct.model->sensor_needstage[direct.sensor_start_ + i];
-
-      // check for position
-      if (sensor_stage == mjSTAGE_POS || sensor_stage == mjSTAGE_VEL) {
-        // dimension
-        int sensor_dim = direct.model->sensor_dim[direct.sensor_start_ + i];
-
-        // address
-        int sensor_adr = direct.model->sensor_adr[direct.sensor_start_ + i];
-
-        // copy sensor data
-        mju_copy(yT + sensor_adr - direct.sensor_start_index_,
-                 d->sensordata + sensor_adr, sensor_dim);
-      }
-    }
-  });
-
   // wait
-  pool_.WaitCount(count_before + qpos_horizon_);
+  pool_.WaitCount(count_before + qpos_horizon_ - 2);
   pool_.ResetCount();
 
   // stop timer
@@ -1151,52 +931,6 @@ void Direct2::InverseDynamicsDerivatives() {
 
   // pool count
   int count_before = pool_.GetCount();
-
-  // first time step
-  pool_.Schedule([&direct = *this, nq, nv]() {
-    // time index
-    int t = 0;
-
-    // data
-    mjData* d = direct.data_[t].get();
-
-    // terms
-    double* q0 = direct.qpos.Get(t);
-    double* dsdq = direct.jac_sensor_qpos.Get(t);
-
-    // set data
-    mju_copy(d->qpos, q0, nq);
-    mju_zero(d->qvel, nv);
-    mju_zero(d->qacc, nv);
-    d->time = direct.time.Get(t)[0];
-
-    // finite-difference derivatives
-    double* dqds = direct.jac_qpos_sensor.Get(t);
-    mjd_inverseFD(direct.model, d, direct.finite_difference.tolerance,
-                  direct.finite_difference.flg_actuation, NULL, NULL, NULL,
-                  dqds, NULL, NULL, NULL);
-    // transpose
-    mju_transpose(dsdq, dqds, nv, direct.model->nsensordata);
-
-    // loop over position sensors
-    for (int i = 0; i < direct.nsensor_; i++) {
-      // sensor stage
-      int sensor_stage =
-          direct.model->sensor_needstage[direct.sensor_start_ + i];
-
-      // dimension
-      int sensor_dim = direct.model->sensor_dim[direct.sensor_start_ + i];
-
-      // address
-      int sensor_adr = direct.model->sensor_adr[direct.sensor_start_ + i];
-
-      // check for position
-      if (sensor_stage != mjSTAGE_POS) {
-        // zero remaining rows
-        mju_zero(dsdq + sensor_adr * nv, sensor_dim * nv);
-      }
-    }
-  });
 
   // loop over predictions
   for (int t = 1; t < qpos_horizon_ - 1; t++) {
@@ -1235,59 +969,8 @@ void Direct2::InverseDynamicsDerivatives() {
     });
   }
 
-  // last time step
-  pool_.Schedule([&direct = *this, nq, nv]() {
-    // time index
-    int t = direct.qpos_horizon_ - 1;
-
-    // data
-    mjData* d = direct.data_[t].get();
-
-    // terms
-    double* qT = direct.qpos.Get(t);
-    double* vT = direct.qvel.Get(t);
-    double* dsdq = direct.jac_sensor_qpos.Get(t);
-    double* dsdv = direct.jac_sensor_qvel.Get(t);
-
-    // set data
-    mju_copy(d->qpos, qT, nq);
-    mju_copy(d->qvel, vT, nv);
-    mju_zero(d->qacc, nv);
-    d->time = direct.time.Get(t)[0];
-
-    // finite-difference derivatives
-    double* dqds = direct.jac_qpos_sensor.Get(t);
-    double* dvds = direct.jac_qvel_sensor.Get(t);
-    mjd_inverseFD(direct.model, d, direct.finite_difference.tolerance,
-                  direct.finite_difference.flg_actuation, NULL, NULL, NULL,
-                  dqds, dvds, NULL, NULL);
-    // transpose
-    mju_transpose(dsdq, dqds, nv, direct.model->nsensordata);
-    mju_transpose(dsdv, dvds, nv, direct.model->nsensordata);
-
-    // loop over position sensors
-    for (int i = 0; i < direct.nsensor_; i++) {
-      // sensor stage
-      int sensor_stage =
-          direct.model->sensor_needstage[direct.sensor_start_ + i];
-
-      // dimension
-      int sensor_dim = direct.model->sensor_dim[direct.sensor_start_ + i];
-
-      // address
-      int sensor_adr = direct.model->sensor_adr[direct.sensor_start_ + i];
-
-      // check for position
-      if (sensor_stage == mjSTAGE_ACC) {
-        // zero remaining rows
-        mju_zero(dsdq + sensor_adr * nv, sensor_dim * nv);
-        mju_zero(dsdv + sensor_adr * nv, sensor_dim * nv);
-      }
-    }
-  });
-
   // wait
-  pool_.WaitCount(count_before + qpos_horizon_);
+  pool_.WaitCount(count_before + qpos_horizon_ - 2);
 
   // reset pool count
   pool_.ResetCount();

@@ -62,12 +62,12 @@ class Direct2 {
   void Initialize(const mjModel* model, int qpos_horizon);
 
   // reset memory
-  void Reset(const mjData* data = nullptr);
+  void Reset();
 
   // evaluate configurations
   void EvaluateConfigurations();
 
-  // compute total cost_
+  // compute total cost
   double Cost(double* gradient, double* hessian);
 
   // optimize trajectory estimate
@@ -191,7 +191,7 @@ class Direct2 {
   double cost_initial_;
   double cost_previous_;
 
-  // lengths
+  // number of planning steps
   int qpos_horizon_;  // qpos horizon (= horizon + 2)
 
   // qpos copy
@@ -333,19 +333,16 @@ class Direct2 {
     bool time_scaling_sensor = true;               // scale sensor costs
     double search_direction_tolerance = 1.0e-8;    // search direction tolerance
     double cost_tolerance = 1.0e-8;                // cost difference tolernace
-    bool first_step_position_sensors =
-        true;  // evaluate position sensors at first time step
-    bool last_step_position_sensors =
-        false;  // evaluate position sensors at last time step
-    bool last_step_velocity_sensors =
-        false;  // evaluate qvel sensors at last time step
   } settings;
 
   // finite-difference settings
   struct FiniteDifferenceSettings {
-    double tolerance = 1.0e-7;
+    double tolerance = 1.0e-6;
     bool flg_actuation = 1;
   } finite_difference;
+
+  // pinned time steps
+  std::vector<bool> pinned;
 };
 
 // optimizer status string
