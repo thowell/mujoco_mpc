@@ -334,6 +334,7 @@ class Direct2 {
     bool time_scaling_sensor = true;               // scale sensor costs
     double search_direction_tolerance = 1.0e-8;    // search direction tolerance
     double cost_tolerance = 1.0e-8;                // cost difference tolernace
+    double random_init = 0.0;
   } settings;
 
   // finite-difference settings

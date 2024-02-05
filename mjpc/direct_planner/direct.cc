@@ -14,6 +14,7 @@
 
 #include "mjpc/direct_planner/direct.h"
 
+#include <absl/random/random.h>
 #include <algorithm>
 #include <chrono>
 #include <cstddef>
@@ -237,11 +238,11 @@ void Direct2::Initialize(const mjModel* model, int qpos_horizon) {
 // reset memory
 void Direct2::Reset() {
   // force weight
-  double wf = GetNumberOrDefault(1.0e-4, model, "direct_force_weight");
+  double wf = GetNumberOrDefault(1.0e-1, model, "direct_force_weight");
   std::fill(weight_force.begin(), weight_force.end(), wf);
 
   // sensor weight
-  double ws = GetNumberOrDefault(1.0e-4, model, "direct_sensor_weight");
+  double ws = GetNumberOrDefault(1.0e-1, model, "direct_sensor_weight");
   std::fill(weight_sensor.begin(), weight_sensor.end(), ws);
 
   // trajectories
@@ -1255,6 +1256,19 @@ void Direct2::Optimize() {
 
   // print initial cost
   PrintCost();
+
+  // ----- random init ----- //
+  if (settings.random_init > 0.0) {
+    std::vector<double> perturb(model->nv);
+    absl::BitGen gen_;
+    for (int t = 0; t < qpos_horizon_; t++) {
+      // random
+      for (int i = 0; i < model->nv; i++) {
+        perturb[i] = absl::Gaussian<double>(gen_, 0.0, 1.0);
+      }
+      mj_integratePos(model, qpos.Get(t), perturb.data(), settings.random_init);
+    }
+  }
 
   // ----- smoother iterations ----- //
 
