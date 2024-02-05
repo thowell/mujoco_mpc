@@ -103,10 +103,10 @@ void Direct2::Initialize(const mjModel* model, int qpos_horizon) {
   nband_ = 3 * nv;
 
   // process noise
-  weight_force.resize(ndstate_);
+  weight_force.resize(nv);
 
   // sensor noise
-  weight_sensor.resize(nsensordata_);  // overallocate
+  weight_sensor.resize(nsensor_);  // overallocate
 
   // -- trajectories -- //
   qpos.Initialize(nq, qpos_horizon_);
@@ -227,7 +227,6 @@ void Direct2::Initialize(const mjModel* model, int qpos_horizon) {
   // status
   gradient_norm_ = 0.0;
   search_direction_norm_ = 0.0;
-  step_size_ = 1.0;
   solve_status_ = kUnsolved;
 
   // pinned
@@ -1287,7 +1286,6 @@ void Direct2::Optimize() {
     // initialize
     double cost_candidate = cost_;
     int iteration_search = 0;
-    step_size_ = 1.0;
     regularization_ = settings.regularization_initial;
     improvement_ = -1.0;
 
@@ -1348,8 +1346,8 @@ void Direct2::Optimize() {
       }
 
       // candidate configurations
-      UpdateConfiguration(qpos, qpos_copy_, search_direction_.data(),
-                          -1.0 * step_size_, pinned);
+      UpdateConfiguration(qpos, qpos_copy_, search_direction_.data(), -1.0,
+                          pinned);
 
       // cost
       cost_candidate = Cost(NULL, NULL);
@@ -1577,7 +1575,6 @@ void Direct2::PrintOptimize() {
   printf("Status:\n");
   printf("  search iterations: %i\n", iterations_search_);
   printf("  smoother iterations: %i\n", iterations_smoother_);
-  printf("  step size: %.6f\n", step_size_);
   printf("  regularization: %.6f\n", regularization_);
   printf("  gradient norm: %.6f\n", gradient_norm_);
   printf("  search direction norm: %.6f\n", search_direction_norm_);

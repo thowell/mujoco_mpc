@@ -29,3 +29,6 @@ target_link_libraries(direct_trajectory_test gmock)
 
 test(direct_utilities_test)
 target_link_libraries(direct_utilities_test load simulation gmock)
+
+test(direct_planner_test)
+target_link_libraries(direct_planner_test load simulation gmock)

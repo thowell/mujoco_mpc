@@ -1605,4 +1605,40 @@ void SetBlockInBand(double* band, const double* block, double scale, int ntotal,
   }
 }
 
+// compute slerp between quat0 and quat1 for t in [0, 1]
+void Slerp(double* res, const double* quat0, const double* quat1, double t) {
+  // quaternion difference
+  double dq[3];
+  mju_subQuat(dq, quat1, quat0);
+
+  // integrate
+  mju_copy4(res, quat0);
+  mju_quatIntegrate(res, dq, t);
+}
+
+// interpolate configuration between qpos1 and qpos2
+void InterpolateConfiguration(double* interp, const mjModel* model, double t,
+                              const double* qpos1, const double* qpos2) {
+  // loop over joints
+  for (int j = 0; j < model->njnt; j++) {
+    // get addresses in qpos and qvel
+    int padr = model->jnt_qposadr[j];
+    switch (model->jnt_type[j]) {
+      case mjJNT_FREE:
+        for (int i = 0; i < 3; i++) {
+          interp[padr + i] = (1.0 - t) * qpos1[padr + i] + t * qpos2[padr + i];
+        }
+        padr += 3;
+        // continute with rotations
+        [[fallthrough]];
+      case mjJNT_BALL:
+        Slerp(interp + padr, qpos1 + padr, qpos2 + padr, t);
+        break;
+      case mjJNT_HINGE:
+      case mjJNT_SLIDE:
+        interp[padr] = (1.0 - t) * qpos1[padr] + t * qpos2[padr];
+    }
+  }
+}
+
 }  // namespace mjpc

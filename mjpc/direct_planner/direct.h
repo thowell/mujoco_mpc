@@ -277,7 +277,6 @@ class Direct2 {
   int iterations_search_;         // total line search iterations
   double gradient_norm_;          // norm of cost gradient
   double regularization_;         // regularization
-  double step_size_;              // step size for line search
   double search_direction_norm_;  // search direction norm
   DirectStatus solve_status_;     // solve status
   double cost_difference_;        // cost difference: abs(cost - cost_previous)
