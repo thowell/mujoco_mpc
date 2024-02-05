@@ -51,7 +51,8 @@ inline constexpr double kMinDirectRegularization = 1.0e-12;
 class Direct2 {
  public:
   // constructor
-  explicit Direct2(const mjModel* model, int qpos_horizon);
+  Direct2() : pool_(NumAvailableHardwareThreads()){};
+  Direct2(const mjModel* model, int qpos_horizon);
 
   // destructor
   virtual ~Direct2() {
@@ -346,7 +347,7 @@ class Direct2 {
 };
 
 // optimizer status string
-std::string StatusString(int code);
+std::string StatusString2(int code);
 
 }  // namespace mjpc
 

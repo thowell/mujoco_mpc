@@ -411,6 +411,9 @@ void SetBlockInBand(double* band, const double* block, double scale, int ntotal,
 // compute slerp between quat0 and quat1 for t in [0, 1]
 void Slerp(double* res, const double* quat0, const double* quat1, double t);
 
+// interpolate configuration between qpos1 and qpos2
+void InterpolateConfiguration(double* interp, const mjModel* model, double t,
+                              const double* qpos1, const double* qpos2);
 }  // namespace mjpc
 
 #endif  // MJPC_UTILITIES_H_

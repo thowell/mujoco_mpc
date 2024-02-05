@@ -34,6 +34,11 @@ class DirectPlanner: public Planner {
   // constructor
   DirectPlanner() = default;
 
+  // destructor
+  ~DirectPlanner() {
+    if (model) mj_deleteModel(model);
+  }
+
   // initialize data and settings
   void Initialize(mjModel* model, const Task& task) override;
 
@@ -74,17 +79,21 @@ class DirectPlanner: public Planner {
   // return number of parameters optimized by planner
   int NumParameters() override;
 
+  // model
+  mjModel* model = nullptr;
+
   // task
   const Task* task;
 
   // direct optimizer
-  // Direct2 direct;
+  Direct2 direct;
 
-  // qpos trajectory
-  DirectTrajectory<double> qpos;
+  // trajectory
+  Trajectory trajectory;
+  Trajectory buffer;
 
-  // ctrl trajectory
-  DirectTrajectory<double> ctrl;
+  // current time
+  double time;
 };
 
 }  // namespace mjpc

@@ -888,6 +888,7 @@ void Direct2::InverseDynamicsPrediction() {
       mju_copy(d->qpos, qt, nq);
       mju_copy(d->qvel, vt, nv);
       mju_copy(d->qacc, at, nv);
+      d->time = direct.time.Get(t)[0];
 
       // inverse dynamics
       mj_inverse(direct.model, d);
@@ -945,6 +946,7 @@ void Direct2::InverseDynamicsDerivatives() {
       mju_copy(data->qpos, q, nq);
       mju_copy(data->qvel, v, nv);
       mju_copy(data->qacc, a, nv);
+      data->time = direct.time.Get(t)[0];
 
       // finite-difference derivatives
       mjd_inverseFD(direct.model, data, direct.finite_difference.tolerance,
@@ -1579,7 +1581,7 @@ void Direct2::PrintOptimize() {
   printf("  gradient norm: %.6f\n", gradient_norm_);
   printf("  search direction norm: %.6f\n", search_direction_norm_);
   printf("  cost difference: %.6f\n", cost_difference_);
-  printf("  solve status: %s\n", StatusString(solve_status_).c_str());
+  printf("  solve status: %s\n", StatusString2(solve_status_).c_str());
   printf("  cost count: %i\n", cost_count_);
   printf("\n");
 
@@ -1633,7 +1635,7 @@ void Direct2::ResetTimers() {
 }
 
 // direct status string
-std::string StatusString(int code) {
+std::string StatusString2(int code) {
   switch (code) {
     case kUnsolved:
       return "UNSOLVED";

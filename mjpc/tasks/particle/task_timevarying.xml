@@ -6,9 +6,9 @@
 
   <custom>
     <!-- agent -->
-    <numeric name="task_risk" data="1" />
-    <numeric name="agent_planner" data="0" />
-    <numeric name="agent_horizon" data="0.5" />
+    <numeric name="task_risk" data="0" />
+    <numeric name="agent_planner" data="6" />
+    <numeric name="agent_horizon" data="0.25" />
     <numeric name="agent_timestep" data="0.01" />
     <numeric name="agent_policy_width" data="0.0015" />
     <numeric name="sampling_spline_points" data="5" />
@@ -22,6 +22,10 @@
     <numeric name="estimator_timestep" data="0.01" />
     <numeric name="batch_configuration_length" data="10" />
     <numeric name="batch_scale_prior" data="1.0e-3" />
+
+    <!-- direct -->
+    <numeric name="direct_sensor_start" data="0"/>
+    <numeric name="direct_number_sensor" data="3"/>
   </custom>
 
   <sensor>
