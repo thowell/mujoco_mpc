@@ -127,7 +127,8 @@ class Direct2 {
   // update qpos trajectory
   void UpdateConfiguration(DirectTrajectory<double>& candidate,
                            const DirectTrajectory<double>& qpos,
-                           const double* search_direction, double step_size);
+                           const double* search_direction, double step_size,
+                           std::vector<bool>& pinned);
 
   // reset timers
   void ResetTimers();

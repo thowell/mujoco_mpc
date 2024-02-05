@@ -430,23 +430,13 @@ double Direct2::CostSensor(double* gradient, double* hessian) {
   int shift_matrix = 0;
 
   // loop over predictions
-  for (int t = 0; t < qpos_horizon_; t++) {
+  for (int t = 1; t < qpos_horizon_ - 1; t++) {
     // residual
     double* rt = residual_sensor_.data() + ns * t;
 
     // unpack Jacobian
-    double* jac;
-    int jac_columns;
-    if (t == 0) {  // only position sensors
-      jac = jac_sensor_qpos.Get(t) + sensor_start_index_ * nv;
-      jac_columns = nband_ - 2 * nv;
-    } else if (t == qpos_horizon_ - 1) {
-      jac = jac_sensor_qpos012.Get(t);
-      jac_columns = nband_ - nv;
-    } else {  // position, qvel, qacc sensors
-      jac = jac_sensor_qpos012.Get(t);
-      jac_columns = nband_;
-    }
+    double* jac = jac_sensor_qpos012.Get(t);
+    int jac_columns = nband_;
 
     // shift
     int shift_sensor = 0;
@@ -516,7 +506,7 @@ double Direct2::CostSensor(double* gradient, double* hessian) {
                      weight, jac_columns);
       }
 
-      // Hessian (Gauss-Newton): dsidq012' * d2ndsi2 * dsidq
+      // Hessian (Gauss-Newton): dsidq012' * d2ndsi2 * dsidq012
       if (hessian) {
         // sensor Jacobian
         double* jaci = jac + jac_columns * shift_sensor;
@@ -983,7 +973,7 @@ void Direct2::InverseDynamicsDerivatives() {
 void Direct2::UpdateConfiguration(DirectTrajectory<double>& candidate,
                                   const DirectTrajectory<double>& qpos,
                                   const double* search_direction,
-                                  double step_size) {
+                                  double step_size, std::vector<bool>& pinned) {
   // start timer
   auto start = std::chrono::steady_clock::now();
 
@@ -991,7 +981,10 @@ void Direct2::UpdateConfiguration(DirectTrajectory<double>& candidate,
   int nq = model->nq, nv = model->nv;
 
   // loop over configurations
+  int tpin = 0;
   for (int t = 0; t < qpos_horizon_; t++) {
+    if (pinned[t]) continue;
+
     // unpack
     const double* qt = qpos.Get(t);
     double* ct = candidate.Get(t);
@@ -1000,10 +993,13 @@ void Direct2::UpdateConfiguration(DirectTrajectory<double>& candidate,
     mju_copy(ct, qt, nq);
 
     // search direction
-    const double* dqt = search_direction + t * nv;
+    const double* dqt = search_direction + tpin * nv;
 
     // integrate
     mj_integratePos(model, ct, dqt, step_size);
+
+    // increment search direction
+    tpin++;
   }
 
   // stop timer
@@ -1167,12 +1163,24 @@ void Direct2::TotalGradient(double* gradient) {
   // start gradient timer
   auto start = std::chrono::steady_clock::now();
 
+  // dimension
+  int nv = model->nv;
+
   // zero memory
   mju_zero(gradient, ntotal_);
 
-  // individual gradients
-  mju_addTo(gradient, gradient_sensor_.data(), ntotal_);
-  mju_addTo(gradient, gradient_force_.data(), ntotal_);
+  // skip pinned qpos
+  int tpin = 0;
+  for (int t = 0; t < qpos_horizon_; t++) {
+    if (pinned[t]) {
+      mju_zero(gradient_sensor_.data() + t * nv, nv);
+      mju_zero(gradient_force_.data() + t * nv, nv);
+      continue;
+    }
+    mju_addTo(gradient + tpin * nv, gradient_sensor_.data() + t * nv, nv);
+    mju_addTo(gradient + tpin * nv, gradient_force_.data() + t * nv, nv);
+    tpin++;
+  }
 
   // stop gradient timer
   timer_.cost_gradient += GetDuration(start);
@@ -1185,12 +1193,43 @@ void Direct2::TotalHessian(double* hessian) {
   // start Hessian timer
   auto start = std::chrono::steady_clock::now();
 
+  // dimension
+  int nv = model->nv;
+
   // zero memory
   mju_zero(hessian, nvel_ * nband_);
 
-  // individual Hessians
-  mju_addTo(hessian, hessian_band_sensor_.data(), nvel_ * nband_);
-  mju_addTo(hessian, hessian_band_force_.data(), nvel_ * nband_);
+  // skip pinned qpos
+  int tpin = 0;
+  for (int t = 0; t < qpos_horizon_; t++) {
+    if (pinned[t]) {
+      // zero row
+      mju_zero(hessian_band_sensor_.data() + t * nv * nband_, nv * nband_);
+      mju_zero(hessian_band_force_.data() + t * nv * nband_, nv * nband_);
+
+      // zero diagonal (/)
+      if (t + 1 < qpos_horizon_) {
+        double* blk_sensor = hessian_band_sensor_.data() + (t + 1) * nv * nband_;
+        double* blk_force = hessian_band_force_.data() + (t + 1) * nv * nband_;
+        for (int i = 0; i < nv; i++) {
+          mju_zero(blk_sensor + i * nband_ + nv, nv);
+          mju_zero(blk_force + i * nband_ + nv, nv);
+        }
+      }
+      if (t + 2 < qpos_horizon_) {
+        double* blk_sensor = hessian_band_sensor_.data() + (t + 2) * nv * nband_;
+        double* blk_force = hessian_band_force_.data() + (t + 2) * nv * nband_;
+        for (int i = 0; i < nv; i++) {
+          mju_zero(blk_sensor + i * nband_, nv);
+          mju_zero(blk_force + i * nband_, nv);
+        }
+      }
+      continue;
+    }
+    mju_addTo(hessian + tpin * nv * nband_, hessian_band_sensor_.data() + t * nv * nband_, nv * nband_);
+    mju_addTo(hessian + tpin * nv * nband_, hessian_band_force_.data() + t * nv * nband_, nv * nband_);
+    tpin++;
+  }
 
   // stop Hessian timer
   timer_.cost_hessian += GetDuration(start);
@@ -1310,7 +1349,7 @@ void Direct2::Optimize() {
 
       // candidate configurations
       UpdateConfiguration(qpos, qpos_copy_, search_direction_.data(),
-                          -1.0 * step_size_);
+                          -1.0 * step_size_, pinned);
 
       // cost
       cost_candidate = Cost(NULL, NULL);
@@ -1406,6 +1445,12 @@ bool Direct2::SearchDirection() {
   auto search_direction_start = std::chrono::steady_clock::now();
 
   // -- band Hessian -- //
+  int ntotal_pin = ntotal_;
+  for (bool p: pinned) {
+    if (p) {
+      ntotal_pin -= model->nv;
+    }
+  }
 
   // unpack
   double* direction = search_direction_.data();
@@ -1427,10 +1472,10 @@ bool Direct2::SearchDirection() {
     }
 
     // copy
-    mju_copy(hessian_band_factor, hessian_band, nvel_ * nband_);
+    mju_copy(hessian_band_factor, hessian_band, ntotal_pin * nband_);
 
     // factorize
-    min_diag = mju_cholFactorBand(hessian_band_factor, ntotal_, nband_, 0,
+    min_diag = mju_cholFactorBand(hessian_band_factor, ntotal_pin, nband_, 0,
                                   regularization_, 0.0);
 
     // increase regularization
@@ -1440,16 +1485,16 @@ bool Direct2::SearchDirection() {
   }
 
   // compute search direction
-  mju_cholSolveBand(direction, hessian_band_factor, gradient, ntotal_, nband_,
-                    0);
+  mju_cholSolveBand(direction, hessian_band_factor, gradient, ntotal_pin,
+                    nband_, 0);
 
   // search direction norm
-  search_direction_norm_ = InfinityNorm(direction, ntotal_);
+  search_direction_norm_ = InfinityNorm(direction, ntotal_pin);
 
   // set regularization
   if (regularization_ > 0.0) {
     // configurations
-    for (int i = 0; i < ntotal_; i++) {
+    for (int i = 0; i < ntotal_pin; i++) {
       hessian_band[i * nband_ + nband_ - 1] += regularization_;
     }
   }
