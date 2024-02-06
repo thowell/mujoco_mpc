@@ -15,6 +15,7 @@
 #include "mjpc/direct_planner/direct.h"
 
 #include <absl/random/random.h>
+#include <absl/strings/match.h>
 #include <algorithm>
 #include <chrono>
 #include <cstddef>
@@ -26,50 +27,25 @@
 
 #include "mjpc/direct/trajectory.h"
 #include "mjpc/norm.h"
+#include "mjpc/trajectory.h"
 #include "mjpc/threadpool.h"
 #include "mjpc/utilities.h"
 
 namespace mjpc {
 
-// constructor
-Direct2::Direct2(mjModel* model, int qpos_horizon)
-    : pool_(NumAvailableHardwareThreads()) {
-  // initialize memory
-  Initialize(model, qpos_horizon);
-
-  // reset memory
-  Reset();
-}
 
 // initialize direct estimator
-void Direct2::Initialize(mjModel* model, int qpos_horizon) {
-  // model
-  // if (this->model) mj_deleteModel(this->model);
-  // this->model = mj_copyModel(nullptr, model);
-  this->model = model;
-
-  if (this->model->na > 0) {
+void Direct2::Initialize(mjModel* model) {
+  // activations check
+  if (model->na > 0) {
     mju_error("na > 0: activations not implemented");
   }
 
+  // model
+  this->model = model;
+
   // set discrete inverse dynamics
   this->model->opt.enableflags |= mjENBL_INVDISCRETE;
-
-  // length of qpos trajectory
-  if (qpos_horizon < 3) {
-    mju_error("qpos_horizon < 3");
-  }
-  qpos_horizon_ = qpos_horizon;
-
-  // data
-  data_.clear();
-  for (int i = 0; i < qpos_horizon_; i++) {
-    data_.push_back(MakeUniqueMjData(mj_makeData(model)));
-  }
-
-  // timestep
-  this->model->opt.timestep =
-      GetNumberOrDefault(this->model->opt.timestep, model, "direct_timestep");
 
   // sensor start index
   sensor_start_ = GetNumberOrDefault(0, model, "direct_sensor_start");
@@ -89,81 +65,83 @@ void Direct2::Initialize(mjModel* model, int qpos_horizon) {
     sensor_start_index_ += model->sensor_dim[i];
   }
 
+  // band dimension
+  nband_ = 3 * model->nv;
+}
+
+// initialize direct estimator
+void Direct2::Allocate() {
+  // data
+  data_.clear();
+  for (int i = 0; i < kMaxTrajectoryHorizon; i++) {
+    data_.push_back(MakeUniqueMjData(mj_makeData(model)));
+  }
+
   // allocation dimension
-  int nq = model->nq, nv = model->nv, na = model->na;
-  int nvel_max = nv * qpos_horizon_;
-  int nsensor_max = nsensordata_ * qpos_horizon_;
-  int ntotal_max = nvel_max;
+  int nq = model->nq, nv = model->nv;
+  int ntotal_max = nv * kMaxTrajectoryHorizon;
+  int nsensor_max = nsensordata_ * kMaxTrajectoryHorizon;
 
-  // state dimensions
-  nstate_ = nq + nv + na;
-  ndstate_ = 2 * nv + na;
-
-  // problem dimensions
-  nvel_ = nv * qpos_horizon_;
-  ntotal_ = nvel_;
-  nband_ = 3 * nv;
-
-  // process noise
+  // force weights
   weight_force.resize(nv);
 
-  // sensor noise
-  weight_sensor.resize(nsensor_);  // overallocate
+  // sensor weights
+  weight_sensor.resize(nsensor_);
 
   // -- trajectories -- //
-  qpos.Initialize(nq, qpos_horizon_);
-  qvel.Initialize(nv, qpos_horizon_);
-  qacc.Initialize(nv, qpos_horizon_);
-  time.Initialize(1, qpos_horizon_);
+  qpos.Initialize(nq, kMaxTrajectoryHorizon);
+  qvel.Initialize(nv, kMaxTrajectoryHorizon);
+  qacc.Initialize(nv, kMaxTrajectoryHorizon);
+  time.Initialize(1, kMaxTrajectoryHorizon);
 
   // sensor
-  sensor_target.Initialize(nsensordata_, qpos_horizon_);
-  sensor.Initialize(nsensordata_, qpos_horizon_);
+  sensor_target.Initialize(nsensordata_, kMaxTrajectoryHorizon);
+  sensor.Initialize(nsensordata_, kMaxTrajectoryHorizon);
 
   // force
-  force_target.Initialize(nv, qpos_horizon_);
-  force.Initialize(nv, qpos_horizon_);
+  force_target.Initialize(nv, kMaxTrajectoryHorizon);
+  force.Initialize(nv, kMaxTrajectoryHorizon);
 
   // residual
   residual_sensor_.resize(nsensor_max);
-  residual_force_.resize(nvel_max);
+  residual_force_.resize(ntotal_max);
 
   // sensor Jacobian
-  jac_sensor_qpos.Initialize(model->nsensordata * nv, qpos_horizon_);
-  jac_sensor_qvel.Initialize(model->nsensordata * nv, qpos_horizon_);
-  jac_sensor_qacc.Initialize(model->nsensordata * nv, qpos_horizon_);
-  jac_qpos_sensor.Initialize(model->nsensordata * nv, qpos_horizon_);
-  jac_qvel_sensor.Initialize(model->nsensordata * nv, qpos_horizon_);
-  jac_qacc_sensor.Initialize(model->nsensordata * nv, qpos_horizon_);
+  jac_sensor_qpos.Initialize(model->nsensordata * nv, kMaxTrajectoryHorizon);
+  jac_sensor_qvel.Initialize(model->nsensordata * nv, kMaxTrajectoryHorizon);
+  jac_sensor_qacc.Initialize(model->nsensordata * nv, kMaxTrajectoryHorizon);
+  jac_qpos_sensor.Initialize(model->nsensordata * nv, kMaxTrajectoryHorizon);
+  jac_qvel_sensor.Initialize(model->nsensordata * nv, kMaxTrajectoryHorizon);
+  jac_qacc_sensor.Initialize(model->nsensordata * nv, kMaxTrajectoryHorizon);
 
-  jac_sensor_qpos0.Initialize(nsensordata_ * nv, qpos_horizon_);
-  jac_sensor_qpos1.Initialize(nsensordata_ * nv, qpos_horizon_);
-  jac_sensor_qpos2.Initialize(nsensordata_ * nv, qpos_horizon_);
-  jac_sensor_qpos012.Initialize(nsensordata_ * nband_, qpos_horizon_);
+  jac_sensor_qpos0.Initialize(nsensordata_ * nv, kMaxTrajectoryHorizon);
+  jac_sensor_qpos1.Initialize(nsensordata_ * nv, kMaxTrajectoryHorizon);
+  jac_sensor_qpos2.Initialize(nsensordata_ * nv, kMaxTrajectoryHorizon);
+  jac_sensor_qpos012.Initialize(nsensordata_ * nband_, kMaxTrajectoryHorizon);
 
   jac_sensor_scratch.Initialize(
-      std::max(nv, nsensordata_) * std::max(nv, nsensordata_), qpos_horizon_);
+      std::max(nv, nsensordata_) * std::max(nv, nsensordata_), kMaxTrajectoryHorizon);
 
   // force Jacobian
-  jac_force_qpos.Initialize(nv * nv, qpos_horizon_);
-  jac_force_qvel.Initialize(nv * nv, qpos_horizon_);
-  jac_force_qacc.Initialize(nv * nv, qpos_horizon_);
+  jac_force_qpos.Initialize(nv * nv, kMaxTrajectoryHorizon);
+  jac_force_qvel.Initialize(nv * nv, kMaxTrajectoryHorizon);
+  jac_force_qacc.Initialize(nv * nv, kMaxTrajectoryHorizon);
 
-  jac_force_qpos0.Initialize(nv * nv, qpos_horizon_);
-  jac_force_qpos1.Initialize(nv * nv, qpos_horizon_);
-  jac_force_qpos2.Initialize(nv * nv, qpos_horizon_);
-  jac_force_qpos012.Initialize(nv * nband_, qpos_horizon_);
+  jac_force_qpos0.Initialize(nv * nv, kMaxTrajectoryHorizon);
+  jac_force_qpos1.Initialize(nv * nv, kMaxTrajectoryHorizon);
+  jac_force_qpos2.Initialize(nv * nv, kMaxTrajectoryHorizon);
+  jac_force_qpos012.Initialize(nv * nband_, kMaxTrajectoryHorizon);
 
-  jac_force_scratch.Initialize(nv * nv, qpos_horizon_);
+  jac_force_scratch.Initialize(nv * nv, kMaxTrajectoryHorizon);
 
   // qvel Jacobian wrt qpos0, qpos1
-  jac_qvel1_qpos0.Initialize(nv * nv, qpos_horizon_);
-  jac_qvel1_qpos1.Initialize(nv * nv, qpos_horizon_);
+  jac_qvel1_qpos0.Initialize(nv * nv, kMaxTrajectoryHorizon);
+  jac_qvel1_qpos1.Initialize(nv * nv, kMaxTrajectoryHorizon);
 
   // qacc Jacobian wrt qpos0, qpos1, qpos2
-  jac_qacc1_qpos0.Initialize(nv * nv, qpos_horizon_);
-  jac_qacc1_qpos1.Initialize(nv * nv, qpos_horizon_);
-  jac_qacc1_qpos2.Initialize(nv * nv, qpos_horizon_);
+  jac_qacc1_qpos0.Initialize(nv * nv, kMaxTrajectoryHorizon);
+  jac_qacc1_qpos1.Initialize(nv * nv, kMaxTrajectoryHorizon);
+  jac_qacc1_qpos2.Initialize(nv * nv, kMaxTrajectoryHorizon);
 
   // cost gradient
   gradient_sensor_.resize(ntotal_max);
@@ -171,34 +149,20 @@ void Direct2::Initialize(mjModel* model, int qpos_horizon) {
   gradient_.resize(ntotal_max);
 
   // cost Hessian
-  hessian_band_sensor_.resize(nvel_max * nband_);
-  hessian_band_force_.resize(nvel_max * nband_);
-  hessian_band_.resize(nvel_max * nband_);
-  hessian_band_factor_.resize(nvel_max * nband_);
+  hessian_band_sensor_.resize(ntotal_max * nband_);
+  hessian_band_force_.resize(ntotal_max * nband_);
+  hessian_band_.resize(ntotal_max * nband_);
+  hessian_band_factor_.resize(ntotal_max * nband_);
 
   // cost norms
   norm_type_sensor.resize(nsensor_);
 
-  // TODO(taylor): method for xml to initialize norm
-  for (int i = 0; i < nsensor_; i++) {
-    norm_type_sensor[i] =
-        (NormType)GetNumberOrDefault(0, model, "direct_norm_sensor");
-
-    // add support by parsing norm parameters
-    if (norm_type_sensor[i] != 0) {
-      mju_error("norm type not supported\n");
-    }
-  }
-
   // cost norm parameters
   norm_parameters_sensor.resize(nsensor_ * kMaxNormParameters);
 
-  // TODO(taylor): initialize norm parameters from xml
-  std::fill(norm_parameters_sensor.begin(), norm_parameters_sensor.end(), 0.0);
-
   // norm
-  norm_sensor_.resize(nsensor_ * qpos_horizon_);
-  norm_force_.resize(qpos_horizon_ - 1);
+  norm_sensor_.resize(nsensor_ * kMaxTrajectoryHorizon);
+  norm_force_.resize(kMaxTrajectoryHorizon);
 
   // norm gradient
   norm_gradient_sensor_.resize(nsensor_max);
@@ -214,37 +178,40 @@ void Direct2::Initialize(mjModel* model, int qpos_horizon) {
   scratch_expected_.resize(ntotal_max);
 
   // copy
-  qpos_copy_.Initialize(nq, qpos_horizon_);
+  qpos_copy_.Initialize(nq, kMaxTrajectoryHorizon);
 
   // search direction
   search_direction_.resize(ntotal_max);
 
-  // regularization
-  regularization_ = settings.regularization_initial;
-
   // timer
-  timer_.sensor_step.resize(qpos_horizon_);
-  timer_.force_step.resize(qpos_horizon_);
-
-  // status
-  gradient_norm_ = 0.0;
-  search_direction_norm_ = 0.0;
-  solve_status_ = kUnsolved;
+  timer_.sensor_step.resize(kMaxTrajectoryHorizon);
+  timer_.force_step.resize(kMaxTrajectoryHorizon);
 
   // pinned
-  pinned.resize(qpos_horizon_);
-  std::fill(pinned.begin(), pinned.end(), false);
+  pinned.resize(kMaxTrajectoryHorizon);
 }
 
 // reset memory
 void Direct2::Reset() {
-  // force weight
-  double wf = GetNumberOrDefault(1.0e-1, model, "direct_force_weight");
-  std::fill(weight_force.begin(), weight_force.end(), wf);
+  // -- force weight -- //
+  double* wf = GetCustomNumericData(model, "direct_force_weight", model->nv);
+  if (wf) {
+    mju_copy(weight_force.data(), wf, model->nv);
+  } else {
+    std::fill(weight_force.begin(), weight_force.end(), 1.0);
+  }
 
-  // sensor weight
-  double ws = GetNumberOrDefault(1.0e-1, model, "direct_sensor_weight");
-  std::fill(weight_sensor.begin(), weight_sensor.end(), ws);
+  // -- sensor weight -- //
+  double* ws = GetCustomNumericData(model, "direct_sensor_weight", nsensor_);
+  if (ws) {
+    mju_copy(weight_sensor.data(), ws, nsensor_);
+  } else {
+    std::fill(weight_sensor.begin(), weight_sensor.end(), 1.0);
+  }
+
+  // TODO(taylor): parse
+  std::fill(norm_type_sensor.begin(), norm_type_sensor.end(), kQuadratic);
+  std::fill(norm_parameters_sensor.begin(), norm_parameters_sensor.end(), 0.0);
 
   // trajectories
   qpos.Reset();
@@ -352,11 +319,7 @@ void Direct2::Reset() {
   // timing
   ResetTimers();
 
-  // status
-  iterations_smoother_ = 0;
-  iterations_search_ = 0;
-  cost_count_ = 0;
-  solve_status_ = kUnsolved;
+  std::fill(pinned.begin(), pinned.end(), false);
 }
 
 // evaluate configurations
@@ -417,7 +380,7 @@ double Direct2::CostSensor(double* gradient, double* hessian) {
 
   // zero memory
   if (gradient) mju_zero(gradient, ntotal_);
-  if (hessian) mju_zero(hessian, nvel_ * nband_);
+  if (hessian) mju_zero(hessian, ntotal_ * nband_);
 
   // time scaling
   double time_scale = 1.0;
@@ -670,7 +633,7 @@ double Direct2::CostForce(double* gradient, double* hessian) {
 
   // zero memory
   if (gradient) mju_zero(gradient, ntotal_);
-  if (hessian) mju_zero(hessian, nvel_ * nband_);
+  if (hessian) mju_zero(hessian, ntotal_ * nband_);
 
   // time scaling
   double time_scale2 = 1.0;
@@ -1200,7 +1163,7 @@ void Direct2::TotalHessian(double* hessian) {
   int nv = model->nv;
 
   // zero memory
-  mju_zero(hessian, nvel_ * nband_);
+  mju_zero(hessian, ntotal_ * nband_);
 
   // skip pinned qpos
   int tpin = 0;
@@ -1239,9 +1202,16 @@ void Direct2::TotalHessian(double* hessian) {
 }
 
 // optimize qpos trajectory
-void Direct2::Optimize() {
+void Direct2::Optimize(int qpos_horizon) {
   // start timer
   auto start_optimize = std::chrono::steady_clock::now();
+
+  // set horizon
+  qpos_horizon_ = qpos_horizon;
+
+  // set dimensions
+  ntotal_ = model->nv * qpos_horizon_;
+  nband_ = 3 * model->nv;
 
   // set status
   gradient_norm_ = 0.0;
@@ -1257,19 +1227,6 @@ void Direct2::Optimize() {
 
   // print initial cost
   PrintCost();
-
-  // ----- random init ----- //
-  if (settings.random_init > 0.0) {
-    std::vector<double> perturb(model->nv);
-    absl::BitGen gen_;
-    for (int t = 0; t < qpos_horizon_; t++) {
-      // random
-      for (int i = 0; i < model->nv; i++) {
-        perturb[i] = absl::Gaussian<double>(gen_, 0.0, 1.0);
-      }
-      mj_integratePos(model, qpos.Get(t), perturb.data(), settings.random_init);
-    }
-  }
 
   // ----- smoother iterations ----- //
 

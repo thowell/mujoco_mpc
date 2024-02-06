@@ -40,7 +40,8 @@ void SetState(const mjModel* model, mjData* data, const double* state);
 void GetState(const mjModel* model, const mjData* data, double* state);
 
 // get numerical data from a custom element in mjModel with the given name
-double* GetCustomNumericData(const mjModel* m, std::string_view name);
+double* GetCustomNumericData(const mjModel* m, std::string_view name,
+                             int length = 1);
 
 // get text data from a custom element in mjModel with the given name
 char* GetCustomTextData(const mjModel* m, std::string_view name);

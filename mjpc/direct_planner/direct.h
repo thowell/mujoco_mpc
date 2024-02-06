@@ -51,16 +51,13 @@ inline constexpr double kMinDirectRegularization = 1.0e-12;
 class Direct2 {
  public:
   // constructor
-  Direct2() : pool_(NumAvailableHardwareThreads()){};
-  Direct2(mjModel* model, int qpos_horizon);
-
-  // destructor
-  // virtual ~Direct2() {
-  //   if (model) mj_deleteModel(model);
-  // }
+  Direct2() : pool_(1){};
 
   // initialize
-  void Initialize(mjModel* model, int qpos_horizon);
+  void Initialize(mjModel* model);
+
+  // allocate
+  void Allocate();
 
   // reset memory
   void Reset();
@@ -72,7 +69,7 @@ class Direct2 {
   double Cost(double* gradient, double* hessian);
 
   // optimize trajectory estimate
-  void Optimize();
+  void Optimize(int qpos_horizon_);
 
   // convert sequence of configurations to velocities, accelerations
   void ConfigurationToVelocityAcceleration();
@@ -146,7 +143,7 @@ class Direct2 {
   // model
   mjModel* model = nullptr;
 
-  // force weight (ndstate_)
+  // force weight (nv)
   std::vector<double> weight_force;
 
   // sensor weight (nsensor_)
@@ -170,13 +167,9 @@ class Direct2 {
       norm_parameters_sensor;  // num_sensor x kMaxNormParameters
 
   // dimensions
-  int nstate_;
-  int ndstate_;
   int nsensordata_;
   int nsensor_;
-
   int ntotal_;  // total number of decision variable
-  int nvel_;    // number of qpos (derivatives) variables
   int nband_;   // cost Hessian band dimension
 
   // sensor indexing
@@ -193,14 +186,14 @@ class Direct2 {
   double cost_initial_;
   double cost_previous_;
 
-  // number of planning steps
+  // number of steps
   int qpos_horizon_;  // qpos horizon (= horizon + 2)
 
   // qpos copy
-  DirectTrajectory<double> qpos_copy_;  // nq x qpos_horizon_
+  DirectTrajectory<double> qpos_copy_;  // nq x T
 
   // residual
-  std::vector<double> residual_sensor_;  // ns x (T - 1)
+  std::vector<double> residual_sensor_;  // ns x (T - 2)
   std::vector<double> residual_force_;   // nv x (T - 2)
 
   // sensor Jacobian blocks (dqds, dvds, dads), (dsdq0, dsdq1, dsdq2)
@@ -334,7 +327,6 @@ class Direct2 {
     bool time_scaling_sensor = true;               // scale sensor costs
     double search_direction_tolerance = 1.0e-8;    // search direction tolerance
     double cost_tolerance = 1.0e-8;                // cost difference tolernace
-    double random_init = 0.0;
   } settings;
 
   // finite-difference settings

@@ -22,14 +22,23 @@
 #include "gtest/gtest.h"
 #include "mjpc/direct_planner/direct.h"
 #include "mjpc/test/load.h"
+#include "mjpc/utilities.h"
 
 namespace mjpc {
 namespace {
 
-// TEST(DirectPlanner, Particle2D) {
-//   // load model
-//   mjModel* model = LoadTestModel("estimator/particle/task.xml");
-//   mjData* data = mj_makeData(model);
+TEST(DirectPlanner, Particle2D) {
+  // load model
+  mjModel* model = LoadTestModel("estimator/particle/task.xml");
+  mjData* data = mj_makeData(model);
+
+  double w = GetNumberOrDefault(0.0, model, "direct_force_weight");
+
+  double* ww = GetCustomNumericData(model, "direct_force_weight", 2);
+
+  printf("weight: %f\n", w);
+
+  if (ww) printf("%f %f\n", ww[0], ww[1]);
 
 //   int qpos_horizon = 100;
 //   Direct2 direct = Direct2(model, qpos_horizon);
@@ -108,45 +117,45 @@ namespace {
 //     mju_printMat(direct.force.Get(t), 1, model->nv);
 //   }
 
-//   // delete data + model
-//   mj_deleteData(data);
-//   mj_deleteModel(model);
-// }
-
-TEST(DirectPlanner, Cartpole) {
-  // load model
-  mjModel* model = LoadTestModel("cartpole.xml");
-  mjData* data = mj_makeData(model);
-
-  data->ctrl[0] = 0.125;
-  mj_step(model, data);
-
-  printf("actuator gain: %f\n", model->actuator_gainprm[mjNGAIN * 0]);
-
-  printf("actuator force:\n");
-  mju_printMat(data->actuator_force, 1, model->nu);
-
-  printf("actuator_moment:\n");
-  mju_printMat(data->actuator_moment, model->nu, model->nv);
-
-  printf("qfrc_actuator:\n");
-  mju_printMat(data->qfrc_actuator, 1, model->nv);
-
-  double ctrl_force[1];
-  for (int i = 0; i < model->nu; i++) {
-    double gain = model->actuator_gainprm[mjNGAIN*i];
-    ctrl_force[i] = gain * data->ctrl[i];
-  }
-  double force[2];
-  mju_mulMatTVec(force, data->actuator_moment, ctrl_force, model->nu, model->nv);
-
-  printf("force:\n");
-  mju_printMat(force, 1, model->nv);
-
   // delete data + model
   mj_deleteData(data);
   mj_deleteModel(model);
 }
+
+// TEST(DirectPlanner, Cartpole) {
+//   // load model
+//   mjModel* model = LoadTestModel("cartpole.xml");
+//   mjData* data = mj_makeData(model);
+
+//   data->ctrl[0] = 0.125;
+//   mj_step(model, data);
+
+//   printf("actuator gain: %f\n", model->actuator_gainprm[mjNGAIN * 0]);
+
+//   printf("actuator force:\n");
+//   mju_printMat(data->actuator_force, 1, model->nu);
+
+//   printf("actuator_moment:\n");
+//   mju_printMat(data->actuator_moment, model->nu, model->nv);
+
+//   printf("qfrc_actuator:\n");
+//   mju_printMat(data->qfrc_actuator, 1, model->nv);
+
+//   double ctrl_force[1];
+//   for (int i = 0; i < model->nu; i++) {
+//     double gain = model->actuator_gainprm[mjNGAIN*i];
+//     ctrl_force[i] = gain * data->ctrl[i];
+//   }
+//   double force[2];
+//   mju_mulMatTVec(force, data->actuator_moment, ctrl_force, model->nu, model->nv);
+
+//   printf("force:\n");
+//   mju_printMat(force, 1, model->nv);
+
+//   // delete data + model
+//   mj_deleteData(data);
+//   mj_deleteModel(model);
+// }
 
 }  // namespace
 }  // namespace mjpc

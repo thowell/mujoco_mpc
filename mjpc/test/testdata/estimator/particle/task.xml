@@ -35,6 +35,10 @@
     <flag contact="disable"/>
   </option>
 
+  <custom>
+    <numeric name="direct_force_weight" data="2.3 5.1"/>
+  </custom>
+
   <worldbody>
     <light name="light" pos="0 0 1"/>
     <camera name="fixed" pos="0 0 .75" quat="1 0 0 0"/>

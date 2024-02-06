@@ -69,9 +69,10 @@ void GetState(const mjModel* model, const mjData* data, double* state) {
 }
 
 // get numerical data from custom using string
-double* GetCustomNumericData(const mjModel* m, std::string_view name) {
+double* GetCustomNumericData(const mjModel* m, std::string_view name, int length) {
   for (int i = 0; i < m->nnumeric; i++) {
-    if (std::string_view(m->names + m->name_numericadr[i]) == name) {
+    if (std::string_view(m->names + m->name_numericadr[i]) == name &&
+        m->numeric_size[i] == length) {
       return m->numeric_data + m->numeric_adr[i];
     }
   }

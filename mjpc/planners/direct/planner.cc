@@ -39,6 +39,13 @@ void DirectPlanner::Initialize(mjModel* model, const Task& task) {
   // task
   this->task = &task;
 
+  // direct optimizer
+  direct.Initialize(model);
+
+  // MPC settings
+  direct.settings.max_search_iterations = 3;
+  direct.settings.max_smoother_iterations = 1;
+
   // trajectory
   trajectory.Initialize(model->nq + model->nv + model->na, model->nu,
                         task.num_residual, task.num_trace,
@@ -49,6 +56,9 @@ void DirectPlanner::Initialize(mjModel* model, const Task& task) {
 
 // allocate memory
 void DirectPlanner::Allocate(){
+  // direct optimizer
+  direct.Allocate();
+
   // trajectory
   trajectory.Allocate(kMaxTrajectoryHorizon);
   buffer.Allocate(kMaxTrajectoryHorizon);
@@ -57,8 +67,22 @@ void DirectPlanner::Allocate(){
 // reset memory to zeros
 void DirectPlanner::Reset(int horizon, const double* initial_repeated_action){
   // direct optimizer
-  direct.Initialize(model, horizon + 2);
   direct.Reset();
+
+  // random initialization
+  std::vector<double> perturb(direct.model->nv);
+  for (int t = 0; t < horizon; t++) {
+    // initialize with default qpos0
+    double* qpos = direct.qpos.Get(t);
+    mju_copy(qpos, direct.model->qpos0, direct.model->nq);
+
+    // random
+    absl::BitGen gen_;
+    for (int i = 0; i < direct.model->nv; i++) {
+      perturb[i] = absl::Gaussian<double>(gen_, 0.0, 1.0);
+    }
+    mj_integratePos(direct.model, qpos, perturb.data(), 1.0e-1);
+  }
   
   // trajectory
   trajectory.Reset(horizon);
@@ -100,138 +124,95 @@ void DirectPlanner::SetState(const State& state){
 
 // optimize nominal policy
 void DirectPlanner::OptimizePolicy(int horizon, ThreadPool& pool){
+  // resample qpos trajectory
+  for (int t = 0; t < horizon + 2; t++) {
+    // set time
+    direct.time.Get(t)[0] = time + (t - 1) * direct.model->opt.timestep;
+
+    // skip pinned qpos
+    if (t <= 1) continue; 
+
+    // interpolate qpos
+    int bounds[2];
+    FindInterval(bounds, trajectory.times, direct.time.Get(t)[0], trajectory.horizon);
+    if (bounds[0] == bounds[1]) {
+      mju_copy(direct.qpos.Get(t),
+                DataAt(trajectory.states, trajectory.dim_state * bounds[0]),
+                direct.model->nq);
+    } else {
+      double time_norm =
+          (direct.time.Get(t)[0] - trajectory.times[bounds[0]]) /
+          (trajectory.times[bounds[1]] - trajectory.times[bounds[0]]);
+      InterpolateConfiguration(
+          direct.qpos.Get(t), direct.model, time_norm,
+          DataAt(trajectory.states, trajectory.dim_state * bounds[0]),
+          DataAt(trajectory.states, trajectory.dim_state * bounds[1]));
+    }
+  }
+
   // set sensor weights
   // TODO(taylor): thread safe
   mju_copy(direct.weight_sensor.data(), task->weight.data(),
            direct.weight_sensor.size());
 
-  direct.model->opt.timestep = model->opt.timestep;
+  // set force weights
+  
+  // optimize qpos trajectory
+  direct.Optimize(horizon + 2);
 
-  if (direct.qpos_horizon_ != horizon + 2) {
-    // resize
-    direct.Initialize(model, horizon + 2);
-    direct.Reset();
+  // update trajectory
+  buffer.horizon = horizon;
 
-    // random initialization
-    std::vector<double> perturb(direct.model->nv);
-    for (int t = 0; t < direct.qpos_horizon_; t++) {
-      // initialize with default qpos0
-      double* qpos = direct.qpos.Get(t);
-      mju_copy(qpos, direct.model->qpos0, direct.model->nq);
+  // memory
+  std::vector<double> Mf(direct.model->nu);
+  std::vector<double> MMT(direct.model->nu * direct.model->nu);
+  std::vector<double> ctrl(direct.model->nu);
 
-      // random
-      absl::BitGen gen_;
-      for (int i = 0; i < direct.model->nv; i++) {
-        perturb[i] = absl::Gaussian<double>(gen_, 0.0, 1.0);
-      }
+  // dimensions
+  int nv = direct.model->nv;
+  int nu = direct.model->nu;
 
-      mj_integratePos(direct.model, qpos, perturb.data(), 1.0e-1);
+  for (int t = 1; t < direct.qpos_horizon_ - 1; t++) {
+    buffer.times[t - 1] = direct.time.Get(t)[0];
+    mju_copy(buffer.states.data() + buffer.dim_state * (t - 1),
+              direct.qpos.Get(t), direct.model->nq);
+
+    // -- recover ctrl -- //
+    // actuator_moment
+    double* actuator_moment = direct.data_[t].get()->actuator_moment;
+
+    // actuator_moment * qfrc_inverse
+    mju_mulMatVec(Mf.data(), actuator_moment, direct.force.Get(t), nu, nv);
+
+    // actuator_moment * actuator_moment'
+    mju_mulMatMatT(MMT.data(), actuator_moment, actuator_moment, nu, nv, nu);
+
+    // factorize
+    int rank = mju_cholFactor(MMT.data(), nu, 0.0);
+    if (rank < nu) {
+      printf("Cholesky failure\n");
     }
 
-    // MPC settings
-    direct.settings.max_search_iterations = 3;
-    direct.settings.max_smoother_iterations = 1;
-    direct.settings.random_init = 1.0e-5;
+    // gain * ctrl = (M M') * M * f
+    mju_cholSolve(ctrl.data(), MMT.data(), Mf.data(), nu);
 
-    return;
-  } else {
-    // resample
-    for (int t = 0; t < direct.qpos_horizon_; t++) {
-      // set time
-      direct.time.Get(t)[0] = time + (t - 1) * direct.model->opt.timestep;
-
-      // skip pinned qpos
-      if (t <= 1) continue; 
-
-      // interpolate qpos
-      int bounds[2];
-      FindInterval(bounds, trajectory.times, direct.time.Get(t)[0], trajectory.horizon);
-      if (bounds[0] == bounds[1]) {
-        mju_copy(direct.qpos.Get(t),
-                 DataAt(trajectory.states, trajectory.dim_state * bounds[0]),
-                 direct.model->nq);
-      } else {
-        double time_norm =
-            (direct.time.Get(t)[0] - trajectory.times[bounds[0]]) /
-            (trajectory.times[bounds[1]] - trajectory.times[bounds[0]]);
-        InterpolateConfiguration(
-            direct.qpos.Get(t), direct.model, time_norm,
-            DataAt(trajectory.states, trajectory.dim_state * bounds[0]),
-            DataAt(trajectory.states, trajectory.dim_state * bounds[1]));
-      }
+    // divide by gains to recover ctrl
+    for (int i = 0; i < nu; i++) {
+      double gain = direct.model->actuator_gainprm[mjNGAIN * i];
+      ctrl[i] /= gain;
     }
 
-    // printf("current time: %f\n", time);
+    // set ctrl
+    mju_copy(buffer.actions.data() + buffer.dim_action * (t - 1), ctrl.data(),
+              nu);
 
-
-    // printf("trajectory times:\n");
-    // mju_printMat(trajectory.times.data(), 1, trajectory.horizon);
-
-    // printf("direct times:\n");
-    // mju_printMat(direct.time.Data(), 1, direct.qpos_horizon_);
-
-    // printf("trajectory horizon: %i\n", trajectory.horizon);
-    // printf("direct horizon: %i\n", direct.qpos_horizon_);
-
-    // optimize qpos trajectory
-    direct.Optimize();
-
-    // update trajectory
-    // TODO(taylor): thread safe
-    buffer.horizon = horizon;
-
-    // memory
-    std::vector<double> Mf(direct.model->nu);
-    std::vector<double> MMT(direct.model->nu * direct.model->nu);
-    std::vector<double> ctrl(direct.model->nu);
-
-    // dimensions
-    int nv = direct.model->nv;
-    int nu = direct.model->nu;
-
-    for (int t = 1; t < direct.qpos_horizon_ - 1; t++) {
-      buffer.times[t - 1] = direct.time.Get(t)[0];
-      mju_copy(buffer.states.data() + buffer.dim_state * (t - 1),
-               direct.qpos.Get(t), direct.model->nq);
-
-      // -- recover ctrl -- //
-      // actuator_moment
-      double* actuator_moment = direct.data_[t].get()->actuator_moment;
-
-      // actuator_moment * qfrc_inverse
-      mju_mulMatVec(Mf.data(), actuator_moment, direct.force.Get(t), nu, nv);
-
-      // actuator_moment * actuator_moment'
-      mju_mulMatMatT(MMT.data(), actuator_moment, actuator_moment, nu, nv, nu);
-
-      // factorize
-      int rank = mju_cholFactor(MMT.data(), nu, 0.0);
-      if (rank < nu) {
-        printf("Cholesky failure\n");
-      }
-
-      // gain * ctrl = (M M') * M * f
-      mju_cholSolve(ctrl.data(), MMT.data(), Mf.data(), nu);
-
-      // divide by gains to recover ctrl
-      for (int i = 0; i < nu; i++) {
-        double gain = direct.model->actuator_gainprm[mjNGAIN * i];
-        ctrl[i] /= gain;
-      }
-
-      // set ctrl
-      mju_copy(buffer.actions.data() + buffer.dim_action * (t - 1), ctrl.data(),
-               nu);
-
-      // set residual terms
-      mju_copy(buffer.residual.data() + buffer.dim_residual * (t - 1),
-               direct.sensor.Get(t), buffer.dim_residual);
-    }
-    trajectory = buffer;
-
-    // printf("ctrl: \n");
-    // mju_printMat(trajectory.actions.data(), trajectory.horizon - 1, trajectory.dim_action);
+    // set residual terms
+    mju_copy(buffer.residual.data() + buffer.dim_residual * (t - 1),
+              direct.sensor.Get(t), buffer.dim_residual);
   }
+
+  // TODO(taylor): thread safe copy
+  trajectory = buffer;
 }
 
 // compute trajectory using nominal policy
@@ -289,7 +270,7 @@ void DirectPlanner::GUI(mjUI& ui){
         direct.weight_force.data() + shift - 1, "1.0e-6 1000.0"};
 
     // add element index
-    str = "dof";
+    str = "DOF ";
     str += " (" + std::to_string(i) + ")";
 
     // set sensor name
