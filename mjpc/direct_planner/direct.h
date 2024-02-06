@@ -52,15 +52,15 @@ class Direct2 {
  public:
   // constructor
   Direct2() : pool_(NumAvailableHardwareThreads()){};
-  Direct2(const mjModel* model, int qpos_horizon);
+  Direct2(mjModel* model, int qpos_horizon);
 
   // destructor
-  virtual ~Direct2() {
-    if (model) mj_deleteModel(model);
-  }
+  // virtual ~Direct2() {
+  //   if (model) mj_deleteModel(model);
+  // }
 
   // initialize
-  void Initialize(const mjModel* model, int qpos_horizon);
+  void Initialize(mjModel* model, int qpos_horizon);
 
   // reset memory
   void Reset();

@@ -34,8 +34,7 @@ namespace mju = ::mujoco::util_mjpc;
 // initialize data and settings
 void DirectPlanner::Initialize(mjModel* model, const Task& task) {
   // model
-  if (this->model) mj_deleteModel(this->model);
-  this->model = mj_copyModel(nullptr, model);
+  this->model = model;
 
   // task
   this->task = &task;
@@ -106,6 +105,8 @@ void DirectPlanner::OptimizePolicy(int horizon, ThreadPool& pool){
   mju_copy(direct.weight_sensor.data(), task->weight.data(),
            direct.weight_sensor.size());
 
+  direct.model->opt.timestep = model->opt.timestep;
+
   if (direct.qpos_horizon_ != horizon + 2) {
     // resize
     direct.Initialize(model, horizon + 2);
@@ -128,7 +129,7 @@ void DirectPlanner::OptimizePolicy(int horizon, ThreadPool& pool){
     }
 
     // MPC settings
-    direct.settings.max_search_iterations = 5;
+    direct.settings.max_search_iterations = 3;
     direct.settings.max_smoother_iterations = 1;
     direct.settings.random_init = 1.0e-5;
 
@@ -160,17 +161,17 @@ void DirectPlanner::OptimizePolicy(int horizon, ThreadPool& pool){
       }
     }
 
-    printf("current time: %f\n", time);
+    // printf("current time: %f\n", time);
 
 
-    printf("trajectory times:\n");
-    mju_printMat(trajectory.times.data(), 1, trajectory.horizon);
+    // printf("trajectory times:\n");
+    // mju_printMat(trajectory.times.data(), 1, trajectory.horizon);
 
-    printf("direct times:\n");
-    mju_printMat(direct.time.Data(), 1, direct.qpos_horizon_);
+    // printf("direct times:\n");
+    // mju_printMat(direct.time.Data(), 1, direct.qpos_horizon_);
 
-    printf("trajectory horizon: %i\n", trajectory.horizon);
-    printf("direct horizon: %i\n", direct.qpos_horizon_);
+    // printf("trajectory horizon: %i\n", trajectory.horizon);
+    // printf("direct horizon: %i\n", direct.qpos_horizon_);
 
     // optimize qpos trajectory
     direct.Optimize();
@@ -190,8 +191,8 @@ void DirectPlanner::OptimizePolicy(int horizon, ThreadPool& pool){
 
     for (int t = 1; t < direct.qpos_horizon_ - 1; t++) {
       buffer.times[t - 1] = direct.time.Get(t)[0];
-      // mju_copy(buffer.states.data() + buffer.dim_state * (t - 1),
-      //          direct.qpos.Get(t), direct.model->nq);
+      mju_copy(buffer.states.data() + buffer.dim_state * (t - 1),
+               direct.qpos.Get(t), direct.model->nq);
 
       // -- recover ctrl -- //
       // actuator_moment
@@ -227,6 +228,9 @@ void DirectPlanner::OptimizePolicy(int horizon, ThreadPool& pool){
                direct.sensor.Get(t), buffer.dim_residual);
     }
     trajectory = buffer;
+
+    // printf("ctrl: \n");
+    // mju_printMat(trajectory.actions.data(), trajectory.horizon - 1, trajectory.dim_action);
   }
 }
 
@@ -282,7 +286,7 @@ void DirectPlanner::GUI(mjUI& ui){
     // element
     defForceWeight[shift] = {
         mjITEM_SLIDERNUM, "", 2,
-        direct.weight_force.data() + shift - 1, "1.0e-3 100.0"};
+        direct.weight_force.data() + shift - 1, "1.0e-6 1000.0"};
 
     // add element index
     str = "dof";

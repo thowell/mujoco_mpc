@@ -32,7 +32,7 @@
 namespace mjpc {
 
 // constructor
-Direct2::Direct2(const mjModel* model, int qpos_horizon)
+Direct2::Direct2(mjModel* model, int qpos_horizon)
     : pool_(NumAvailableHardwareThreads()) {
   // initialize memory
   Initialize(model, qpos_horizon);
@@ -42,10 +42,11 @@ Direct2::Direct2(const mjModel* model, int qpos_horizon)
 }
 
 // initialize direct estimator
-void Direct2::Initialize(const mjModel* model, int qpos_horizon) {
+void Direct2::Initialize(mjModel* model, int qpos_horizon) {
   // model
-  if (this->model) mj_deleteModel(this->model);
-  this->model = mj_copyModel(nullptr, model);
+  // if (this->model) mj_deleteModel(this->model);
+  // this->model = mj_copyModel(nullptr, model);
+  this->model = model;
 
   if (this->model->na > 0) {
     mju_error("na > 0: activations not implemented");
@@ -1602,9 +1603,9 @@ void Direct2::PrintOptimize() {
   // cost
   printf("Cost:\n");
   printf("  final: %.3f\n", cost_);
-  printf("    - sensor: %.3f\n", cost_sensor_);
-  printf("    - force: %.3f\n", cost_force_);
-  printf("  <initial: %.3f>\n", cost_initial_);
+  printf("    - sensor: %.8f\n", cost_sensor_);
+  printf("    - force: %.8f\n", cost_force_);
+  printf("  <initial: %.8f>\n", cost_initial_);
   printf("\n");
 
   fflush(stdout);
@@ -1613,10 +1614,10 @@ void Direct2::PrintOptimize() {
 // print cost
 void Direct2::PrintCost() {
   if (settings.verbose_cost) {
-    printf("cost (total): %.3f\n", cost_);
-    printf("  sensor: %.3f\n", cost_sensor_);
-    printf("  force: %.3f\n", cost_force_);
-    printf("  [initial: %.3f]\n", cost_initial_);
+    printf("cost (total): %.8f\n", cost_);
+    printf("  sensor: %.8f\n", cost_sensor_);
+    printf("  force: %.8f\n", cost_force_);
+    printf("  [initial: %.8f]\n", cost_initial_);
     fflush(stdout);
   }
 }

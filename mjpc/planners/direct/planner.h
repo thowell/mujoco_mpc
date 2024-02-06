@@ -35,9 +35,9 @@ class DirectPlanner: public Planner {
   DirectPlanner() = default;
 
   // destructor
-  ~DirectPlanner() {
-    if (model) mj_deleteModel(model);
-  }
+  // ~DirectPlanner() {
+  //   if (model) mj_deleteModel(model);
+  // }
 
   // initialize data and settings
   void Initialize(mjModel* model, const Task& task) override;
@@ -80,7 +80,7 @@ class DirectPlanner: public Planner {
   int NumParameters() override;
 
   // model
-  mjModel* model = nullptr;
+  mjModel* model;
 
   // task
   const Task* task;

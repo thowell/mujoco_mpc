@@ -1011,6 +1011,53 @@ void Agent::Plots(const mjData* data, int shift) {
                cost_bounds[0], cost_bounds[1], 10, 2);
 
   // ----- action ----- //
+  // double action_bounds[2] = {-1.0, 1.0};
+
+  // int dim_state = model_->nq + model_->nv + model_->na;
+
+  // // shift data
+  // if (shift) {
+  //   // agent history
+  //   for (int j = 0; j < model_->nq; j++) {
+  //     PlotUpdateData(&plots_.action, action_bounds, data->time, data->qpos[j],
+  //                    1000, j, 1, 1, time_lower_bound);
+  //   }
+  // }
+
+  // // agent actions
+  // PlotData(&plots_.action, action_bounds, winner->times.data(),
+  //          winner->states.data(), dim_state, model_->nq, winner->horizon,
+  //          model_->nq, time_lower_bound);
+
+  // // set final action for visualization
+  // for (int j = 0; j < model_->nq; j++) {
+  //   // set data
+  //   if (winner->horizon > 1) {
+  //     plots_.action.linedata[model_->nq + j][2 * (winner->horizon - 1) + 1] =
+  //         winner->states[(winner->horizon - 1) * dim_state + j];
+  //   } else {
+  //     plots_.action.linedata[model_->nq + j][2 * (winner->horizon - 1) + 1] = 0;
+  //   }
+  // }
+
+  // // vertical lines at current time and agent time
+  // PlotVertical(&plots_.action, data->time, action_bounds[0], action_bounds[1],
+  //              10, 2 * model_->nq);
+  // PlotVertical(&plots_.action,
+  //              (winner->times[0] > 0.0 ? winner->times[0] : data->time),
+  //              action_bounds[0], action_bounds[1], 10, 2 * model_->nq + 1);
+
+  // // ranges
+  // plots_.action.range[0][0] = data->time - horizon_ + model_->opt.timestep;
+  // plots_.action.range[0][1] = data->time + horizon_ - model_->opt.timestep;
+  // plots_.action.range[1][0] = action_bounds[0];
+  // plots_.action.range[1][1] = action_bounds[1];
+
+  // // legend
+  // mju::strcpy_arr(plots_.action.linename[0], "History");
+  // mju::strcpy_arr(plots_.action.linename[model_->nq], "Prediction");
+
+  // ----- action ----- //
   double action_bounds[2] = {-1.0, 1.0};
 
   int dim_action = mju_min(model_->nu, kMaxActionPlots);
