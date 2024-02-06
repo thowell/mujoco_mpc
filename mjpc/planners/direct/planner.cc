@@ -43,7 +43,7 @@ void DirectPlanner::Initialize(mjModel* model, const Task& task) {
   direct.Initialize(model);
 
   // MPC settings
-  direct.settings.max_search_iterations = 3;
+  direct.settings.max_search_iterations = 10;
   direct.settings.max_smoother_iterations = 1;
 
   // trajectory
@@ -81,7 +81,7 @@ void DirectPlanner::Reset(int horizon, const double* initial_repeated_action){
     for (int i = 0; i < direct.model->nv; i++) {
       perturb[i] = absl::Gaussian<double>(gen_, 0.0, 1.0);
     }
-    mj_integratePos(direct.model, qpos, perturb.data(), 1.0e-1);
+    mj_integratePos(direct.model, qpos, perturb.data(), 1.0e-5);
   }
   
   // trajectory
@@ -209,6 +209,9 @@ void DirectPlanner::OptimizePolicy(int horizon, ThreadPool& pool){
     // set residual terms
     mju_copy(buffer.residual.data() + buffer.dim_residual * (t - 1),
               direct.sensor.Get(t), buffer.dim_residual);
+
+    // total return
+    buffer.total_return = direct.cost_;
   }
 
   // TODO(taylor): thread safe copy

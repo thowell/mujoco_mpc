@@ -1228,6 +1228,16 @@ void Direct2::Optimize(int qpos_horizon) {
   // print initial cost
   PrintCost();
 
+  // std::vector<double> perturb(model->nv);
+  // absl::BitGen gen_;
+  // for (int t = 0; t < qpos_horizon_; t++) {
+  //   // random
+  //   for (int i = 0; i < model->nv; i++) {
+  //     perturb[i] = absl::Gaussian<double>(gen_, 0.0, 1.0);
+  //   }
+  //   mj_integratePos(model, qpos.Get(t), perturb.data(), 1.0e-3);
+  // }
+
   // ----- smoother iterations ----- //
 
   // reset
