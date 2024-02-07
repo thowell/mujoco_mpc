@@ -4,13 +4,18 @@
   <size memory="400K"/>
 
   <custom>
-    <numeric name="agent_planner" data="0" />
+    <numeric name="agent_planner" data="6" />
     <numeric name="agent_horizon" data="0.35" />
     <numeric name="agent_timestep" data="0.015" />
     <numeric name="sampling_spline_points" data="3" />
     <numeric name="sampling_exploration" data="0.05" />
     <numeric name="gradient_spline_points" data="5" />
     <numeric name="residual_Height Goal" data="1.4 0.0 1.5" />
+
+    <!-- direct -->
+    <numeric name="direct_sensor_start" data="0"/>
+    <numeric name="direct_number_sensor" data="5"/>
+    <numeric name="direct_force_weight" data="1.0e6 1.0e6 1.0e6 1.0e6 1.0e6 1.0e6 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0 1.0"/>
   </custom>
 
   <sensor>

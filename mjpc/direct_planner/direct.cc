@@ -193,6 +193,8 @@ void Direct2::Allocate() {
 
 // reset memory
 void Direct2::Reset() {
+  regularization_ = settings.regularization_initial;
+
   // -- force weight -- //
   double* wf = GetCustomNumericData(model, "direct_force_weight", model->nv);
   if (wf) {
@@ -1228,16 +1230,6 @@ void Direct2::Optimize(int qpos_horizon) {
   // print initial cost
   PrintCost();
 
-  // std::vector<double> perturb(model->nv);
-  // absl::BitGen gen_;
-  // for (int t = 0; t < qpos_horizon_; t++) {
-  //   // random
-  //   for (int i = 0; i < model->nv; i++) {
-  //     perturb[i] = absl::Gaussian<double>(gen_, 0.0, 1.0);
-  //   }
-  //   mj_integratePos(model, qpos.Get(t), perturb.data(), 1.0e-3);
-  // }
-
   // ----- smoother iterations ----- //
 
   // reset
@@ -1271,6 +1263,7 @@ void Direct2::Optimize(int qpos_horizon) {
     double cost_candidate = cost_;
     int iteration_search = 0;
     regularization_ = settings.regularization_initial;
+    // regularization_ /= settings.regularization_scaling;
     improvement_ = -1.0;
 
     // -- search direction -- //
@@ -1281,11 +1274,13 @@ void Direct2::Optimize(int qpos_horizon) {
       solve_status_ = kMaxRegularizationFailure;
 
       // failure
+      mju_copy(qpos.Data(), qpos_copy_.Data(), model->nq * qpos_horizon_);
       return;
     }
 
     // compute initial search direction
     if (!SearchDirection()) {
+      mju_copy(qpos.Data(), qpos_copy_.Data(), model->nq * qpos_horizon_);
       return;  // failure
     }
 
@@ -1295,6 +1290,7 @@ void Direct2::Optimize(int qpos_horizon) {
       solve_status_ = kSmallDirectionFailure;
 
       // failure
+      mju_copy(qpos.Data(), qpos_copy_.Data(), model->nq * qpos_horizon_);
       return;
     }
 
@@ -1306,6 +1302,7 @@ void Direct2::Optimize(int qpos_horizon) {
         solve_status_ = kMaxIterationsFailure;
 
         // failure
+        mju_copy(qpos.Data(), qpos_copy_.Data(), model->nq * qpos_horizon_);
         return;
       }
 
@@ -1316,6 +1313,7 @@ void Direct2::Optimize(int qpos_horizon) {
 
         // recompute search direction
         if (!SearchDirection()) {
+          mju_copy(qpos.Data(), qpos_copy_.Data(), model->nq * qpos_horizon_);
           return;  // failure
         }
 
@@ -1325,6 +1323,7 @@ void Direct2::Optimize(int qpos_horizon) {
           solve_status_ = kSmallDirectionFailure;
 
           // failure
+          mju_copy(qpos.Data(), qpos_copy_.Data(), model->nq * qpos_horizon_);
           return;
         }
       }
@@ -1387,6 +1386,8 @@ void Direct2::Optimize(int qpos_horizon) {
     // reduction ratio
     reduction_ratio_ = improvement_ / expected_;
 
+    printf("reduction ratio: %f\n", reduction_ratio_);
+
     // update regularization
     if (reduction_ratio_ > 0.75) {
       // decrease
@@ -1446,12 +1447,12 @@ bool Direct2::SearchDirection() {
   double min_diag = 0.0;
   while (min_diag <= 0.0) {
     // failure
-    if (regularization_ >= kMaxDirectRegularization) {
-      printf("min diag = %f\n", min_diag);
-      printf("cost Hessian factorization failure: MAX REGULARIZATION\n");
-      solve_status_ = kMaxRegularizationFailure;
-      return false;
-    }
+    // if (regularization_ >= kMaxDirectRegularization) {
+    //   printf("min diag = %f\n", min_diag);
+    //   mju_error("cost Hessian factorization failure: MAX REGULARIZATION\n");
+    //   solve_status_ = kMaxRegularizationFailure;
+    //   return false;
+    // }
 
     // copy
     mju_copy(hessian_band_factor, hessian_band, ntotal_pin * nband_);

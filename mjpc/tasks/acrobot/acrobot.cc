@@ -45,7 +45,44 @@ void Acrobot::ResidualFn::Residual(const mjModel* model, const mjData* data,
   residual[3] = data->qvel[1];
 
   // ---------- Residual (4) ----------
-  residual[4] = data->ctrl[0];
+  std::vector<double> Mf(model->nu);
+  std::vector<double> MMT(model->nu * model->nu);
+  std::vector<double> ctrl(model->nu);
+
+  // dimensions
+  int nv = model->nv;
+  int nu = model->nu;
+
+  // -- recover ctrl -- //
+  // actuator_moment
+  double* actuator_moment = data->actuator_moment;
+
+  // actuator_moment * qfrc_inverse
+  mju_mulMatVec(Mf.data(), actuator_moment, data->qfrc_inverse, nu, nv);
+
+  // actuator_moment * actuator_moment'
+  mju_mulMatMatT(MMT.data(), actuator_moment, actuator_moment, nu, nv, nu);
+
+  for (int i = 0; i < nu; i++) {
+    MMT[i * nu + i] += 1.0e-5;
+  }
+
+  // factorize
+  int rank = mju_cholFactor(MMT.data(), nu, 0.0);
+  if (rank < nu) {
+    printf("Cholesky failure\n");
+  }
+
+  // gain * ctrl = (M M') * M * f
+  mju_cholSolve(ctrl.data(), MMT.data(), Mf.data(), nu);
+
+  // divide by gains to recover ctrl
+  for (int i = 0; i < nu; i++) {
+    double gain = model->actuator_gainprm[mjNGAIN * i];
+    ctrl[i] /= gain;
+  }
+  residual[4] = ctrl[0];
+  // residual[4] = data->ctrl[0];
 }
 
 }  // namespace mjpc

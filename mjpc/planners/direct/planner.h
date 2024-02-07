@@ -89,11 +89,18 @@ class DirectPlanner: public Planner {
   Direct2 direct;
 
   // trajectory
+  Trajectory policy;
   Trajectory trajectory;
-  Trajectory buffer;
+  Trajectory nominal;
 
-  // current time
+  // state
+  std::vector<double> state;
   double time;
+  std::vector<double> mocap;
+  std::vector<double> userdata;
+
+  // sensor scaling
+  double sensor_scaling = 1.0;
 };
 
 }  // namespace mjpc
