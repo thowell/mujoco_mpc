@@ -19,6 +19,7 @@
 
 #include "mjpc/task.h"
 #include "mjpc/tasks/acrobot/acrobot.h"
+#include "mjpc/tasks/bimanual/bimanual.h"
 #include "mjpc/tasks/cube/solve.h"
 #include "mjpc/tasks/cartpole/cartpole.h"
 #include "mjpc/tasks/fingers/fingers.h"
