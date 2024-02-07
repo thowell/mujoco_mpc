@@ -43,7 +43,7 @@ namespace mjpc {
 std::vector<std::shared_ptr<Task>> GetTasks() {
   return {
     std::make_shared<Acrobot>(),
-    // std::make_shared<CubeSolve>(), // Python API build issue..
+    std::make_shared<CubeSolve>(),
     std::make_shared<Cartpole>(),
     std::make_shared<Fingers>(),
     std::make_shared<Hand>(),
