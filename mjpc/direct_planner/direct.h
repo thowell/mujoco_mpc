@@ -51,7 +51,7 @@ inline constexpr double kMinDirectRegularization = 1.0e-12;
 class Direct2 {
  public:
   // constructor
-  Direct2() : pool_(1){};
+  Direct2() : pool_(10){};
 
   // initialize
   void Initialize(mjModel* model);
@@ -169,7 +169,9 @@ class Direct2 {
   // dimensions
   int nsensordata_;
   int nsensor_;
-  int ntotal_;  // total number of decision variable
+  int ntotal_;  // max number of decision variable
+  int ntotal_pin_;  // total number of decision variables (after pinned
+                    // variables are removed)
   int nband_;   // cost Hessian band dimension
 
   // sensor indexing
@@ -325,8 +327,8 @@ class Direct2 {
     double regularization_scaling = mju_sqrt(10);  // regularization scaling
     bool time_scaling_force = true;                // scale force costs
     bool time_scaling_sensor = true;               // scale sensor costs
-    double search_direction_tolerance = 1.0e-8;    // search direction tolerance
-    double cost_tolerance = 1.0e-8;                // cost difference tolernace
+    double search_direction_tolerance = 1.0e-10;    // search direction tolerance
+    double cost_tolerance = 1.0e-10;                // cost difference tolernace
   } settings;
 
   // finite-difference settings

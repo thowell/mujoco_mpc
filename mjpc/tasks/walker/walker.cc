@@ -38,44 +38,7 @@ std::string Walker::Name() const { return "Walker"; }
 void Walker::ResidualFn::Residual(const mjModel* model, const mjData* data,
                       double* residual) const {
   int counter = 0;
-  // ---------- Residual (0) ----------
-  // std::vector<double> Mf(model->nu);
-  // std::vector<double> MMT(model->nu * model->nu);
-  // std::vector<double> ctrl(model->nu);
-
-  // // dimensions
-  // int nv = model->nv;
-  // int nu = model->nu;
-
-  // // -- recover ctrl -- //
-  // // actuator_moment
-  // double* actuator_moment = data->actuator_moment;
-
-  // // actuator_moment * qfrc_inverse
-  // mju_mulMatVec(Mf.data(), actuator_moment, data->qfrc_inverse, nu, nv);
-
-  // // actuator_moment * actuator_moment'
-  // mju_mulMatMatT(MMT.data(), actuator_moment, actuator_moment, nu, nv, nu);
-
-  // for (int i = 0; i < nu; i++) {
-  //   MMT[i * nu + i] += 1.0e-5;
-  // }
-
-  // // factorize
-  // int rank = mju_cholFactor(MMT.data(), nu, 0.0);
-  // if (rank < nu) {
-  //   printf("Cholesky failure\n");
-  // }
-
-  // // gain * ctrl = (M M') * M * f
-  // mju_cholSolve(ctrl.data(), MMT.data(), Mf.data(), nu);
-
-  // // divide by gains to recover ctrl
-  // for (int i = 0; i < nu; i++) {
-  //   double gain = model->actuator_gainprm[mjNGAIN * i];
-  //   ctrl[i] /= gain;
-  // }
-  // mju_copy(&residual[counter], ctrl.data(), model->nu);
+  
   mju_copy(&residual[counter], data->ctrl, model->nu);
   counter += model->nu;
 
@@ -90,6 +53,9 @@ void Walker::ResidualFn::Residual(const mjModel* model, const mjData* data,
   // ---------- Residual (3) ----------
   double com_vel = SensorByName(model, data, "torso_subtreelinvel")[0];
   residual[counter++] = com_vel - parameters_[1];
+
+  mju_copy(residual + counter, data->qvel, model->nv);
+  counter += model->nv;
 
   // sensor dim sanity check
   // TODO: use this pattern everywhere and make this a utility function

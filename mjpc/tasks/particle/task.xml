@@ -18,6 +18,7 @@
     <numeric name="direct_sensor_start" data="0"/>
     <numeric name="direct_number_sensor" data="3"/>
     <numeric name="direct_force_weight" data="1.0 1.0"/>
+    <numeric name="direct_sensor_scale" data="100.0"/>
   </custom>
 
   <sensor>

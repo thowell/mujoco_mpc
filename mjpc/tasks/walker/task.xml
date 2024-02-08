@@ -7,8 +7,8 @@
   <custom>
     <!-- agent -->
     <numeric name="agent_planner" data="6" />
-    <numeric name="agent_horizon" data="0.5" />
-    <numeric name="agent_timestep" data="0.01" />
+    <numeric name="agent_horizon" data="0.6" />
+    <numeric name="agent_timestep" data="0.1" />
     <numeric name="sampling_spline_points" data="3" />
     <numeric name="sampling_exploration" data="0.5" />
     <numeric name="gradient_spline_points" data="5" />
@@ -25,16 +25,19 @@
 
     <!-- direct -->
     <numeric name="direct_sensor_start" data="0"/>
-    <numeric name="direct_number_sensor" data="4"/>
-    <numeric name="direct_force_weight" data="1.0e6 1.0e6 1.0e6 1.0 1.0 1.0 1.0 1.0 1.0"/>
+    <numeric name="direct_number_sensor" data="5"/>
+    <!-- <numeric name="direct_force_weight" data="1.0e6 1.0e6 1.0e6 1.0e-3 1.0e-3 1.0e-3 1.0e-3 1.0e-3 1.0e-3"/> -->
+    <numeric name="direct_force_weight" data="1.0 1.0 10.0 100.0 100.0 100.0 100.0 100.0 100.0"/>
+    <numeric name="direct_sensor_scale" data="1.0e4"/>
   </custom>
 
   <sensor>
     <!-- cost -->
     <user name="Control" dim="9" user="0 0.1 0.0 1.0" />
-    <user name="Height" dim="1" user="0 10.0 0.0 10.0" />
+    <user name="Height" dim="1" user="0 100.0 0.0 1000.0" />
     <user name="Rotation" dim="1" user="0 3.0 0.0 5.0" />
     <user name="Speed" dim="1" user="0 1.0 0.0 1.0" />
+    <user name="Jnt. Vel." dim="9" user="0 1.0e-1 0.0 10.0"/>
 
     <!-- estimator -->
     <jointpos name="rootz" joint="rootz" />

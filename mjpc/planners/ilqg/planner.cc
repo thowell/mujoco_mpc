@@ -158,6 +158,10 @@ void iLQGPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
 
   // iteration
   this->Iteration(horizon, pool);
+
+  printf("ilqg actions:\n");
+  mju_printMat(policy.trajectory.actions.data(), policy.trajectory.horizon - 1,
+               model->nu);
 }
 
 // compute trajectory using nominal policy

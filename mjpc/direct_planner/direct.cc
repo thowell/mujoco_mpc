@@ -189,11 +189,6 @@ void Direct2::Allocate() {
 
   // pinned
   pinned.resize(kMaxTrajectoryHorizon);
-}
-
-// reset memory
-void Direct2::Reset() {
-  regularization_ = settings.regularization_initial;
 
   // -- force weight -- //
   double* wf = GetCustomNumericData(model, "direct_force_weight", model->nv);
@@ -210,6 +205,11 @@ void Direct2::Reset() {
   } else {
     std::fill(weight_sensor.begin(), weight_sensor.end(), 1.0);
   }
+}
+
+// reset memory
+void Direct2::Reset() {
+  regularization_ = settings.regularization_initial;
 
   // TODO(taylor): parse
   std::fill(norm_type_sensor.begin(), norm_type_sensor.end(), kQuadratic);
@@ -430,7 +430,7 @@ double Direct2::CostSensor(double* gradient, double* hessian) {
       double* rti = rt + shift_sensor;
 
       // weight
-      double weight = time_weight * weight_sensor[i] / nsi / qpos_horizon_;
+      double weight = time_weight * weight_sensor[i] / nsi / (qpos_horizon_ - 2);
 
       // parameters
       double* pi = norm_parameters_sensor.data() + kMaxNormParameters * i;
@@ -1019,6 +1019,7 @@ void Direct2::VelocityAccelerationDerivatives() {
   // loop over configurations
   for (int t = 1; t < qpos_horizon_; t++) {
     // unpack
+    double hinv = 1.0 / model->opt.timestep;
     double* q1 = qpos.Get(t - 1);
     double* q2 = qpos.Get(t);
     double* dv2dq1 = jac_qvel1_qpos0.Get(t);
@@ -1041,15 +1042,15 @@ void Direct2::VelocityAccelerationDerivatives() {
 
       // dadq0 = -dv1dq0 / h
       mju_copy(dadq0, dv1dq0, nv * nv);
-      mju_scl(dadq0, dadq0, -1.0 / model->opt.timestep, nv * nv);
+      mju_scl(dadq0, dadq0, -hinv, nv * nv);
 
       // dadq1 = dv2dq1 / h - dv1dq1 / h = (dv2dq1 - dv1dq1) / h
       mju_sub(dadq1, dv2dq1, dv1dq1, nv * nv);
-      mju_scl(dadq1, dadq1, 1.0 / model->opt.timestep, nv * nv);
+      mju_scl(dadq1, dadq1, hinv, nv * nv);
 
       // dadq2 = dv2dq2 / h
       mju_copy(dadq2, dv2dq2, nv * nv);
-      mju_scl(dadq2, dadq2, 1.0 / model->opt.timestep, nv * nv);
+      mju_scl(dadq2, dadq2, hinv, nv * nv);
     }
   }
 
@@ -1213,7 +1214,12 @@ void Direct2::Optimize(int qpos_horizon) {
 
   // set dimensions
   ntotal_ = model->nv * qpos_horizon_;
-  nband_ = 3 * model->nv;
+  ntotal_pin_ = ntotal_;
+  for (bool p: pinned) {
+    if (p) {
+      ntotal_pin_ -= model->nv;
+    }
+  }
 
   // set status
   gradient_norm_ = 0.0;
@@ -1225,7 +1231,8 @@ void Direct2::Optimize(int qpos_horizon) {
 
   // initial cost
   cost_count_ = 0;
-  cost_ = cost_initial_ = Cost(NULL, NULL);
+  cost_ = Cost(NULL, NULL);
+  cost_initial_ = cost_;
 
   // print initial cost
   PrintCost();
@@ -1235,6 +1242,7 @@ void Direct2::Optimize(int qpos_horizon) {
   // reset
   iterations_smoother_ = 0;
   iterations_search_ = 0;
+  regularization_ = settings.regularization_initial;
 
   // iterations
   for (; iterations_smoother_ < settings.max_smoother_iterations;
@@ -1249,7 +1257,7 @@ void Direct2::Optimize(int qpos_horizon) {
     double* gradient = gradient_.data();
 
     // gradient tolerance check
-    gradient_norm_ = mju_norm(gradient, ntotal_) / ntotal_;
+    gradient_norm_ = mju_norm(gradient, ntotal_pin_) / ntotal_pin_;
     if (gradient_norm_ < settings.gradient_tolerance) {
       break;
     }
@@ -1257,30 +1265,28 @@ void Direct2::Optimize(int qpos_horizon) {
     // ----- line / curve search ----- //
 
     // copy qpos
-    mju_copy(qpos_copy_.Data(), qpos.Data(), model->nq * qpos_horizon_);
+    mju_copy(qpos_copy_.Data(), qpos.Data(), ntotal_);
 
     // initialize
     double cost_candidate = cost_;
     int iteration_search = 0;
-    regularization_ = settings.regularization_initial;
-    // regularization_ /= settings.regularization_scaling;
     improvement_ = -1.0;
 
     // -- search direction -- //
 
     // check regularization
+
+    // REMOVE
     if (regularization_ >= kMaxDirectRegularization - 1.0e-6) {
       // set solve status
       solve_status_ = kMaxRegularizationFailure;
 
       // failure
-      mju_copy(qpos.Data(), qpos_copy_.Data(), model->nq * qpos_horizon_);
       return;
     }
 
     // compute initial search direction
     if (!SearchDirection()) {
-      mju_copy(qpos.Data(), qpos_copy_.Data(), model->nq * qpos_horizon_);
       return;  // failure
     }
 
@@ -1290,7 +1296,6 @@ void Direct2::Optimize(int qpos_horizon) {
       solve_status_ = kSmallDirectionFailure;
 
       // failure
-      mju_copy(qpos.Data(), qpos_copy_.Data(), model->nq * qpos_horizon_);
       return;
     }
 
@@ -1302,7 +1307,6 @@ void Direct2::Optimize(int qpos_horizon) {
         solve_status_ = kMaxIterationsFailure;
 
         // failure
-        mju_copy(qpos.Data(), qpos_copy_.Data(), model->nq * qpos_horizon_);
         return;
       }
 
@@ -1313,7 +1317,6 @@ void Direct2::Optimize(int qpos_horizon) {
 
         // recompute search direction
         if (!SearchDirection()) {
-          mju_copy(qpos.Data(), qpos_copy_.Data(), model->nq * qpos_horizon_);
           return;  // failure
         }
 
@@ -1323,7 +1326,6 @@ void Direct2::Optimize(int qpos_horizon) {
           solve_status_ = kSmallDirectionFailure;
 
           // failure
-          mju_copy(qpos.Data(), qpos_copy_.Data(), model->nq * qpos_horizon_);
           return;
         }
       }
@@ -1350,7 +1352,7 @@ void Direct2::Optimize(int qpos_horizon) {
     cost_ = cost_candidate;
 
     // check cost difference
-    cost_difference_ = std::abs(cost_ - cost_previous_);
+    // cost_difference_ = std::abs(cost_ - cost_previous_);
     if (cost_difference_ < settings.cost_tolerance) {
       // set status
       solve_status_ = kCostDifferenceFailure;
@@ -1360,19 +1362,18 @@ void Direct2::Optimize(int qpos_horizon) {
     }
 
     // ----- curve search ----- //
-
     // expected = g' d + 0.5 d' H d
 
     // g' * d
-    expected_ = mju_dot(gradient_.data(), search_direction_.data(), ntotal_);
+    expected_ = mju_dot(gradient_.data(), search_direction_.data(), ntotal_pin_);
 
     // tmp = H * d
     double* tmp = scratch_expected_.data();
     mju_bandMulMatVec(tmp, hessian_band_.data(), search_direction_.data(),
-                      ntotal_, nband_, 0, 1, true);
+                      ntotal_pin_, nband_, 0, 1, true);
 
     // expected += 0.5 d' tmp
-    expected_ += 0.5 * mju_dot(search_direction_.data(), tmp, ntotal_);
+    expected_ += 0.5 * mju_dot(search_direction_.data(), tmp, ntotal_pin_);
 
     // check for no expected decrease
     if (expected_ <= 0.0) {
@@ -1385,8 +1386,6 @@ void Direct2::Optimize(int qpos_horizon) {
 
     // reduction ratio
     reduction_ratio_ = improvement_ / expected_;
-
-    printf("reduction ratio: %f\n", reduction_ratio_);
 
     // update regularization
     if (reduction_ratio_ > 0.75) {
@@ -1428,13 +1427,6 @@ bool Direct2::SearchDirection() {
   auto search_direction_start = std::chrono::steady_clock::now();
 
   // -- band Hessian -- //
-  int ntotal_pin = ntotal_;
-  for (bool p: pinned) {
-    if (p) {
-      ntotal_pin -= model->nv;
-    }
-  }
-
   // unpack
   double* direction = search_direction_.data();
   double* gradient = gradient_.data();
@@ -1447,18 +1439,18 @@ bool Direct2::SearchDirection() {
   double min_diag = 0.0;
   while (min_diag <= 0.0) {
     // failure
-    // if (regularization_ >= kMaxDirectRegularization) {
-    //   printf("min diag = %f\n", min_diag);
-    //   mju_error("cost Hessian factorization failure: MAX REGULARIZATION\n");
-    //   solve_status_ = kMaxRegularizationFailure;
-    //   return false;
-    // }
+    if (regularization_ >= kMaxDirectRegularization) {
+      // printf("min diag = %f\n", min_diag);
+      // mju_error("cost Hessian factorization failure: MAX REGULARIZATION\n");
+      solve_status_ = kMaxRegularizationFailure;
+      return false;
+    }
 
     // copy
-    mju_copy(hessian_band_factor, hessian_band, ntotal_pin * nband_);
+    mju_copy(hessian_band_factor, hessian_band, ntotal_pin_ * nband_);
 
     // factorize
-    min_diag = mju_cholFactorBand(hessian_band_factor, ntotal_pin, nband_, 0,
+    min_diag = mju_cholFactorBand(hessian_band_factor, ntotal_pin_, nband_, 0,
                                   regularization_, 0.0);
 
     // increase regularization
@@ -1468,16 +1460,16 @@ bool Direct2::SearchDirection() {
   }
 
   // compute search direction
-  mju_cholSolveBand(direction, hessian_band_factor, gradient, ntotal_pin,
+  mju_cholSolveBand(direction, hessian_band_factor, gradient, ntotal_pin_,
                     nband_, 0);
 
   // search direction norm
-  search_direction_norm_ = InfinityNorm(direction, ntotal_pin);
+  search_direction_norm_ = InfinityNorm(direction, ntotal_pin_);
 
   // set regularization
   if (regularization_ > 0.0) {
     // configurations
-    for (int i = 0; i < ntotal_pin; i++) {
+    for (int i = 0; i < ntotal_pin_; i++) {
       hessian_band[i * nband_ + nband_ - 1] += regularization_;
     }
   }

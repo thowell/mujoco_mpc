@@ -55,9 +55,9 @@
   </worldbody>
 
   <actuator>
-    <motor name="root_z" joint="rootz" gear="100"/>
-    <motor name="root_x" joint="rootx" gear="100"/>
-    <motor name="root_y" joint="rooty" gear="100"/>
+    <motor name="root_z" joint="rootz" gear="300"/>
+    <motor name="root_x" joint="rootx" gear="300"/>
+    <motor name="root_y" joint="rooty" gear="300"/>
     <motor name="right_hip" joint="right_hip" gear="100"/>
     <motor name="right_knee" joint="right_knee" gear="50"/>
     <motor name="right_ankle" joint="right_ankle" gear="20"/>
