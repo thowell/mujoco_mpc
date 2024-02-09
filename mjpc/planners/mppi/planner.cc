@@ -154,11 +154,6 @@ void MPPIPlanner::SetState(const State& state) {
 
 // optimize nominal policy using random sampling
 void MPPIPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
-  // check horizon
-  if (horizon != nominal_trajectory.horizon) {
-    NominalTrajectory(horizon, pool);
-  }
-
   // if num_trajectory_ has changed, use it in this new iteration.
   // num_trajectory_ might change while this function runs. Keep it constant
   // for the duration of this function.
@@ -205,17 +200,6 @@ void MPPIPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
   // start timer
   auto policy_update_start = std::chrono::steady_clock::now();
 
-  // reset parameters scratch to zero
-  std::fill(parameters_scratch.begin(), parameters_scratch.end(), 0.0);
-
-  // reset nominal trajectory
-  nominal_trajectory.Reset(horizon);
-
-  // set nominal trajectory times
-  for (int tt = 0; tt <= horizon; tt++) {
-    nominal_trajectory.times[tt] = time + tt * model->opt.timestep;
-  }
-
   // best trajectory
   int idx = trajectory_order[0];
 
@@ -223,6 +207,9 @@ void MPPIPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
   double total_weight = 0.0;
   double lambda = lambda_;  // fixed in this function
   std::fill(weights_.begin(), weights_.end(), 0.0);
+
+  // average return
+  double avg_return = 0.0;
 
   // (1) computing MPPI weights
   for (int i = 0; i < num_trajectory; i++) {
@@ -252,18 +239,8 @@ void MPPIPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
                  candidate_policy[i].parameters.data(), norm_weight,
                  policy.num_parameters);
 
-    // add to nominal trajectory
-    mju_addToScl(nominal_trajectory.actions.data(),
-                 trajectory[i].actions.data(), norm_weight,
-                 model->nu * (horizon - 1));
-    mju_addToScl(nominal_trajectory.trace.data(), trajectory[i].trace.data(),
-                 norm_weight, nominal_trajectory.dim_trace * horizon);
-    mju_addToScl(nominal_trajectory.residual.data(),
-                 trajectory[i].residual.data(), norm_weight,
-                 nominal_trajectory.dim_residual * horizon);
-    mju_addToScl(nominal_trajectory.costs.data(), trajectory[i].costs.data(),
-                 norm_weight, horizon);
-    nominal_trajectory.total_return += trajectory[i].total_return * norm_weight;
+    // add return
+    avg_return += trajectory[i].total_return * norm_weight;
   }
 
   // update
@@ -273,8 +250,7 @@ void MPPIPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
   }
 
   // improvement: compare nominal to elite average
-  improvement = mju_max(
-      nominal_trajectory.total_return - trajectory[idx].total_return, 0.0);
+  improvement = mju_max(avg_return - trajectory[idx].total_return, 0.0);
 
   // stop timer
   policy_update_compute_time = GetDuration(policy_update_start);
@@ -425,7 +401,13 @@ void MPPIPlanner::Rollouts(int num_trajectory, int horizon, ThreadPool& pool) {
       s.trajectory[i].total_return += gamma * c;
     });
   }
-  pool.WaitCount(count_before + num_trajectory);
+
+  // nominal
+  ThreadPool tmp(0);
+  pool.Schedule(
+      [&s = *this, &tmp, horizon]() { s.NominalTrajectory(horizon, tmp); });
+
+  pool.WaitCount(count_before + num_trajectory + 1);
   pool.ResetCount();
 }
 
