@@ -48,13 +48,16 @@ void MPPIPlanner::Initialize(mjModel* model, const Task& task) {
   this->task = &task;
 
   // sampling noise
-  noise_exploration_ = GetNumberOrDefault(0.1, model, "sampling_exploration");
+  noise_exploration_ = GetNumberOrDefault(0.1, model, "mppi_exploration");
 
   // set number of trajectories to rollout
-  num_trajectory_ = GetNumberOrDefault(10, model, "sampling_trajectories");
+  num_trajectory_ = GetNumberOrDefault(10, model, "mppi_trajectories");
 
   // set the temperature of the cost energy distribution
-  lambda_ = GetNumberOrDefault(0.01, model, "lambda");
+  lambda_ = GetNumberOrDefault(0.01, model, "mppi_lambda");
+
+  // set action noise weight
+  gamma_ = GetNumberOrDefault(0.0, model, "mppi_gamma");
 
   if (num_trajectory_ > kMaxTrajectory) {
     mju_error_i("Too many trajectories, %d is the maximum allowed.",
@@ -254,7 +257,7 @@ void MPPIPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
                  trajectory[i].actions.data(), norm_weight,
                  model->nu * (horizon - 1));
     mju_addToScl(nominal_trajectory.trace.data(), trajectory[i].trace.data(),
-                 norm_weight, 3 * horizon);
+                 norm_weight, nominal_trajectory.dim_trace * horizon);
     mju_addToScl(nominal_trajectory.residual.data(),
                  trajectory[i].residual.data(), norm_weight,
                  nominal_trajectory.dim_residual * horizon);
@@ -329,6 +332,8 @@ void MPPIPlanner::ResamplePolicy(int horizon) {
 
   LinearRange(resampled_policy.times.data(), time_shift,
               resampled_policy.times[0], num_spline_points);
+
+  resampled_policy.representation = policy.representation;
 }
 
 // add random noise to nominal policy
@@ -371,13 +376,16 @@ void MPPIPlanner::Rollouts(int num_trajectory, int horizon, ThreadPool& pool) {
   // reset noise compute time
   noise_compute_time = 0.0;
 
+  // lock gamma
+  double gamma = gamma_;
+
   // random search
   int count_before = pool.GetCount();
   for (int i = 0; i < num_trajectory; i++) {
     pool.Schedule([&s = *this, &model = this->model, &task = this->task,
                    &state = this->state, &time = this->time,
                    &mocap = this->mocap, &userdata = this->userdata, horizon,
-                   i]() {
+                   gamma, i]() {
       // copy nominal policy and sample noise
       {
         const std::shared_lock<std::shared_mutex> lock(s.mtx_);
@@ -403,6 +411,18 @@ void MPPIPlanner::Rollouts(int num_trajectory, int horizon, ThreadPool& pool) {
       s.trajectory[i].Rollout(
           sample_policy_i, task, model, s.data_[ThreadPool::WorkerId()].get(),
           state.data(), time, mocap.data(), userdata.data(), horizon);
+
+      // MPPI action noise cost
+      double c = 0.0;
+      double* u = s.trajectory[i].actions.data();
+      double* eps = s.noise.data() + i * (model->nu * kMaxTrajectoryHorizon);
+      for (int t = 0; t < horizon - 1; t++) {
+        for (int j = 0; j < model->nu; j++) {
+          c += u[t * model->nu + j] * eps[t * model->nu + j] /
+               s.noise_exploration_;
+        }
+      }
+      s.trajectory[i].total_return += gamma * c;
     });
   }
   pool.WaitCount(count_before + num_trajectory);
@@ -428,11 +448,14 @@ void MPPIPlanner::Traces(mjvScene* scn) {
   double zero3[3] = {0};
   double zero9[9] = {0};
 
+  // lock
+  int num_trajectory = num_trajectory_;
+
   // best
   auto best = this->BestTrajectory();
 
   // sample traces
-  for (int k = 0; k < num_trajectory_; k++) {
+  for (int k = 0; k < num_trajectory; k++) {
     // plot sample
     for (int i = 0; i < best->horizon - 1; i++) {
       if (scn->ngeom + task->num_trace > scn->maxgeom) break;
@@ -441,8 +464,9 @@ void MPPIPlanner::Traces(mjvScene* scn) {
         mjv_initGeom(&scn->geoms[scn->ngeom], mjGEOM_LINE, zero3, zero3, zero9,
                      color);
 
-        // elite index
+        // sorted index
         int idx = trajectory_order[k];
+
         // make geometry
         mjv_makeConnector(
             &scn->geoms[scn->ngeom], mjGEOM_LINE, width,
@@ -469,6 +493,7 @@ void MPPIPlanner::GUI(mjUI& ui) {
       {mjITEM_SLIDERINT, "Spline Pts", 2, &policy.num_spline_points, "0 1"},
       {mjITEM_SLIDERNUM, "Noise Std", 2, &noise_exploration_, "0 1"},
       {mjITEM_SLIDERNUM, "Temperature", 2, &lambda_, "0.01 1.0"},
+      {mjITEM_SLIDERNUM, "Gamma", 2, &gamma_, "0.0 1.0"},
       {mjITEM_END}};
 
   // set number of trajectory slider limits

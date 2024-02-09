@@ -84,6 +84,11 @@ class MPPIPlanner : public Planner {
   void Plots(mjvFigure* fig_planner, mjvFigure* fig_timer, int planner_shift,
              int timer_shift, int planning, int* shift) override;
 
+  // return number of parameters optimized by planner
+  int NumParameters() override {
+    return policy.num_spline_points * policy.model->nu;
+  }
+
   // ----- members ----- //
   mjModel* model;
   const Task* task;
@@ -130,6 +135,7 @@ class MPPIPlanner : public Planner {
   // MPPI variables
   double lambda_;                // the temp of the energy-based model
   std::vector<double> weights_;  // MPPI weights
+  double gamma_;                 // action noise weight
 
   int num_trajectory_;
   mutable std::shared_mutex mtx_;
