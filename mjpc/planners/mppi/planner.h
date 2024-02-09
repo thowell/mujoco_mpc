@@ -57,6 +57,7 @@ class MPPIPlanner : public Planner {
 
   // compute trajectory using nominal policy
   void NominalTrajectory(int horizon, ThreadPool& pool) override;
+  void NominalTrajectory(int horizon);
 
   // set action from policy
   void ActionFromPolicy(double* action, const double* state, double time,
@@ -111,7 +112,7 @@ class MPPIPlanner : public Planner {
 
   // trajectories
   Trajectory trajectory[kMaxTrajectory];
-  Trajectory nominal_trajectory;  // the weighted traj of rollouts
+  Trajectory nominal_trajectory;  // the weighted trajectory of rollouts
 
   // order of indices of rolled out trajectories, ordered by total return
   std::vector<int> trajectory_order;

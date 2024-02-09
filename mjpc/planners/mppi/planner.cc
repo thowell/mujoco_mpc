@@ -201,25 +201,24 @@ void MPPIPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
   auto policy_update_start = std::chrono::steady_clock::now();
 
   // best trajectory
-  int idx = trajectory_order[0];
+  int idx_best = trajectory_order[0];
 
   // ----- MPPI update ----- //
   double total_weight = 0.0;
   double lambda = lambda_;  // fixed in this function
   std::fill(weights_.begin(), weights_.end(), 0.0);
 
-  // average return
-  double avg_return = 0.0;
-
   // (1) computing MPPI weights
   for (int i = 0; i < num_trajectory; i++) {
     // subtract a baseline for variance reduction + numerical stability
-    double diff = trajectory[i].total_return - trajectory[idx].total_return;
+    double diff =
+        trajectory[i].total_return - trajectory[idx_best].total_return;
     weights_[i] = std::exp(-diff / lambda);
     total_weight += weights_[i];
   }
 
   // (2) updating the distribution parameters
+  double avg_return = 0.0;
   std::fill(parameters_scratch.begin(), parameters_scratch.end(), 0.0);
   for (int i = 0; i < num_trajectory; i++) {
     // The vanilla MPPI update looks like
@@ -250,14 +249,14 @@ void MPPIPlanner::OptimizePolicy(int horizon, ThreadPool& pool) {
   }
 
   // improvement: compare nominal to elite average
-  improvement = mju_max(avg_return - trajectory[idx].total_return, 0.0);
+  improvement = mju_max(avg_return - trajectory[idx_best].total_return, 0.0);
 
   // stop timer
   policy_update_compute_time = GetDuration(policy_update_start);
 }
 
 // compute trajectory using nominal policy
-void MPPIPlanner::NominalTrajectory(int horizon, ThreadPool& pool) {
+void MPPIPlanner::NominalTrajectory(int horizon) {
   // set policy
   auto nominal_policy = [&cp = resampled_policy](
                             double* action, const double* state, double time) {
@@ -265,9 +264,12 @@ void MPPIPlanner::NominalTrajectory(int horizon, ThreadPool& pool) {
   };
 
   // rollout nominal policy
-  nominal_trajectory.Rollout(nominal_policy, task, model, data_[0].get(),
-                             state.data(), time, mocap.data(), userdata.data(),
-                             horizon);
+  nominal_trajectory.Rollout(nominal_policy, task, model,
+                             data_[ThreadPool::WorkerId()].get(), state.data(),
+                             time, mocap.data(), userdata.data(), horizon);
+}
+void MPPIPlanner::NominalTrajectory(int horizon, ThreadPool& pool) {
+  NominalTrajectory(horizon);
 }
 
 // set action from policy
@@ -403,10 +405,9 @@ void MPPIPlanner::Rollouts(int num_trajectory, int horizon, ThreadPool& pool) {
   }
 
   // nominal
-  ThreadPool tmp(0);
-  pool.Schedule(
-      [&s = *this, &tmp, horizon]() { s.NominalTrajectory(horizon, tmp); });
+  pool.Schedule([&s = *this, horizon]() { s.NominalTrajectory(horizon); });
 
+  // wait
   pool.WaitCount(count_before + num_trajectory + 1);
   pool.ResetCount();
 }
