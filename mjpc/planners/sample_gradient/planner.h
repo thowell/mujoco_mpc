@@ -116,9 +116,6 @@ class SampleGradientPlanner : public Planner {
   // order of indices of rolled out trajectories, ordered by total return
   std::vector<int> trajectory_order;
 
-  // rollout parameters
-  double timestep_power;
-
   // perturbation scale
   double scale;
 
