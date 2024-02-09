@@ -340,7 +340,6 @@ def diff_sensor(
       dadq0 (npt.ArrayLike): trajectory of acceleration derivatives wrt previous configuration
       dadq1 (npt.ArrayLike): trajectory of acceleration derivatives wrt current configuration
       dadq2 (npt.ArrayLike): trajectory of acceleration derivatives wrt next configuration
-      horizon (int): number of timesteps
 
   Returns:
       npt.ArrayLike: trajectory of sensor derivatives wrt previous, current, and next configurations
@@ -686,7 +685,8 @@ def configuration_update(
   tpin = 0
   for t in range(horizon):
     # skip pinned qpos
-    if pinned[t]: continue
+    if pinned[t]:
+      continue
 
     q = np.array(qpos[:, t])
     dq = update[(tpin * model.nv) : ((tpin + 1) * model.nv)]
@@ -832,7 +832,7 @@ class DirectOptimizer:
     self.weights_force = np.zeros((model.nv, horizon))
 
     # pinned
-    self.pinned = np.zeros(horizon, dtype='bool')
+    self.pinned = np.zeros(horizon, dtype="bool")
 
     # finite-difference velocity and acceleration Jacobians (wrt configurations)
     self._dvdq0 = [np.zeros((model.nv, model.nv)) for t in range(horizon)]
@@ -1066,11 +1066,13 @@ class DirectOptimizer:
       self._gradient[idx_tpin] = force_gradient[idx_t] + sensor_gradient[idx_t]
 
       # total hessian
-      self._hessian[idx_tpin] = force_hessian[idx_t, :] + sensor_hessian[idx_t, :]
+      self._hessian[idx_tpin, :] = (
+          force_hessian[idx_t, :] + sensor_hessian[idx_t, :]
+      )
 
       # increment
       tpin += 1
-    
+
   def _eval_search_direction(self) -> bool:
     """Compute search direction.
 
@@ -1079,17 +1081,28 @@ class DirectOptimizer:
     """
     # factorize cost Hessian
     self._hessian_factor = np.array(self._hessian.ravel())
-    min_diag = mujoco.mju_cholFactorBand(
-        self._hessian_factor,
-        self._ntotal_pin,
-        self._nband,
-        0,
-        self._regularization,
-        0.0,
-    )
+    while self._regularization < self.regularization_max:
+      # attempt factorization
+      min_diag = mujoco.mju_cholFactorBand(
+          self._hessian_factor,
+          self._ntotal_pin,
+          self._nband,
+          0,
+          self._regularization,
+          0.0,
+      )
+
+      # check factorization
+      if min_diag > 0.0: break
+      
+      # increase regularization
+      self._regularization = np.minimum(
+          self.regularization_max,
+          self._regularization * self.regularization_scale,
+      )
 
     # check rank deficient
-    if min_diag < 1.0e-16:
+    if self._regularization >= self.regularization_max:
       self._status_msg = "rank deficient cost Hessian"
       return False
 
@@ -1102,6 +1115,9 @@ class DirectOptimizer:
         self._nband,
         0,
     )
+
+    # update Hessian
+    self._hessian[:, -1] += self._regularization
 
     # check small direction
     if (
