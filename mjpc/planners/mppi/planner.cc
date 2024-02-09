@@ -47,9 +47,6 @@ void MPPIPlanner::Initialize(mjModel* model, const Task& task) {
   // task
   this->task = &task;
 
-  // rollout parameters
-  timestep_power = 1.0;
-
   // sampling noise
   noise_exploration_ = GetNumberOrDefault(0.1, model, "sampling_exploration");
 
@@ -330,11 +327,8 @@ void MPPIPlanner::ResamplePolicy(int horizon) {
   mju_copy(resampled_policy.times.data(), times_scratch.data(),
            num_spline_points);
 
-  // time step power scaling
-  PowerSequence(resampled_policy.times.data(), time_shift,
-                resampled_policy.times[0],
-                resampled_policy.times[num_spline_points - 1], timestep_power,
-                num_spline_points);
+  LinearRange(resampled_policy.times.data(), time_shift,
+              resampled_policy.times[0], num_spline_points);
 }
 
 // add random noise to nominal policy
