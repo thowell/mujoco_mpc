@@ -109,7 +109,9 @@ class Agent(contextlib.AbstractContextManager):
       atexit.register(self.server_process.kill)
 
     self.server_addr = connect_to or f"localhost:{self.port}"
-    credentials = grpc.local_channel_credentials(grpc.LocalConnectionType.LOCAL_TCP)
+    credentials = grpc.local_channel_credentials(
+        grpc.LocalConnectionType.LOCAL_TCP
+    )
     self.channel = grpc.secure_channel(self.server_addr, credentials)
     grpc.channel_ready_future(self.channel).result(timeout=30)
     self.stub = agent_pb2_grpc.AgentStub(self.channel)
@@ -189,7 +191,7 @@ class Agent(contextlib.AbstractContextManager):
       mocap_pos: Optional[npt.ArrayLike] = None,
       mocap_quat: Optional[npt.ArrayLike] = None,
       userdata: Optional[npt.ArrayLike] = None,
-      set_sim_state: Optional[bool] = False
+      set_simulation: Optional[bool] = False,
   ):
     """Set `Agent`'s MuJoCo `data` state.
 
@@ -201,7 +203,7 @@ class Agent(contextlib.AbstractContextManager):
       mocap_pos: `data.mocap_pos`.
       mocap_quat: `data.mocap_quat`.
       userdata: `data.userdata`.
-      set_sim_state: bool, set the simulation state.
+      set_simulation: bool, set the simulation state.
     """
     # if mocap_pos is an ndarray rather than a list, flatten it
     if hasattr(mocap_pos, "flatten"):
@@ -219,7 +221,9 @@ class Agent(contextlib.AbstractContextManager):
         userdata=userdata if userdata is not None else [],
     )
 
-    set_state_request = agent_pb2.SetStateRequest(state=state, set_sim_state=set_sim_state)
+    set_state_request = agent_pb2.SetStateRequest(
+        state=state, set_simulation=set_simulation
+    )
     self.stub.SetState(set_state_request)
 
   def get_state(self) -> agent_pb2.State:
@@ -270,8 +274,9 @@ class Agent(contextlib.AbstractContextManager):
 
   def get_residuals(self) -> dict[str, Sequence[float]]:
     residuals = self.stub.GetResiduals(agent_pb2.GetResidualsRequest())
-    return {name: residual.values
-            for name, residual in residuals.values.items()}
+    return {
+        name: residual.values for name, residual in residuals.values.items()
+    }
 
   def planner_step(self):
     """Send a planner request."""
