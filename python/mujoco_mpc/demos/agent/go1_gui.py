@@ -13,7 +13,19 @@
 # limitations under the License.
 
 import pathlib
+import mujoco
 from mujoco_mpc import agent as agent_lib
+from mujoco_mpc import filter as filter_lib
+
+# model
+model_path = (
+    pathlib.Path(__file__).parent.parent.parent
+    / "../../build/mjpc/tasks/go1/task.xml"
+)
+model = mujoco.MjModel.from_xml_path(str(model_path))
+
+# set up filter
+filter = filter_lib.Filter(model=model, send_as="mjb")
 
 # Run GUI
 with agent_lib.Agent(
