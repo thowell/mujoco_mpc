@@ -24,8 +24,8 @@ with agent_lib.Agent(
 ) as agent:
   while True:
     ## set state (from estimator)
-    # agent.set_state()
+    # agent.set_state(qpos=, qvel=, time=)
 
     ## ## get action (from planner)
-    # agent.get_action()
+    # ctrl = agent.get_action()
     None
