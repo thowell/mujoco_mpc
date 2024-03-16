@@ -105,8 +105,8 @@ We recommend building with `clang` and not `gcc`.
 
 We provide a simple Python API for MJPC. This API is still experimental and expects some more experience from its users. For example, the correct usage requires that the model (defined in Python) and the MJPC task (i.e., the residual and transition functions defined in C++) are compatible with each other. Currently, the Python API does not provide any particular error handling for verifying this compatibility and may be difficult to debug without more in-depth knowledge about mujoco and MJPC.
 
-## Installing via Pip
-First, build MJPC (see above).
+## Installing
+First, build MJPC (see above). The API requires Python >= 3.10.
 
 Next, change to the python directory:
 ```sh
