@@ -120,7 +120,7 @@ python setup.py install
 
 Test that installation was successful:
 ```sh
-python "mujoco_mpc/agent_test.py"
+python mujoco_mpc/agent_test.py
 ```
 
 Additionally, the [Python version of MuJoCo](https://pypi.org/project/mujoco/#history) should match the MJPC version (this information can be found in the terminal while the application is running).
