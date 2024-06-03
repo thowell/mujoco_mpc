@@ -16,8 +16,10 @@
 #define CONTACT_KEYFRAME_H
 
 #include <mujoco/mujoco.h>
-#include <vector>
+
 #include <nlohmann/json.hpp>
+#include <vector>
+
 using json = nlohmann::json;
 
 namespace mjpc::humanoid {
@@ -27,37 +29,35 @@ constexpr int kNotSelectedInteract = -1;
 constexpr int kNumberOfContactPairsInteract = 5;
 
 class ContactPair {
-public:
-    int body1, body2, geom1, geom2;
-    mjtNum local_pos1[3], local_pos2[3];
+ public:
+  int body1, body2, geom1, geom2;
+  mjtNum local_pos1[3], local_pos2[3];
 
-    ContactPair() : body1(kNotSelectedInteract),
-                body2(kNotSelectedInteract),
-                geom1(kNotSelectedInteract),
-                geom2(kNotSelectedInteract),
-                local_pos1{0.},
-                local_pos2{0.} {}
-    
-    void Reset();
+  ContactPair()
+      : body1(kNotSelectedInteract),
+        body2(kNotSelectedInteract),
+        geom1(kNotSelectedInteract),
+        geom2(kNotSelectedInteract),
+        local_pos1{0.},
+        local_pos2{0.} {}
+
+  void Reset();
 };
 
 class ContactKeyframe {
-public:
-    std::string name;
-    ContactPair contact_pairs[kNumberOfContactPairsInteract]; 
+ public:
+  std::string name;
+  ContactPair contact_pairs[kNumberOfContactPairsInteract];
 
-    // the direction on the xy-plane for the torso to point towards   
-    std::vector<mjtNum> facing_target; 
-    
-    // weight of all residual terms (name -> value map)
-    std::map<std::string, mjtNum> weight;
+  // the direction on the xy-plane for the torso to point towards
+  std::vector<mjtNum> facing_target;
 
-    ContactKeyframe() : name(""),
-              contact_pairs{},
-              facing_target(),
-              weight() {}
+  // weight of all residual terms (name -> value map)
+  std::map<std::string, mjtNum> weight;
 
-    void Reset();
+  ContactKeyframe() : name(""), contact_pairs{}, facing_target(), weight() {}
+
+  void Reset();
 };
 
 void to_json(json& j, const ContactPair& contact_pair);
